@@ -52,25 +52,6 @@ export const initialInventory = [
   },
 ]
 
-export const initialExpenses = [
-  {
-    id: 1,
-    title: 'Emergency vet visit for Sheru',
-    requester: 'Anaya',
-    amount: 3200,
-    raised: 2200,
-    reason: 'Wound dressing, antibiotics, and transport',
-  },
-  {
-    id: 2,
-    title: 'Weekend food drive top-up',
-    requester: 'Rohan',
-    amount: 1800,
-    raised: 900,
-    reason: 'Chicken, rice, and rehydration stock',
-  },
-]
-
 export const emptyDogForm = {
   name: '',
   area: '',
@@ -89,7 +70,18 @@ export const emptyInventoryForm = {
 
 export const emptyExpenseForm = {
   title: '',
-  requester: '',
-  amount: '',
+  requester_name: '',
+  requester_email: '',
+  amount_needed: '',
   reason: '',
+  status: 'open',
+}
+
+export const emptyContributionForm = {
+  appeal_id: '',
+  contributor_name: '',
+  contributor_email: '',
+  amount: '',
+  status: 'pledged',
+  notes: '',
 }

@@ -1,16 +1,77 @@
-# React + Vite
+# StreetDogs
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+StreetDogs is a responsive community welfare app for tracking local dog care, food planning, donation appeals, volunteer contributions, and task coordination.
 
-Currently, two official plugins are available:
+## Tech stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- React 19
+- Vite 7
+- Supabase JavaScript client
+- Vercel deployment
 
-## React Compiler
+## Environment variables
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Create a `.env.local` file in the project root with:
 
-## Expanding the ESLint configuration
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Vite is configured to expose `NEXT_PUBLIC_*` values to the browser, so the same variable names should also be used in Vercel.
+
+## Supabase setup
+
+1. Open your Supabase project.
+2. Go to the SQL editor.
+3. Run `supabase/schema.sql`.
+
+This creates the following tables:
+
+- `users`
+- `donation_appeals`
+- `contributions`
+- `tasks`
+- `food_commitments`
+
+It also enables Row Level Security and adds basic read/insert/update policies for `anon` and `authenticated` roles so the frontend can work with the anon key during local development and Vercel previews.
+
+## Local development
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Run the dev server:
+
+```bash
+npm run dev
+```
+
+## Production build
+
+```bash
+npm run build
+npm run preview
+```
+
+## Vercel environment variables
+
+In Vercel project settings, add:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+Use the same values from your local `.env.local`.
+
+## What is already connected
+
+- Donation appeals are loaded from Supabase.
+- Contributions are loaded from Supabase.
+- Tasks are loaded from Supabase.
+- Donation appeal create and status update flows write back to Supabase.
+- Contribution create and status update flows write back to Supabase.
+
+Dogs and local food inventory still use browser storage in this version.

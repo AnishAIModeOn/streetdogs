@@ -11,6 +11,7 @@ export function HeroSection({ dogsCount, totalFoodUnits, fundingProgress }) {
           <a href="#dogs">Dog Profiles</a>
           <a href="#inventory">Food Inventory</a>
           <a href="#expenses">Expenses</a>
+          <a href="#tasks">Tasks</a>
         </div>
       </nav>
 

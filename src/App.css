@@ -159,6 +159,10 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.stats-grid-wide {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .split-layout {
   grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
   align-items: start;
@@ -207,6 +211,10 @@
   gap: 16px;
 }
 
+.task-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .dog-card,
 .expense-card,
 .inventory-row {
@@ -238,6 +246,22 @@
 .stat-card p {
   margin: 0;
   color: #4b5a52;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.compact-row {
+  margin-top: 12px;
+}
+
+.field-label {
+  min-width: 130px;
+  font-size: 0.9rem;
+  color: #5c665f;
 }
 
 .tag {
@@ -297,6 +321,42 @@ textarea {
   background: linear-gradient(90deg, #c96c37, #e7a15f);
 }
 
+.expenses-layout {
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+}
+
+.status-banner {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(31, 77, 66, 0.1);
+  color: #1f4d42;
+}
+
+.empty-state {
+  text-align: left;
+}
+
+.subsection {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(61, 56, 48, 0.12);
+}
+
+.subsection h4 {
+  margin: 0 0 10px;
+}
+
+.sub-card {
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(243, 229, 207, 0.5);
+}
+
+.contribution-list {
+  gap: 12px;
+}
+
 @keyframes rise {
   from {
     opacity: 0;
@@ -313,6 +373,7 @@ textarea {
   .topbar,
   .hero-grid,
   .stats-grid,
+  .stats-grid-wide,
   .split-layout {
     grid-template-columns: 1fr;
   }
@@ -323,6 +384,10 @@ textarea {
 
   .nav-links {
     justify-content: flex-start;
+  }
+
+  .task-grid {
+    grid-template-columns: 1fr;
   }
 }
 
