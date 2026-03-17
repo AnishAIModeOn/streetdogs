@@ -1,19 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PawPrint, Search } from 'lucide-react'
-import { listAreas, listDogs } from '../lib/communityData'
+import { useDogs } from '../hooks/use-dogs'
+import { listAreas } from '../lib/communityData'
 import { navigateTo } from '../lib/navigation'
 import { DogCard } from './DogCard'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Card, CardContent } from './ui/card'
 import { Input } from './ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 
 export function DogsPage() {
-  const [dogs, setDogs] = useState([])
   const [areas, setAreas] = useState({})
-  const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const {
+    data: dogs = [],
+    isLoading,
+    error,
+  } = useDogs()
 
   useEffect(() => {
     let isMounted = true
@@ -21,13 +27,12 @@ export function DogsPage() {
     const loadData = async () => {
       try {
         setErrorMessage('')
-        const [nextDogs, nextAreas] = await Promise.all([listDogs(), listAreas()])
+        const nextAreas = await listAreas()
 
         if (!isMounted) {
           return
         }
 
-        setDogs(nextDogs)
         setAreas(
           nextAreas.reduce((grouped, area) => {
             grouped[area.id] = area
@@ -37,10 +42,6 @@ export function DogsPage() {
       } catch (error) {
         if (isMounted) {
           setErrorMessage(error instanceof Error ? error.message : 'Unable to load dog listing.')
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false)
         }
       }
     }
@@ -55,16 +56,14 @@ export function DogsPage() {
   const filteredDogs = useMemo(() => {
     const normalizedQuery = searchTerm.trim().toLowerCase()
 
-    if (!normalizedQuery) {
-      return dogs
-    }
-
     return dogs.filter((dog) => {
       const area = areas[dog.area_id]
+      const dogStatus = dog.status || dog.dog_status || 'active'
       const haystack = [
         dog.dog_name_or_temp_name,
         dog.location_description,
         dog.health_notes,
+        dog.notes,
         area?.name,
         area?.city,
       ]
@@ -72,9 +71,15 @@ export function DogsPage() {
         .join(' ')
         .toLowerCase()
 
-      return haystack.includes(normalizedQuery)
+      const matchesSearch = normalizedQuery ? haystack.includes(normalizedQuery) : true
+      const matchesStatus = statusFilter === 'all' ? true : dogStatus === statusFilter
+
+      return matchesSearch && matchesStatus
     })
-  }, [areas, dogs, searchTerm])
+  }, [areas, dogs, searchTerm, statusFilter])
+
+  const activeErrorMessage =
+    errorMessage || (error instanceof Error ? error.message : error ? 'Unable to load dog listing.' : '')
 
   return (
     <section className="space-y-6">
@@ -108,6 +113,18 @@ export function DogsPage() {
                 onChange={(event) => setSearchTerm(event.target.value)}
               />
             </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="adopted">Adopted</SelectItem>
+                <SelectItem value="missing">Missing</SelectItem>
+                <SelectItem value="deceased">Deceased</SelectItem>
+              </SelectContent>
+            </Select>
             <Button variant="outline" onClick={() => navigateTo('/dogs/new')}>
               Add a new dog record
             </Button>
@@ -115,9 +132,9 @@ export function DogsPage() {
         </Card>
       </div>
 
-      {errorMessage ? (
+      {activeErrorMessage ? (
         <Card className="rounded-3xl border-red-200 bg-red-50/80">
-          <CardContent className="p-5 text-sm text-red-700">{errorMessage}</CardContent>
+          <CardContent className="p-5 text-sm text-red-700">{activeErrorMessage}</CardContent>
         </Card>
       ) : null}
 

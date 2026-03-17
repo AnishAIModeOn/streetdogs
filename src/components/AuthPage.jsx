@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { emptySignInForm, emptySignUpForm } from '../data/seedData'
-import { signInWithEmail, signUpWithEmail } from '../lib/auth'
+import { useSignIn, useSignUp } from '../hooks/use-auth'
 import { AuthShell } from './AuthShell'
 import { StatusBanner } from './StatusBanner'
 import { Button } from './ui/button'
@@ -12,17 +12,22 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
   const [signUpForm, setSignUpForm] = useState(emptySignUpForm)
   const [signInForm, setSignInForm] = useState(emptySignInForm)
   const [errorMessage, setErrorMessage] = useState(authError)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const signInMutation = useSignIn()
+  const signUpMutation = useSignUp()
+  const isSubmitting = signInMutation.isPending || signUpMutation.isPending
 
   const activeError = errorMessage || authError
+
+  useEffect(() => {
+    setErrorMessage(authError)
+  }, [authError])
 
   const handleSignUpSubmit = async (event) => {
     event.preventDefault()
 
     try {
-      setIsSubmitting(true)
       setErrorMessage('')
-      await signUpWithEmail({
+      await signUpMutation.mutateAsync({
         fullName: signUpForm.full_name.trim(),
         email: signUpForm.email.trim(),
         password: signUpForm.password,
@@ -31,8 +36,6 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
       onNavigate(authState.redirectTo)
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to create your account.')
-    } finally {
-      setIsSubmitting(false)
     }
   }
 
@@ -40,9 +43,8 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
     event.preventDefault()
 
     try {
-      setIsSubmitting(true)
       setErrorMessage('')
-      await signInWithEmail({
+      await signInMutation.mutateAsync({
         email: signInForm.email.trim(),
         password: signInForm.password,
       })
@@ -50,8 +52,6 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
       onNavigate(authState.redirectTo)
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to sign you in.')
-    } finally {
-      setIsSubmitting(false)
     }
   }
 

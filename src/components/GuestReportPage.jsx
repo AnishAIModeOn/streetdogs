@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { HeartHandshake, MapPin, UploadCloud } from 'lucide-react'
 import { toast } from 'sonner'
 import { emptyGuestReportForm } from '../data/seedData'
+import { useAuthState } from '../hooks/use-auth'
+import { useCreateDog, useUploadDogPhoto } from '../hooks/use-dogs'
 import { listActiveAreas } from '../lib/communityData'
-import { ensureSupabase } from '../lib/supabaseClient'
 import { StatusBanner } from './StatusBanner'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
@@ -13,7 +14,7 @@ import { Input } from './ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Textarea } from './ui/textarea'
 
-export function GuestReportPage({ onNavigate }) {
+export function GuestReportPage({ onNavigate, currentUser = null }) {
   const [areas, setAreas] = useState([])
   const [form, setForm] = useState(emptyGuestReportForm)
   const [isLoading, setIsLoading] = useState(true)
@@ -22,6 +23,10 @@ export function GuestReportPage({ onNavigate }) {
   const [successMessage, setSuccessMessage] = useState('')
   const [selectedImageFile, setSelectedImageFile] = useState(null)
   const [selectedImagePreview, setSelectedImagePreview] = useState('')
+  const { data: authState } = useAuthState()
+  const createDogMutation = useCreateDog()
+  const uploadDogPhotoMutation = useUploadDogPhoto()
+  const activeUser = authState?.user ?? currentUser
 
   useEffect(() => {
     let isMounted = true
@@ -72,26 +77,38 @@ export function GuestReportPage({ onNavigate }) {
       setIsSaving(true)
       setErrorMessage('')
       setSuccessMessage('')
-      const client = ensureSupabase()
+      let uploadedPhoto = {
+        photo_path: null,
+        photo_url: form.photo_url.trim() || null,
+      }
+
+      if (selectedImageFile) {
+        if (!activeUser?.id) {
+          throw new Error('Please sign in to upload a photo, or paste a public photo link instead.')
+        }
+
+        uploadedPhoto = await uploadDogPhotoMutation.mutateAsync({
+          file: selectedImageFile,
+          userId: activeUser.id,
+        })
+      }
+
       const payload = {
         dog_name_or_temp_name: form.dog_name_or_temp_name.trim() || null,
         area_id: form.area_id,
-        added_by_guest: true,
-        added_by_user_id: null,
-        guest_contact: form.guest_contact.trim(),
+        added_by_guest: !activeUser?.id,
+        added_by_user_id: activeUser?.id ?? null,
+        guest_contact: form.guest_contact.trim() || null,
         location_description: form.location_description.trim(),
-        photo_url: form.photo_url.trim() || null,
+        photo_path: uploadedPhoto.photo_path,
+        photo_url: uploadedPhoto.photo_url,
         approx_age: form.approx_age.trim() || null,
         health_notes: form.health_notes.trim() || null,
         visibility_type: 'normal_area_visible',
         status: 'active',
       }
 
-      const { error } = await client.from('dogs').insert(payload)
-
-      if (error) {
-        throw error
-      }
+      await createDogMutation.mutateAsync(payload)
 
       setForm(emptyGuestReportForm)
       setSelectedImageFile(null)
@@ -245,8 +262,8 @@ export function GuestReportPage({ onNavigate }) {
                       and a short note about condition or behavior.
                     </div>
                     <FormMessage className="text-muted-foreground">
-                      Image upload is included in the guest flow, but the current submission still
-                      stores the public photo link field below for volunteer follow-up.
+                      Signed-in users can upload directly to StreetDog App storage. Guests can still
+                      submit a report and optionally paste a public image link below.
                     </FormMessage>
                   </CardContent>
                 </Card>
@@ -358,8 +375,12 @@ export function GuestReportPage({ onNavigate }) {
                   Back to Home
                 </Button>
                 <div className="flex flex-col gap-3 sm:flex-row">
-                  <Button type="button" variant="secondary" onClick={() => onNavigate('/signin')}>
-                    Sign In Instead
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => onNavigate(activeUser ? '/dashboard' : '/signin')}
+                  >
+                    {activeUser ? 'Go to Dashboard' : 'Sign In Instead'}
                   </Button>
                   <Button type="submit" disabled={isSaving}>
                     {isSaving ? 'Submitting report...' : 'Submit Report'}
