@@ -1,4 +1,4 @@
-export type ProfileRole = 'volunteer' | 'admin'
+export type ProfileRole = 'end_user' | 'inventory_admin' | 'superadmin' | 'volunteer' | 'admin'
 export type DogStatus = 'active' | 'adopted' | 'missing' | 'deceased'
 export type VaccinationStatus =
   | 'unknown'
@@ -11,8 +11,14 @@ export type SterilizationStatus =
   | 'scheduled'
   | 'sterilized'
 export type HealthStatus = 'observation' | 'needs_food' | 'medical_attention' | 'stable'
-export type ExpenseStatus = 'open' | 'funded' | 'settled' | 'cancelled'
-export type ContributionStatus = 'pending' | 'confirmed' | 'refunded'
+export type ExpenseStatus =
+  | 'open'
+  | 'funded'
+  | 'settled'
+  | 'cancelled'
+  | 'partially_funded'
+  | 'closed'
+export type ContributionStatus = 'pending' | 'confirmed' | 'refunded' | 'failed'
 
 export interface Profile {
   id: string
@@ -24,6 +30,8 @@ export interface Profile {
   city: string | null
   area_name: string | null
   primary_area_id?: string | null
+  upi_id?: string | null
+  status?: 'active' | 'inactive' | null
   created_at: string
   updated_at: string
 }
@@ -64,30 +72,54 @@ export interface Dog {
 export interface Expense {
   id: string
   dog_id: string
-  created_by: string
-  title: string
+  created_by?: string | null
+  raised_by_user_id?: string | null
+  area_id?: string | null
+  title?: string | null
+  expense_type?: string | null
   description: string | null
-  amount: number
-  expense_status: ExpenseStatus
-  incurred_at: string
+  amount?: number | null
+  total_amount?: number | null
+  amount_contributed?: number | null
+  amount_pending?: number | null
+  expense_status?: ExpenseStatus | null
+  status?: ExpenseStatus | null
+  incurred_at?: string | null
+  disclaimer_accepted?: boolean
   receipt_path: string | null
   receipt_url: string | null
   created_at: string
   updated_at: string
+  raised_by_profile?: {
+    full_name?: string | null
+    upi_id?: string | null
+  } | null
+  expense_receipts?: Array<{
+    id: string
+    file_url: string
+    uploaded_at?: string | null
+  }>
 }
 
 export interface Contribution {
   id: string
   expense_id: string
-  contributor_id: string | null
-  contributor_name: string | null
-  contributor_email: string | null
+  contributor_id?: string | null
+  contributor_user_id?: string | null
+  contributor_name?: string | null
+  contributor_email?: string | null
   amount: number
   payment_method: string
-  contribution_status: ContributionStatus
-  note: string | null
+  contribution_status?: ContributionStatus | null
+  payment_status?: ContributionStatus | null
+  note?: string | null
+  notes?: string | null
+  contributed_at?: string | null
   created_at: string
   updated_at: string
+  contributor_profile?: {
+    full_name?: string | null
+  } | null
 }
 
 export interface ExpenseWithContributions extends Expense {

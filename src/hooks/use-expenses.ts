@@ -2,9 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createContribution,
   createExpense,
+  createExpenseReceipt,
   getExpenseById,
   listExpenses,
   uploadExpenseReceipt,
+  type CreateExpenseReceiptInput,
   type CreateContributionInput,
   type CreateExpenseInput,
 } from '../services/expenses.service'
@@ -50,5 +52,16 @@ export function useUploadExpenseReceipt() {
   return useMutation({
     mutationFn: ({ file, userId }: { file: File; userId: string }) =>
       uploadExpenseReceipt(file, userId),
+  })
+}
+
+export function useCreateExpenseReceipt() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (input: CreateExpenseReceiptInput) => createExpenseReceipt(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['expenses'] })
+    },
   })
 }

@@ -19,13 +19,45 @@ export interface CreateContributionInput {
   note?: string | null
   contributor_name?: string | null
   contributor_email?: string | null
+  contributor_user_id?: string | null
+  payment_status?: string
+  notes?: string | null
+}
+
+export interface CreateExpenseReceiptInput {
+  expense_id: string
+  uploaded_by_user_id: string
+  file_url: string
 }
 
 export async function listExpenses(dogId?: string) {
   const supabase = requireSupabase()
   let query = supabase
     .from('expenses')
-    .select('*, contributions(*)')
+    .select(
+      `
+        *,
+        raised_by_profile:profiles!expenses_raised_by_user_id_fkey (
+          full_name,
+          upi_id
+        ),
+        expense_receipts (
+          id,
+          file_url,
+          uploaded_at
+        ),
+        contributions (
+          id,
+          contributor_user_id,
+          amount,
+          payment_status,
+          contributed_at,
+          contributor_profile:profiles!contributions_contributor_user_id_fkey (
+            full_name
+          )
+        )
+      `,
+    )
     .order('created_at', { ascending: false })
 
   if (dogId) {
@@ -45,7 +77,30 @@ export async function getExpenseById(expenseId: string) {
   const supabase = requireSupabase()
   const { data, error } = await supabase
     .from('expenses')
-    .select('*, contributions(*)')
+    .select(
+      `
+        *,
+        raised_by_profile:profiles!expenses_raised_by_user_id_fkey (
+          full_name,
+          upi_id
+        ),
+        expense_receipts (
+          id,
+          file_url,
+          uploaded_at
+        ),
+        contributions (
+          id,
+          contributor_user_id,
+          amount,
+          payment_status,
+          contributed_at,
+          contributor_profile:profiles!contributions_contributor_user_id_fkey (
+            full_name
+          )
+        )
+      `,
+    )
     .eq('id', expenseId)
     .single()
 
@@ -64,6 +119,48 @@ export async function createExpense(input: CreateExpenseInput) {
 
   if (!user) {
     throw new Error('Not authenticated.')
+  }
+
+  const isLegacyExpensePayload =
+    'raised_by_user_id' in input ||
+    'expense_type' in input ||
+    'total_amount' in input ||
+    'amount_pending' in input
+
+  if (isLegacyExpensePayload) {
+    const legacyInput = input as CreateExpenseInput & {
+      raised_by_user_id?: string
+      area_id?: string
+      expense_type?: string
+      total_amount?: number
+      amount_contributed?: number
+      amount_pending?: number
+      disclaimer_accepted?: boolean
+      status?: string
+    }
+
+    const { data, error } = await supabase
+      .from('expenses')
+      .insert({
+        dog_id: legacyInput.dog_id,
+        raised_by_user_id: legacyInput.raised_by_user_id ?? user.id,
+        area_id: legacyInput.area_id ?? null,
+        expense_type: legacyInput.expense_type ?? 'other',
+        description: legacyInput.description ?? null,
+        total_amount: legacyInput.total_amount ?? legacyInput.amount ?? 0,
+        amount_contributed: legacyInput.amount_contributed ?? 0,
+        amount_pending: legacyInput.amount_pending ?? legacyInput.amount ?? 0,
+        disclaimer_accepted: Boolean(legacyInput.disclaimer_accepted),
+        status: legacyInput.status ?? 'open',
+      })
+      .select('*')
+      .single()
+
+    if (error) {
+      throw error
+    }
+
+    return data as Expense
   }
 
   const { data, error } = await supabase
@@ -88,6 +185,31 @@ export async function createContribution(input: CreateContributionInput) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  const isLegacyContributionPayload =
+    'contributor_user_id' in input || 'payment_status' in input || 'notes' in input
+
+  if (isLegacyContributionPayload) {
+    const legacyInput = input as CreateContributionInput
+    const { data, error } = await supabase
+      .from('contributions')
+      .insert({
+        expense_id: legacyInput.expense_id,
+        contributor_user_id: legacyInput.contributor_user_id ?? user?.id ?? null,
+        amount: legacyInput.amount,
+        payment_method: legacyInput.payment_method ?? 'upi',
+        payment_status: legacyInput.payment_status ?? 'confirmed',
+        notes: legacyInput.notes ?? legacyInput.note ?? null,
+      })
+      .select('*')
+      .single()
+
+    if (error) {
+      throw error
+    }
+
+    return data as Contribution
+  }
+
   const { data, error } = await supabase
     .from('contributions')
     .insert({
@@ -102,6 +224,25 @@ export async function createContribution(input: CreateContributionInput) {
   }
 
   return data as Contribution
+}
+
+export async function createExpenseReceipt(input: CreateExpenseReceiptInput) {
+  const supabase = requireSupabase()
+  const { data, error } = await supabase
+    .from('expense_receipts')
+    .insert({
+      expense_id: input.expense_id,
+      uploaded_by_user_id: input.uploaded_by_user_id,
+      file_url: input.file_url,
+    })
+    .select('*')
+    .single()
+
+  if (error) {
+    throw error
+  }
+
+  return data
 }
 
 export async function uploadExpenseReceipt(file: File, userId: string) {

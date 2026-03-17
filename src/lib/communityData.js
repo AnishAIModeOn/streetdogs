@@ -71,6 +71,7 @@ export async function listProfilesForAdmin() {
           id,
           full_name,
           role,
+          status,
           created_at,
           primary_area:areas!profiles_primary_area_id_fkey (
             name,
@@ -80,6 +81,20 @@ export async function listProfilesForAdmin() {
       )
       .order('created_at', { ascending: false }),
   )
+}
+
+export async function countPendingContributions() {
+  const client = ensureSupabase()
+  const { count, error } = await client
+    .from('contributions')
+    .select('id', { count: 'exact', head: true })
+    .eq('payment_status', 'pending')
+
+  if (error) {
+    throw new Error(toErrorMessage(error))
+  }
+
+  return count ?? 0
 }
 
 export async function updateUserRole(userId, role) {

@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react'
+import { UploadCloud } from 'lucide-react'
 import { emptyExpenseForm } from '../data/seedData'
-import { createExpense, createExpenseReceipt, getDog, getProfile, listAreas } from '../lib/communityData'
+import { getDog, getProfile, listAreas } from '../lib/communityData'
+import {
+  useCreateExpense,
+  useCreateExpenseReceipt,
+  useUploadExpenseReceipt,
+} from '../hooks/use-expenses'
 import { navigateTo } from '../lib/navigation'
 import { StatusBanner } from './StatusBanner'
 import { Badge } from './ui/badge'
@@ -26,6 +32,10 @@ export function RaiseExpensePage({ dogId, user }) {
   const [isSaving, setIsSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const [selectedReceiptFile, setSelectedReceiptFile] = useState(null)
+  const createExpenseMutation = useCreateExpense()
+  const createExpenseReceiptMutation = useCreateExpenseReceipt()
+  const uploadExpenseReceiptMutation = useUploadExpenseReceipt()
 
   useEffect(() => {
     let isMounted = true
@@ -109,10 +119,21 @@ export function RaiseExpensePage({ dogId, user }) {
         status: 'open',
       }
 
-      const createdExpense = await createExpense(payload)
+      const createdExpense = await createExpenseMutation.mutateAsync(payload)
 
-      if (form.receipt_url.trim()) {
-        await createExpenseReceipt({
+      if (selectedReceiptFile) {
+        const uploadedReceipt = await uploadExpenseReceiptMutation.mutateAsync({
+          file: selectedReceiptFile,
+          userId: user.id,
+        })
+
+        await createExpenseReceiptMutation.mutateAsync({
+          expense_id: createdExpense.id,
+          uploaded_by_user_id: user.id,
+          file_url: uploadedReceipt.receipt_url,
+        })
+      } else if (form.receipt_url.trim()) {
+        await createExpenseReceiptMutation.mutateAsync({
           expense_id: createdExpense.id,
           uploaded_by_user_id: user.id,
           file_url: form.receipt_url.trim(),
@@ -298,6 +319,32 @@ export function RaiseExpensePage({ dogId, user }) {
                 />
                 <FormDescription>
                   Add a bill, estimate, or proof link if you already have one.
+                </FormDescription>
+              </FormField>
+
+              <FormField>
+                <FormLabel>Receipt upload</FormLabel>
+                <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-[1.5rem] border border-dashed border-border bg-secondary/15 px-5 py-8 text-center transition hover:bg-secondary/25">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <UploadCloud className="h-5 w-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">
+                      {selectedReceiptFile ? selectedReceiptFile.name : 'Choose a receipt file'}
+                    </p>
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      Upload a bill or proof file to StreetDog App storage.
+                    </p>
+                  </div>
+                  <input
+                    className="sr-only"
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={(event) => setSelectedReceiptFile(event.target.files?.[0] ?? null)}
+                  />
+                </label>
+                <FormDescription>
+                  You can upload a receipt file, paste a receipt URL, or do both.
                 </FormDescription>
               </FormField>
             </CardContent>

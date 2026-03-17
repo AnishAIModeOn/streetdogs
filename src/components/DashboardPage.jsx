@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   Activity,
   ArrowRight,
@@ -10,7 +11,9 @@ import {
   Syringe,
   Wallet,
 } from 'lucide-react'
-import { listActiveAreas, listDogSightings, listDogs, listExpensesForDog } from '../lib/communityData'
+import { useDogs } from '../hooks/use-dogs'
+import { useExpenses } from '../hooks/use-expenses'
+import { listActiveAreas, listDogSightings } from '../lib/communityData'
 import { navigateTo } from '../lib/navigation'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
@@ -39,69 +42,32 @@ function DashboardSkeleton() {
 }
 
 export function DashboardPage({ profile }) {
-  const [dogs, setDogs] = useState([])
-  const [areas, setAreas] = useState([])
-  const [sightings, setSightings] = useState([])
-  const [expenseTotal, setExpenseTotal] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
-  const [errorMessage, setErrorMessage] = useState('')
-
-  useEffect(() => {
-    let isMounted = true
-
-    const loadData = async () => {
-      try {
-        setErrorMessage('')
-        const [nextDogs, nextAreas, nextSightings] = await Promise.all([
-          listDogs(),
-          listActiveAreas(),
-          listDogSightings(),
-        ])
-
-        if (!isMounted) {
-          return
-        }
-
-        setDogs(nextDogs)
-        setAreas(nextAreas)
-        setSightings(nextSightings)
-
-        const expenseResults = await Promise.all(
-          nextDogs.slice(0, 12).map(async (dog) => {
-            try {
-              return await listExpensesForDog(dog.id)
-            } catch {
-              return []
-            }
-          }),
-        )
-
-        if (!isMounted) {
-          return
-        }
-
-        const totalRaised = expenseResults
-          .flat()
-          .reduce((sum, expense) => sum + Number(expense.total_amount || 0), 0)
-
-        setExpenseTotal(totalRaised)
-      } catch (error) {
-        if (isMounted) {
-          setErrorMessage(error instanceof Error ? error.message : 'Unable to load the dashboard.')
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    loadData()
-
-    return () => {
-      isMounted = false
-    }
-  }, [])
+  const {
+    data: dogs = [],
+    isLoading: isDogsLoading,
+    error: dogsError,
+  } = useDogs()
+  const {
+    data: expenses = [],
+    isLoading: isExpensesLoading,
+    error: expensesError,
+  } = useExpenses()
+  const {
+    data: areas = [],
+    isLoading: isAreasLoading,
+    error: areasError,
+  } = useQuery({
+    queryKey: ['areas', 'active'],
+    queryFn: listActiveAreas,
+  })
+  const {
+    data: sightings = [],
+    isLoading: isSightingsLoading,
+    error: sightingsError,
+  } = useQuery({
+    queryKey: ['dog-sightings'],
+    queryFn: listDogSightings,
+  })
 
   const areaMap = useMemo(
     () =>
@@ -112,6 +78,14 @@ export function DashboardPage({ profile }) {
     [areas],
   )
 
+  const isLoading = isDogsLoading || isExpensesLoading || isAreasLoading || isSightingsLoading
+  const errorMessage =
+    (dogsError instanceof Error && dogsError.message) ||
+    (expensesError instanceof Error && expensesError.message) ||
+    (areasError instanceof Error && areasError.message) ||
+    (sightingsError instanceof Error && sightingsError.message) ||
+    ''
+
   const vaccinatedDogs = dogs.filter((dog) => dog.vaccination_status === 'vaccinated').length
   const medicalDogs = dogs.filter((dog) =>
     (dog.health_notes || '').toLowerCase().includes('medical'),
@@ -120,6 +94,18 @@ export function DashboardPage({ profile }) {
   const sterilizedDogs = dogs.filter((dog) => dog.sterilization_status === 'sterilized').length
   const recentDogs = dogs.slice(0, 4)
   const recentSightings = sightings.slice(0, 4)
+  const expenseTotal = expenses.reduce(
+    (sum, expense) => sum + Number(expense.total_amount || expense.amount || 0),
+    0,
+  )
+  const pendingContributions = expenses.reduce(
+    (sum, expense) =>
+      sum +
+      (expense.contributions ?? []).filter(
+        (contribution) => contribution.payment_status === 'pending',
+      ).length,
+    0,
+  )
   const canManageInventory =
     profile?.role === 'inventory_admin' || profile?.role === 'superadmin'
 
@@ -389,7 +375,10 @@ export function DashboardPage({ profile }) {
                   {[
                     { label: 'Expenses raised', value: formatCurrency(expenseTotal) },
                     { label: 'Recent sightings', value: sightings.length.toString() },
-                    { label: 'Active areas', value: areas.length.toString() },
+                    {
+                      label: 'Pending contributions',
+                      value: pendingContributions.toString(),
+                    },
                   ].map((item) => (
                     <div key={item.label} className="rounded-[1.5rem] bg-secondary/40 p-5 shadow-soft">
                       <p className="text-sm font-medium text-muted-foreground">{item.label}</p>
