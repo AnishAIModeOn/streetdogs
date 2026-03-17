@@ -259,129 +259,165 @@ export function DogDetailPage({ dogId, isAuthenticated, user }) {
 
   return (
     <section className="space-y-6">
-      <div className="grid gap-4 rounded-[2rem] border border-white/70 bg-hero-wash p-6 shadow-float lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="space-y-4">
-          <Badge className="w-fit" variant="secondary">
-            Dog Detail
-          </Badge>
-          <div className="space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-              {dog.dog_name_or_temp_name || 'Unnamed dog'}
-            </h1>
-            <p className="flex items-center gap-2 text-sm text-muted-foreground">
-              <MapPin className="h-4 w-4 text-accent" />
-              {area ? `${area.city} - ${area.name}` : 'Area unavailable'}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Badge variant="outline">{formatLabel(dog.visibility_type)}</Badge>
-            <Badge variant={dog.vaccination_status === 'vaccinated' ? 'success' : 'outline'}>
-              {formatLabel(dog.vaccination_status)}
-            </Badge>
-            <Badge variant={dog.sterilization_status === 'sterilized' ? 'success' : 'outline'}>
-              {formatLabel(dog.sterilization_status)}
-            </Badge>
-          </div>
-          {isAuthenticated ? (
-            <div className="flex flex-wrap gap-3">
-              <Button onClick={() => navigateTo(`/dogs/${dog.id}/raise-expense`)}>
-                Raise Expense
-              </Button>
-            </div>
-          ) : null}
-        </div>
-
-        <Card className="overflow-hidden rounded-[1.75rem] border-white/70 bg-white/90">
-          <div className="relative aspect-[4/3] overflow-hidden bg-secondary/40">
+      <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
+        <Card className="overflow-hidden rounded-[2rem] border-white/70 bg-white/90 shadow-float">
+          <div className="relative aspect-[4/3] overflow-hidden bg-secondary/40 sm:aspect-[5/4]">
             {dog.photo_url ? (
               <img
                 src={dog.photo_url}
                 alt={dog.dog_name_or_temp_name || 'Dog profile'}
-                className="h-full w-full object-cover"
+                className="h-full w-full object-cover transition-transform duration-700 hover:scale-[1.02]"
               />
             ) : (
               <div className="flex h-full items-center justify-center bg-hero-wash text-primary">
                 <PawPrint className="h-14 w-14" />
               </div>
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
-            <div className="absolute bottom-4 left-4 right-4 rounded-[1.25rem] border border-white/20 bg-black/20 p-4 backdrop-blur-md">
-              <p className="text-lg font-semibold text-white">
+            <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/15 to-transparent" />
+            <div className="absolute inset-x-4 bottom-4 rounded-[1.5rem] border border-white/25 bg-black/25 p-4 backdrop-blur-md sm:inset-x-6 sm:bottom-6 sm:p-5">
+              <div className="flex flex-wrap gap-2">
+                <Badge className="border-white/20 bg-white/15 text-white hover:bg-white/15" variant="outline">
+                  {formatLabel(dog.visibility_type)}
+                </Badge>
+                <Badge className="border-white/20 bg-white/15 text-white hover:bg-white/15" variant="outline">
+                  {formatLabel(dog.status)}
+                </Badge>
+              </div>
+              <p className="mt-3 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
                 {dog.dog_name_or_temp_name || 'Community dog record'}
               </p>
-              <p className="mt-1 text-sm text-white/80">
+              <p className="mt-2 flex items-center gap-2 text-sm text-white/85">
+                <MapPin className="h-4 w-4 text-white/80" />
+                {area ? `${area.city} - ${area.name}` : 'Area unavailable'}
+              </p>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/80">
                 {dog.location_description || 'Location details pending'}
               </p>
             </div>
           </div>
         </Card>
+
+        <div className="grid gap-4">
+          <Card className="rounded-[2rem] border-white/70 bg-[linear-gradient(150deg,rgba(255,255,255,0.95),rgba(249,244,230,0.95)_52%,rgba(234,245,238,0.95))] shadow-soft">
+            <CardHeader className="space-y-4">
+              <div className="space-y-2">
+                <Badge className="w-fit" variant="secondary">
+                  Dog Detail
+                </Badge>
+                <CardTitle className="text-3xl tracking-tight sm:text-4xl">
+                  {dog.dog_name_or_temp_name || 'Unnamed dog'}
+                </CardTitle>
+                <CardDescription className="text-sm leading-7">
+                  A calm view of this dog&apos;s current care record, support needs, and recent community activity.
+                </CardDescription>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant={dog.vaccination_status === 'vaccinated' ? 'success' : 'outline'}>
+                  {formatLabel(dog.vaccination_status)}
+                </Badge>
+                <Badge variant={dog.sterilization_status === 'sterilized' ? 'success' : 'outline'}>
+                  {formatLabel(dog.sterilization_status)}
+                </Badge>
+                <Badge variant="outline">{formatLabel(dog.visibility_type)}</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-[1.5rem] bg-white/70 p-4 shadow-soft">
+                <p className="text-sm font-medium text-muted-foreground">Health notes</p>
+                <p className="mt-2 text-sm leading-6 text-foreground">
+                  {dog.health_notes || 'No health notes added yet.'}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                {isAuthenticated ? (
+                  <Button size="lg" className="shadow-soft" onClick={() => navigateTo(`/dogs/${dog.id}/raise-expense`)}>
+                    Raise Expense
+                  </Button>
+                ) : null}
+                <Button size="lg" variant="secondary" onClick={() => navigateTo('/dogs')}>
+                  Back to Dogs
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <MetricCard
+              icon={ShieldCheck}
+              label="Vaccination"
+              value={formatLabel(dog.vaccination_status)}
+            />
+            <MetricCard
+              icon={ShieldCheck}
+              label="Sterilization"
+              value={formatLabel(dog.sterilization_status)}
+            />
+            <MetricCard icon={Stethoscope} label="Status" value={formatLabel(dog.status)} />
+            <MetricCard
+              icon={ReceiptText}
+              label="Expenses"
+              value={expenses.length ? `${expenses.length} active records` : 'No expenses yet'}
+            />
+          </div>
+        </div>
       </div>
 
       {errorMessage ? <StatusBanner variant="error">{errorMessage}</StatusBanner> : null}
       {successMessage ? <StatusBanner variant="success">{successMessage}</StatusBanner> : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          icon={ShieldCheck}
-          label="Vaccination"
-          value={formatLabel(dog.vaccination_status)}
-        />
-        <MetricCard
-          icon={ShieldCheck}
-          label="Sterilization"
-          value={formatLabel(dog.sterilization_status)}
-        />
-        <MetricCard icon={Stethoscope} label="Status" value={formatLabel(dog.status)} />
-        <MetricCard
-          icon={ReceiptText}
-          label="Expenses"
-          value={expenses.length ? `${expenses.length} active records` : 'No expenses yet'}
-        />
-      </div>
-
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
+        <TabsList className="h-auto flex-wrap rounded-2xl bg-white/80 p-1 shadow-soft">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="sightings">Sightings</TabsTrigger>
           <TabsTrigger value="expenses">Expenses</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
-          <Card className="rounded-[2rem] border-white/70 bg-white/90">
+          <Card className="rounded-[2rem] border-white/70 bg-white/90 shadow-soft">
             <CardHeader>
               <CardTitle>Dog overview</CardTitle>
-              <CardDescription>One clean summary of the visible dog record.</CardDescription>
+              <CardDescription>
+                Key information grouped into one calm, readable care summary.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <InfoTile label="Approx age" value={dog.approx_age || 'Not added'} />
-              <InfoTile label="Gender" value={formatLabel(dog.gender)} />
-              <InfoTile label="Temperament" value={dog.temperament || 'Not added'} />
-              <InfoTile label="Latitude" value={dog.latitude ?? 'Not added'} />
-              <InfoTile label="Longitude" value={dog.longitude ?? 'Not added'} />
-              <InfoTile label="Visibility" value={formatLabel(dog.visibility_type)} />
-              <InfoTile label="Status" value={formatLabel(dog.status)} />
-              <InfoTile label="Area" value={area ? `${area.city} - ${area.name}` : 'Area unavailable'} />
-              <div className="rounded-2xl bg-secondary/30 p-4 md:col-span-2 xl:col-span-4">
-                <p className="text-sm font-medium text-muted-foreground">Location description</p>
-                <p className="mt-2 text-sm leading-6 text-foreground">
-                  {dog.location_description || 'Not added'}
-                </p>
+            <CardContent className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <InfoTile label="Approx age" value={dog.approx_age || 'Not added'} />
+                <InfoTile label="Gender" value={formatLabel(dog.gender)} />
+                <InfoTile label="Temperament" value={dog.temperament || 'Not added'} />
+                <InfoTile label="Latitude" value={dog.latitude ?? 'Not added'} />
+                <InfoTile label="Longitude" value={dog.longitude ?? 'Not added'} />
+                <InfoTile label="Visibility" value={formatLabel(dog.visibility_type)} />
+                <InfoTile label="Status" value={formatLabel(dog.status)} />
+                <InfoTile
+                  label="Area"
+                  value={area ? `${area.city} - ${area.name}` : 'Area unavailable'}
+                />
               </div>
-              <div className="rounded-2xl bg-secondary/30 p-4 md:col-span-2 xl:col-span-4">
-                <p className="text-sm font-medium text-muted-foreground">Health notes</p>
-                <p className="mt-2 text-sm leading-6 text-foreground">
-                  {dog.health_notes || 'Not added'}
-                </p>
+
+              <div className="grid gap-4">
+                <div className="rounded-[1.75rem] bg-secondary/25 p-5">
+                  <p className="text-sm font-medium text-muted-foreground">Location description</p>
+                  <p className="mt-2 text-sm leading-7 text-foreground">
+                    {dog.location_description || 'Not added'}
+                  </p>
+                </div>
+                <div className="rounded-[1.75rem] bg-secondary/25 p-5">
+                  <p className="text-sm font-medium text-muted-foreground">Health notes</p>
+                  <p className="mt-2 text-sm leading-7 text-foreground">
+                    {dog.health_notes || 'Not added'}
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="sightings">
-          <Card className="rounded-[2rem] border-white/70 bg-white/90">
+          <Card className="rounded-[2rem] border-white/70 bg-white/90 shadow-soft">
             <CardHeader>
               <CardTitle>Sightings</CardTitle>
-              <CardDescription>Recent observations for this dog.</CardDescription>
+              <CardDescription>Recent observations grouped in a calmer timeline view.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3">
               {sightings.length === 0 ? (
@@ -390,11 +426,12 @@ export function DogDetailPage({ dogId, isAuthenticated, user }) {
                 </div>
               ) : (
                 sightings.map((sighting) => (
-                  <div key={sighting.id} className="rounded-[1.5rem] border border-border/70 bg-secondary/25 p-4 shadow-soft">
-                    <p className="text-sm font-semibold text-foreground">
+                  <div key={sighting.id} className="rounded-[1.5rem] border border-border/70 bg-secondary/25 p-5 shadow-soft">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                      <MapPin className="h-4 w-4 text-accent" />
                       {new Date(sighting.sighted_at).toLocaleString()}
                     </p>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    <p className="mt-3 text-sm leading-7 text-muted-foreground">
                       {sighting.notes || 'No notes added.'}
                     </p>
                   </div>
@@ -427,7 +464,7 @@ export function DogDetailPage({ dogId, isAuthenticated, user }) {
                   expense.status === 'closed'
 
                 return (
-                  <Card key={expense.id} className="rounded-[2rem] border-white/70 bg-white/90">
+                  <Card key={expense.id} className="rounded-[2rem] border-white/70 bg-white/90 shadow-soft">
                     <CardHeader className="space-y-4">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div className="space-y-2">
@@ -445,7 +482,7 @@ export function DogDetailPage({ dogId, isAuthenticated, user }) {
                       </p>
                     </CardHeader>
 
-                    <CardContent className="grid gap-4">
+                    <CardContent className="grid gap-5">
                       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                         <InfoTile label="Total Amount" value={`Rs. ${formatMoney(expense.total_amount)}`} />
                         <InfoTile label="Contributed" value={`Rs. ${formatMoney(expense.amount_contributed)}`} />
@@ -469,7 +506,7 @@ export function DogDetailPage({ dogId, isAuthenticated, user }) {
                       ) : null}
 
                       {isAuthenticated ? (
-                        <div className="rounded-[1.5rem] border border-border/70 bg-secondary/20 p-5">
+                        <div className="rounded-[1.75rem] border border-border/70 bg-secondary/20 p-5">
                           <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
                             <div className="space-y-3">
                               <p className="text-lg font-semibold text-foreground">Support this appeal</p>
@@ -660,7 +697,7 @@ export function DogDetailPage({ dogId, isAuthenticated, user }) {
 
 function MetricCard({ icon: Icon, label, value }) {
   return (
-    <Card className="rounded-[1.5rem] border-white/70 bg-white/90">
+    <Card className="rounded-[1.5rem] border-white/70 bg-white/90 shadow-soft">
       <CardContent className="space-y-3 p-5">
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium text-muted-foreground">{label}</p>
@@ -676,7 +713,7 @@ function MetricCard({ icon: Icon, label, value }) {
 
 function InfoTile({ label, value }) {
   return (
-    <div className="rounded-2xl bg-secondary/30 p-4">
+    <div className="rounded-[1.35rem] bg-secondary/30 p-4">
       <p className="text-sm font-medium text-muted-foreground">{label}</p>
       <p className="mt-2 text-sm font-medium text-foreground">{value}</p>
     </div>
