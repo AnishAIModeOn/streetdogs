@@ -2,6 +2,14 @@ import { useEffect, useState } from 'react'
 import { emptyExpenseForm } from '../data/seedData'
 import { createExpense, createExpenseReceipt, getDog, getProfile, listAreas } from '../lib/communityData'
 import { navigateTo } from '../lib/navigation'
+import { StatusBanner } from './StatusBanner'
+import { Badge } from './ui/badge'
+import { Button } from './ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
+import { FormDescription, FormField, FormLabel } from './ui/form'
+import { Input } from './ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
+import { Textarea } from './ui/textarea'
 
 const expenseTypes = ['food', 'medical', 'vaccination', 'rescue', 'other']
 
@@ -125,102 +133,236 @@ export function RaiseExpensePage({ dogId, user }) {
 
   if (isLoading) {
     return (
-      <section className="section stack">
-        <div className="panel empty-state">
-          <h3>Loading dog</h3>
-          <p>Checking that this dog is available for expense creation.</p>
-        </div>
+      <section className="space-y-6">
+        <Card className="rounded-[2rem] border-white/70 bg-white/90 shadow-soft">
+          <CardContent className="space-y-3 p-6">
+            <div className="h-6 w-40 animate-pulse rounded-full bg-secondary/50" />
+            <div className="h-4 w-72 animate-pulse rounded-full bg-secondary/40" />
+          </CardContent>
+        </Card>
       </section>
     )
   }
 
   if (!dog) {
     return (
-      <section className="section stack">
-        <div className="panel empty-state">
-          <h3>Dog not available</h3>
-          <p>This dog could not be found or is outside your access scope.</p>
-        </div>
+      <section className="space-y-6">
+        <Card className="rounded-[2rem] border-dashed border-border bg-white/90 shadow-soft">
+          <CardContent className="space-y-2 p-8 text-center">
+            <h3 className="text-xl font-semibold text-foreground">Dog not available</h3>
+            <p className="text-sm leading-6 text-muted-foreground">
+              This dog could not be found or is outside your access scope.
+            </p>
+            <div className="pt-2">
+              <Button variant="secondary" onClick={() => navigateTo('/dogs')}>
+                Back to Dogs
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </section>
     )
   }
 
   return (
-    <section className="section stack">
-      <div className="section-heading">
-        <p className="eyebrow">Raise Expense</p>
-        <h2>Create an expense for {dog.dog_name_or_temp_name || 'this dog'}</h2>
-        <p className="helper-copy">{area ? `${area.city} - ${area.name}` : 'Area unavailable'}</p>
-      </div>
-
-      {errorMessage ? <p className="status-banner status-error">{errorMessage}</p> : null}
-      {successMessage ? <p className="status-banner">{successMessage}</p> : null}
-
-      {!profile?.upi_id ? (
-        <div className="panel empty-state">
-          <h3>UPI ID required</h3>
-          <p>To raise an expense appeal you must first add your UPI ID.</p>
-          <div className="hero-actions top-gap">
-            <button
-              type="button"
-              className="button button-primary"
-              onClick={() => navigateTo('/profile')}
-            >
-              Add UPI ID
-            </button>
+    <section className="space-y-6">
+      <div className="grid gap-4 rounded-[2rem] border border-white/70 bg-hero-wash p-6 shadow-float lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="space-y-4">
+          <Badge className="w-fit" variant="secondary">
+            Raise Expense
+          </Badge>
+          <div className="space-y-2">
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+              Create an expense for {dog.dog_name_or_temp_name || 'this dog'}
+            </h1>
+            <p className="max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
+              Start a clear, trustworthy expense request so supporters can understand the need and
+              help with confidence.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Button variant="secondary" onClick={() => navigateTo(`/dogs/${dog.id}`)}>
+              Back to Dog
+            </Button>
           </div>
         </div>
+
+        <Card className="overflow-hidden rounded-[1.75rem] border-white/70 bg-white/90">
+          <CardHeader>
+            <CardTitle>Expense context</CardTitle>
+            <CardDescription>
+              Keep requests specific and verifiable so the community can support quickly.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 text-sm leading-6 text-muted-foreground">
+            <div className="rounded-2xl bg-secondary/40 p-4">
+              <span className="font-semibold text-foreground">Dog:</span>{' '}
+              {dog.dog_name_or_temp_name || 'Unnamed dog'}
+            </div>
+            <div className="rounded-2xl bg-secondary/40 p-4">
+              <span className="font-semibold text-foreground">Area:</span>{' '}
+              {area ? `${area.city} - ${area.name}` : 'Area unavailable'}
+            </div>
+            <div className="rounded-2xl bg-secondary/40 p-4">
+              Add a short description and receipt link if available so contributors have context.
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {errorMessage ? <StatusBanner variant="error">{errorMessage}</StatusBanner> : null}
+      {successMessage ? <StatusBanner variant="success">{successMessage}</StatusBanner> : null}
+
+      {!profile?.upi_id ? (
+        <Card className="rounded-[2rem] border-orange-200 bg-orange-50/80 shadow-soft">
+          <CardContent className="space-y-3 p-6">
+            <h3 className="text-xl font-semibold text-foreground">UPI ID required</h3>
+            <p className="text-sm leading-6 text-muted-foreground">
+              To raise an expense appeal you must first add your UPI ID.
+            </p>
+            <div>
+              <Button onClick={() => navigateTo('/profile')}>
+                Add UPI ID
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       ) : null}
 
       {profile?.upi_id ? (
-        <form className="panel stack" onSubmit={handleSubmit}>
-          <select
-            value={form.expense_type}
-            onChange={(event) => setForm((current) => ({ ...current, expense_type: event.target.value }))}
-          >
-            {expenseTypes.map((option) => (
-              <option key={option} value={option}>
-                {formatLabel(option)}
-              </option>
-            ))}
-          </select>
-          <input
-            required
-            type="number"
-            min="1"
-            step="0.01"
-            placeholder="Total amount"
-            value={form.total_amount}
-            onChange={(event) => setForm((current) => ({ ...current, total_amount: event.target.value }))}
-          />
-          <textarea
-            placeholder="Description"
-            value={form.description}
-            onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-          />
-          <input
-            type="url"
-            placeholder="Receipt URL (optional)"
-            value={form.receipt_url}
-            onChange={(event) => setForm((current) => ({ ...current, receipt_url: event.target.value }))}
-          />
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={form.disclaimer_accepted}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, disclaimer_accepted: event.target.checked }))
-              }
-            />
-            <span>I confirm this expense is valid and I accept the disclaimer requirement.</span>
-          </label>
-          <div className="hero-actions">
-            <button type="submit" className="button button-primary" disabled={isSaving}>
-              {isSaving ? 'Raising expense...' : 'Raise Expense'}
-            </button>
-            <button type="button" className="button button-secondary" onClick={() => navigateTo(`/dogs/${dog.id}`)}>
-              Back to Dog
-            </button>
+        <form className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]" onSubmit={handleSubmit}>
+          <Card className="rounded-[2rem] border-white/70 bg-white/90 shadow-soft">
+            <CardHeader>
+              <CardTitle>Expense details</CardTitle>
+              <CardDescription>
+                Keep the form simple and clear so supporters immediately understand what is needed.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-5">
+              <FormField>
+                <FormLabel>Expense type</FormLabel>
+                <Select
+                  value={form.expense_type}
+                  onValueChange={(value) =>
+                    setForm((current) => ({ ...current, expense_type: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select expense type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {expenseTypes.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {formatLabel(option)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormField>
+
+              <FormField>
+                <FormLabel>Total amount</FormLabel>
+                <Input
+                  required
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  placeholder="Total amount"
+                  value={form.total_amount}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, total_amount: event.target.value }))
+                  }
+                />
+              </FormField>
+
+              <FormField>
+                <FormLabel>Description</FormLabel>
+                <Textarea
+                  placeholder="Explain what this expense covers and why it is needed"
+                  value={form.description}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, description: event.target.value }))
+                  }
+                />
+              </FormField>
+
+              <FormField>
+                <FormLabel>Receipt URL</FormLabel>
+                <Input
+                  type="url"
+                  placeholder="Receipt URL (optional)"
+                  value={form.receipt_url}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, receipt_url: event.target.value }))
+                  }
+                />
+                <FormDescription>
+                  Add a bill, estimate, or proof link if you already have one.
+                </FormDescription>
+              </FormField>
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-5">
+            <Card className="rounded-[2rem] border-white/70 bg-white/90 shadow-soft">
+              <CardHeader>
+                <CardTitle>Before you submit</CardTitle>
+                <CardDescription>
+                  A little context helps StreetDog App stay trustworthy and easy to support.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 text-sm leading-6 text-muted-foreground">
+                <div className="rounded-2xl bg-secondary/40 p-4">
+                  Share the real amount needed and keep the description specific.
+                </div>
+                <div className="rounded-2xl bg-secondary/40 p-4">
+                  Your UPI ID will be used by supporters to pay you directly.
+                </div>
+                <div className="rounded-2xl bg-secondary/40 p-4">
+                  Receipt links build confidence and make the appeal easier to verify.
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-[2rem] border-white/70 bg-white/90 shadow-soft">
+              <CardHeader>
+                <CardTitle>Disclaimer</CardTitle>
+                <CardDescription>
+                  Please confirm that this request is valid before creating the expense.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4">
+                <label className="flex items-start gap-3 rounded-2xl border border-border/70 bg-secondary/20 p-4 text-sm text-foreground">
+                  <input
+                    className="mt-1 h-4 w-4 accent-[hsl(var(--primary))]"
+                    type="checkbox"
+                    checked={form.disclaimer_accepted}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        disclaimer_accepted: event.target.checked,
+                      }))
+                    }
+                  />
+                  <span>
+                    I confirm this expense is valid and I accept the disclaimer requirement.
+                  </span>
+                </label>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => navigateTo(`/dogs/${dog.id}`)}
+                  >
+                    Back to Dog
+                  </Button>
+                  <Button type="submit" disabled={isSaving}>
+                    {isSaving ? 'Raising expense...' : 'Raise Expense'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </form>
       ) : null}
