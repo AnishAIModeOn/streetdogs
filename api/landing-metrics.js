@@ -31,9 +31,10 @@ export default async function handler(req, res) {
       metrics: {
         totalDogs: 0,
         vaccinatedDogs: 0,
-        sterilizedDogs: 0,
         expensesRaised: 0,
+        inventoryFulfilled: 0,
       },
+      featuredDogs: [],
     })
   }
 
@@ -41,8 +42,8 @@ export default async function handler(req, res) {
     const [
       totalDogsResult,
       vaccinatedDogsResult,
-      sterilizedDogsResult,
       expensesResult,
+      inventoryItemsResult,
       featuredDogsResult,
       areasResult,
     ] = await Promise.all([
@@ -51,11 +52,8 @@ export default async function handler(req, res) {
         .from('dogs')
         .select('id', { count: 'exact', head: true })
         .eq('vaccination_status', 'vaccinated'),
-      supabase
-        .from('dogs')
-        .select('id', { count: 'exact', head: true })
-        .eq('sterilization_status', 'sterilized'),
       supabase.from('expenses').select('total_amount'),
+      supabase.from('inventory_request_items').select('quantity_required, quantity_committed'),
       supabase
         .from('dogs')
         .select('id, dog_name_or_temp_name, photo_url, location_description, area_id, status, vaccination_status, health_notes')
@@ -67,8 +65,8 @@ export default async function handler(req, res) {
     if (
       totalDogsResult.error ||
       vaccinatedDogsResult.error ||
-      sterilizedDogsResult.error ||
       expensesResult.error ||
+      inventoryItemsResult.error ||
       featuredDogsResult.error ||
       areasResult.error
     ) {
@@ -79,6 +77,11 @@ export default async function handler(req, res) {
       (sum, expense) => sum + Number(expense.total_amount ?? 0),
       0,
     )
+    const inventoryFulfilled = (inventoryItemsResult.data ?? []).filter(
+      (item) =>
+        Number(item.quantity_required ?? 0) > 0 &&
+        Number(item.quantity_committed ?? 0) >= Number(item.quantity_required ?? 0),
+    ).length
     const areaMap = Object.fromEntries((areasResult.data ?? []).map((area) => [area.id, area]))
     const featuredDogs = (featuredDogsResult.data ?? []).map((dog) => ({
       ...dog,
@@ -90,8 +93,8 @@ export default async function handler(req, res) {
       metrics: {
         totalDogs: totalDogsResult.count ?? 0,
         vaccinatedDogs: vaccinatedDogsResult.count ?? 0,
-        sterilizedDogs: sterilizedDogsResult.count ?? 0,
         expensesRaised,
+        inventoryFulfilled,
       },
       featuredDogs,
     })
@@ -101,8 +104,8 @@ export default async function handler(req, res) {
       metrics: {
         totalDogs: 0,
         vaccinatedDogs: 0,
-        sterilizedDogs: 0,
         expensesRaised: 0,
+        inventoryFulfilled: 0,
       },
       featuredDogs: [],
     })

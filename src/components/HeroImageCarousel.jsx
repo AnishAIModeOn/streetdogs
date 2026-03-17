@@ -53,13 +53,20 @@ export function HeroImageCarousel({ slides, intervalMs = 5000, className }) {
         })}
 
         <div className="absolute bottom-5 left-5 right-5 flex items-end justify-between gap-4">
-          <div className="max-w-xs rounded-[1.5rem] border border-white/20 bg-black/20 px-4 py-3 backdrop-blur-md">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/70">
-              StreetDog App
-            </p>
-            <p className="mt-1 text-sm leading-6 text-white/90">
-              A warmer, calmer way to help dogs get seen and supported.
-            </p>
+          <div className="max-w-sm rounded-[1.6rem] border border-white/20 bg-black/20 p-4 backdrop-blur-md shadow-float">
+            <div className="flex flex-wrap gap-2">
+              {getSlideBadges(slides[activeIndex]).map((badge) => (
+                <span
+                  key={badge}
+                  className="rounded-full border border-white/20 bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white"
+                >
+                  {badge}
+                </span>
+              ))}
+            </div>
+            <p className="mt-3 text-2xl font-semibold text-white">{slides[activeIndex].name}</p>
+            <p className="mt-1 text-sm text-white/80">{slides[activeIndex].location}</p>
+            <p className="mt-3 text-sm leading-6 text-white/88">{slides[activeIndex].summary}</p>
           </div>
           <div className="flex items-center gap-2 rounded-full border border-white/20 bg-black/20 px-3 py-2 backdrop-blur-md">
             {slides.map((slide, index) => (
@@ -79,4 +86,8 @@ export function HeroImageCarousel({ slides, intervalMs = 5000, className }) {
       </div>
     </div>
   )
+}
+
+function getSlideBadges(slide) {
+  return Array.isArray(slide?.badges) ? slide.badges : []
 }
