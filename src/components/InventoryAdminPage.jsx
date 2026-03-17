@@ -1,8 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   listInventoryRequestsForReporting,
   updateInventoryRequestStatus,
 } from '../lib/communityData'
+import { StatusBanner } from './StatusBanner'
+import { Badge } from './ui/badge'
+import { Button } from './ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 
 function formatLabel(value) {
   return value ? value.replaceAll('_', ' ') : 'Not added'
@@ -16,6 +20,17 @@ function formatCommitmentStatus(status) {
       return 'Cancelled'
     default:
       return 'Committed'
+  }
+}
+
+function getCommitmentVariant(status) {
+  switch (status) {
+    case 'fulfilled':
+      return 'success'
+    case 'cancelled':
+      return 'danger'
+    default:
+      return 'outline'
   }
 }
 
@@ -98,136 +113,213 @@ export function InventoryAdminPage({ user, profile }) {
     }
   }
 
+  const stats = useMemo(() => {
+    const items = requests.flatMap((request) => request.inventory_request_items ?? [])
+    const commitments = items.flatMap((item) => item.inventory_commitments ?? [])
+
+    return {
+      requests: requests.length,
+      items: items.length,
+      commitments: commitments.length,
+    }
+  }, [requests])
+
   if (!canManageInventory) {
     return (
-      <section className="section stack">
-        <div className="panel empty-state">
-          <h3>Unauthorized</h3>
-          <p>Only inventory admins and superadmins can access inventory reporting.</p>
-        </div>
+      <section className="space-y-6">
+        <Card className="rounded-[2rem] border-dashed border-border bg-white/90">
+          <CardContent className="space-y-2 p-10 text-center">
+            <h3 className="text-xl font-semibold text-foreground">Unauthorized</h3>
+            <p className="text-sm leading-6 text-muted-foreground">
+              Only inventory admins and superadmins can access inventory reporting.
+            </p>
+          </CardContent>
+        </Card>
       </section>
     )
   }
 
   return (
-    <section className="section stack">
-      <div className="section-heading">
-        <p className="eyebrow">Inventory Admin</p>
-        <h2>Inventory reporting dashboard</h2>
-        <p className="helper-copy">
-          Review requests, item balances, and contributor activity across visible areas.
-        </p>
+    <section className="space-y-6">
+      <div className="grid gap-4 rounded-[2rem] border border-white/70 bg-hero-wash p-6 shadow-float lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="space-y-4">
+          <Badge className="w-fit" variant="secondary">
+            Inventory Admin
+          </Badge>
+          <div className="space-y-2">
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+              Inventory reporting dashboard
+            </h1>
+            <p className="max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
+              Review requests, item balances, and commitment activity across the areas visible to
+              your account.
+            </p>
+          </div>
+        </div>
+
+        <Card className="rounded-[1.75rem] border-white/70 bg-white/90">
+          <CardHeader>
+            <CardTitle>Reporting snapshot</CardTitle>
+            <CardDescription>Quick totals for visible inventory activity.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+            <StatTile label="Requests" value={stats.requests} />
+            <StatTile label="Items" value={stats.items} />
+            <StatTile label="Commitments" value={stats.commitments} />
+          </CardContent>
+        </Card>
       </div>
 
-      {errorMessage ? <p className="status-banner status-error">{errorMessage}</p> : null}
-      {successMessage ? <p className="status-banner">{successMessage}</p> : null}
+      {errorMessage ? <StatusBanner variant="error">{errorMessage}</StatusBanner> : null}
+      {successMessage ? <StatusBanner variant="success">{successMessage}</StatusBanner> : null}
 
       {isLoading ? (
-        <div className="panel empty-state">
-          <h3>Loading inventory reporting</h3>
-          <p>Gathering requests, items, and commitments.</p>
+        <div className="grid gap-4">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div
+              key={index}
+              className="h-48 animate-pulse rounded-[2rem] border border-border/70 bg-white/70"
+            />
+          ))}
         </div>
       ) : requests.length === 0 ? (
-        <div className="panel empty-state">
-          <h3>No inventory requests found</h3>
-          <p>There are no visible inventory requests for this reporting view yet.</p>
-        </div>
+        <Card className="rounded-[2rem] border-dashed border-border bg-white/90">
+          <CardContent className="space-y-2 p-10 text-center">
+            <h3 className="text-xl font-semibold text-foreground">No inventory requests found</h3>
+            <p className="text-sm leading-6 text-muted-foreground">
+              There are no visible inventory requests for this reporting view yet.
+            </p>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="stack">
+        <div className="grid gap-4">
           {requests.map((request) => {
-            const canUpdateStatus =
-              isSuperadmin || request.created_by_profile?.id === user?.id
+            const canUpdateStatus = isSuperadmin || request.created_by_profile?.id === user?.id
 
             return (
-              <article key={request.id} className="panel stack">
-                <div className="card-top">
-                  <div>
-                    <h3>{request.title}</h3>
-                    <p>{request.description || 'No description added.'}</p>
+              <Card key={request.id} className="rounded-[2rem] border-white/70 bg-white/90">
+                <CardHeader className="space-y-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-2">
+                      <CardTitle>{request.title}</CardTitle>
+                      <CardDescription>{request.description || 'No description added.'}</CardDescription>
+                    </div>
+                    <Badge variant="outline">{formatLabel(request.status)}</Badge>
                   </div>
-                  <span className="tag">{formatLabel(request.status)}</span>
-                </div>
 
-                <div className="detail-grid compact-grid">
-                  <p>
-                    <strong>Area:</strong>{' '}
-                    {request.area ? `${request.area.city} - ${request.area.name}` : 'Area unavailable'}
-                  </p>
-                  <p>
-                    <strong>Created by:</strong>{' '}
-                    {request.created_by_profile?.full_name || 'Name not available'}
-                  </p>
-                  <p><strong>Created:</strong> {new Date(request.created_at).toLocaleString()}</p>
-                  <p><strong>Status:</strong> {formatLabel(request.status)}</p>
-                </div>
-
-                {canUpdateStatus ? (
-                  <div className="hero-actions">
-                    <button
-                      type="button"
-                      className="button button-secondary"
-                      disabled={isSavingRequestId === request.id}
-                      onClick={() => handleStatusChange(request)}
-                    >
-                      {isSavingRequestId === request.id
-                        ? 'Saving...'
-                        : request.status === 'closed'
-                          ? 'Reopen request'
-                          : 'Mark request as closed'}
-                    </button>
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <InfoTile
+                      label="Area"
+                      value={
+                        request.area ? `${request.area.city} - ${request.area.name}` : 'Area unavailable'
+                      }
+                    />
+                    <InfoTile
+                      label="Created by"
+                      value={request.created_by_profile?.full_name || 'Name not available'}
+                    />
+                    <InfoTile label="Created" value={new Date(request.created_at).toLocaleString()} />
+                    <InfoTile label="Status" value={formatLabel(request.status)} />
                   </div>
-                ) : null}
 
-                <div className="stack">
+                  {canUpdateStatus ? (
+                    <div className="flex flex-wrap gap-3">
+                      <Button
+                        variant="secondary"
+                        disabled={isSavingRequestId === request.id}
+                        onClick={() => handleStatusChange(request)}
+                      >
+                        {isSavingRequestId === request.id
+                          ? 'Saving...'
+                          : request.status === 'closed'
+                            ? 'Reopen request'
+                            : 'Mark request as closed'}
+                      </Button>
+                    </div>
+                  ) : null}
+                </CardHeader>
+
+                <CardContent className="grid gap-4">
                   {request.inventory_request_items?.map((item) => (
-                    <div key={item.id} className="sub-card stack">
-                      <div className="card-top">
-                        <div>
-                          <h4>{item.item_name}</h4>
-                          <p>{formatLabel(item.category)}</p>
+                    <div
+                      key={item.id}
+                      className="rounded-[1.5rem] border border-border/70 bg-secondary/25 p-5 shadow-soft"
+                    >
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="space-y-1">
+                          <p className="text-lg font-semibold text-foreground">{item.item_name}</p>
+                          <p className="text-sm text-muted-foreground">{formatLabel(item.category)}</p>
                         </div>
-                        <span className="tag">
+                        <Badge variant="warning">
                           {item.quantity_remaining} {item.unit} remaining
-                        </span>
+                        </Badge>
                       </div>
 
-                      <div className="detail-grid compact-grid">
-                        <p><strong>Required:</strong> {item.quantity_required} {item.unit}</p>
-                        <p><strong>Committed:</strong> {item.quantity_committed} {item.unit}</p>
-                        <p><strong>Remaining:</strong> {item.quantity_remaining} {item.unit}</p>
-                        <p><strong>Unit:</strong> {item.unit}</p>
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <InfoTile label="Required" value={`${item.quantity_required} ${item.unit}`} />
+                        <InfoTile label="Committed" value={`${item.quantity_committed} ${item.unit}`} />
+                        <InfoTile label="Remaining" value={`${item.quantity_remaining} ${item.unit}`} />
+                        <InfoTile label="Unit" value={item.unit} />
                       </div>
 
-                      <div className="stack">
-                        <p className="panel-title">Commitments</p>
+                      <div className="mt-4 space-y-3">
+                        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                          Commitments
+                        </p>
                         {item.inventory_commitments?.length ? (
                           item.inventory_commitments.map((commitment) => (
-                            <div key={commitment.id} className="sub-card inventory-commitment-card">
-                              <p>
-                                <strong>Committed by:</strong>{' '}
-                                {commitment.committed_by_profile?.full_name || 'Name not available'}
-                              </p>
-                              <p><strong>Quantity:</strong> {commitment.quantity} {item.unit}</p>
-                              <p><strong>Status:</strong> {formatCommitmentStatus(commitment.status)}</p>
-                              <p><strong>Notes:</strong> {commitment.notes || 'No notes added.'}</p>
-                              <p>
-                                <strong>Committed at:</strong>{' '}
-                                {new Date(commitment.created_at).toLocaleString()}
-                              </p>
+                            <div key={commitment.id} className="rounded-2xl bg-white/80 p-4">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-sm font-semibold text-foreground">
+                                  {commitment.committed_by_profile?.full_name || 'Name not available'}
+                                </p>
+                                <Badge variant={getCommitmentVariant(commitment.status)}>
+                                  {formatCommitmentStatus(commitment.status)}
+                                </Badge>
+                              </div>
+                              <div className="mt-2 grid gap-2 text-sm leading-6 text-muted-foreground md:grid-cols-2">
+                                <p>
+                                  Quantity: {commitment.quantity} {item.unit}
+                                </p>
+                                <p>Committed at: {new Date(commitment.created_at).toLocaleString()}</p>
+                                <p className="md:col-span-2">
+                                  Notes: {commitment.notes || 'No notes added.'}
+                                </p>
+                              </div>
                             </div>
                           ))
                         ) : (
-                          <p className="helper-copy">No commitments recorded for this item yet.</p>
+                          <div className="rounded-2xl border border-dashed border-border bg-white/70 p-4 text-sm text-muted-foreground">
+                            No commitments recorded for this item yet.
+                          </div>
                         )}
                       </div>
                     </div>
                   ))}
-                </div>
-              </article>
+                </CardContent>
+              </Card>
             )
           })}
         </div>
       )}
     </section>
+  )
+}
+
+function StatTile({ label, value }) {
+  return (
+    <div className="rounded-2xl bg-secondary/35 p-4 shadow-soft">
+      <p className="text-sm font-medium text-muted-foreground">{label}</p>
+      <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">{value}</p>
+    </div>
+  )
+}
+
+function InfoTile({ label, value }) {
+  return (
+    <div className="rounded-2xl bg-secondary/30 p-4">
+      <p className="text-sm font-medium text-muted-foreground">{label}</p>
+      <p className="mt-2 text-sm font-medium text-foreground">{value}</p>
+    </div>
   )
 }
