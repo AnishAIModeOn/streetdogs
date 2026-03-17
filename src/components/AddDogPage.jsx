@@ -1,7 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
+import { Sparkles, UploadCloud } from 'lucide-react'
 import { emptyDogForm } from '../data/seedData'
 import { createDog, listActiveAreas } from '../lib/communityData'
 import { navigateTo } from '../lib/navigation'
+import { StatusBanner } from './StatusBanner'
+import { Badge } from './ui/badge'
+import { Button } from './ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
+import { FormDescription, FormField, FormLabel } from './ui/form'
+import { Input } from './ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
+import { Textarea } from './ui/textarea'
 
 const genderOptions = ['unknown', 'male', 'female']
 const vaccinationOptions = ['unknown', 'not_vaccinated', 'partially_vaccinated', 'vaccinated']
@@ -248,193 +257,391 @@ export function AddDogPage({ user, profile }) {
   }
 
   return (
-    <section className="section stack">
-      <div className="section-heading">
-        <p className="eyebrow">Add Dog</p>
-        <h2>Create a new dog record</h2>
+    <section className="space-y-6">
+      <div className="grid gap-4 rounded-[2rem] border border-white/70 bg-hero-wash p-6 shadow-float lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="space-y-4">
+          <Badge className="w-fit" variant="secondary">
+            Add Dog
+          </Badge>
+          <div className="space-y-2">
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+              Create a new dog record
+            </h1>
+            <p className="max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
+              Add a dog profile with clear location and care notes so volunteers can track support
+              with confidence.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Button variant="secondary" onClick={() => navigateTo('/dogs')}>
+              Back to Dogs
+            </Button>
+          </div>
+        </div>
+
+        <Card className="overflow-hidden rounded-[1.75rem] border-white/70 bg-white/90">
+          <CardHeader>
+            <CardTitle>Before you save</CardTitle>
+            <CardDescription>
+              One clear photo and a short location description usually create the most useful first
+              record.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 text-sm leading-6 text-muted-foreground">
+            <div className="rounded-2xl bg-secondary/40 p-4">
+              Pick the correct area so the dog is visible to the right local volunteers.
+            </div>
+            <div className="rounded-2xl bg-secondary/40 p-4">
+              AI analysis can help suggest age, gender, temperament, and care notes from the photo.
+            </div>
+            <div className="rounded-2xl bg-secondary/40 p-4">
+              You can review all AI suggestions before saving anything.
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {errorMessage ? <p className="status-banner status-error">{errorMessage}</p> : null}
-      {aiStatusMessage ? <p className="status-banner">{aiStatusMessage}</p> : null}
+      {errorMessage ? <StatusBanner variant="error">{errorMessage}</StatusBanner> : null}
+      {aiStatusMessage ? <StatusBanner variant="success">{aiStatusMessage}</StatusBanner> : null}
 
       {isLoading ? (
-        <div className="panel empty-state">
-          <h3>Loading areas</h3>
-          <p>Preparing your signed-in dog creation form.</p>
+        <div className="grid gap-4">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div
+              key={index}
+              className="h-40 animate-pulse rounded-[2rem] border border-border/70 bg-white/70"
+            />
+          ))}
         </div>
       ) : (
-        <form className="panel stack" onSubmit={handleSubmit}>
-          <div className="stack ai-upload-panel">
-            <div>
-              <h3>Dog photo</h3>
-              <p className="helper-copy">
-                Upload a dog photo to get AI-generated suggestions before saving.
-              </p>
-            </div>
-            <input
-              type="file"
-              accept="image/*"
-              disabled={isAnalyzingImage}
-              onChange={(event) => {
-                const nextFile = event.target.files?.[0] ?? null
-                analysisRequestIdRef.current += 1
-                setSelectedImageFile(nextFile)
-                setAiSuggestions(null)
-                setAiStatusMessage('')
-              }}
-            />
-            {selectedImagePreview ? (
-              <img
-                className="ai-preview-image"
-                src={selectedImagePreview}
-                alt="Selected dog preview"
-              />
+        <form className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]" onSubmit={handleSubmit}>
+          <div className="grid gap-5">
+            <Card className="rounded-[2rem] border-white/70 bg-white/90 shadow-soft">
+              <CardHeader>
+                <CardTitle>Dog photo</CardTitle>
+                <CardDescription>
+                  Upload a dog photo to get AI-generated suggestions before saving.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4">
+                <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-[1.5rem] border border-dashed border-border bg-secondary/15 px-5 py-8 text-center transition hover:bg-secondary/25">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <UploadCloud className="h-5 w-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">
+                      {selectedImageFile ? selectedImageFile.name : 'Choose a dog photo'}
+                    </p>
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      Mobile camera photos work well for AI analysis.
+                    </p>
+                  </div>
+                  <input
+                    className="sr-only"
+                    type="file"
+                    accept="image/*"
+                    disabled={isAnalyzingImage}
+                    onChange={(event) => {
+                      const nextFile = event.target.files?.[0] ?? null
+                      analysisRequestIdRef.current += 1
+                      setSelectedImageFile(nextFile)
+                      setAiSuggestions(null)
+                      setAiStatusMessage('')
+                    }}
+                  />
+                </label>
+
+                {selectedImagePreview ? (
+                  <img
+                    src={selectedImagePreview}
+                    alt="Selected dog preview"
+                    className="h-64 w-full rounded-[1.5rem] border border-border/70 object-cover"
+                  />
+                ) : (
+                  <div className="flex h-64 items-center justify-center rounded-[1.5rem] border border-dashed border-border bg-white/70 text-sm text-muted-foreground">
+                    Photo preview will appear here.
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-3">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={!selectedImageFile || isAnalyzingImage}
+                    onClick={handleAnalyzeImage}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    {isAnalyzingImage ? 'Analyzing dog image...' : 'Analyze with AI'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {aiSuggestions ? (
+              <Card className="rounded-[2rem] border-white/70 bg-white/90 shadow-soft">
+                <CardHeader>
+                  <CardTitle>AI Suggestions</CardTitle>
+                  <CardDescription>
+                    Review the suggestions before saving the dog record.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-3 md:grid-cols-2">
+                  <SuggestionTile
+                    label="Name suggestion"
+                    value={aiSuggestions.dog_name_or_temp_name || 'Not detected'}
+                  />
+                  <SuggestionTile label="Approx age" value={aiSuggestions.approx_age || 'Not detected'} />
+                  <SuggestionTile label="Gender" value={aiSuggestions.gender || 'Not detected'} />
+                  <SuggestionTile label="Dog color" value={aiSuggestions.dog_color || 'Not detected'} />
+                  <SuggestionTile label="Dog size" value={aiSuggestions.dog_size || 'Not detected'} />
+                  <SuggestionTile label="Likely breed" value={aiSuggestions.likely_breed || 'Not detected'} />
+                  <SuggestionTile label="Temperament" value={aiSuggestions.temperament || 'Not detected'} />
+                  <SuggestionTile
+                    label="Distinctive features"
+                    value={aiSuggestions.distinctive_features || 'Not detected'}
+                  />
+                  <div className="rounded-2xl bg-secondary/30 p-4 md:col-span-2">
+                    <p className="text-sm font-medium text-muted-foreground">Health notes suggestion</p>
+                    <p className="mt-2 text-sm leading-6 text-foreground">
+                      {aiSuggestions.health_notes || 'Not detected'}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
             ) : null}
-            <div className="hero-actions">
-              <button
-                type="button"
-                className="button button-secondary"
-                disabled={!selectedImageFile || isAnalyzingImage}
-                onClick={handleAnalyzeImage}
-              >
-                {isAnalyzingImage ? 'Analyzing dog image...' : 'Analyze with AI'}
-              </button>
-            </div>
           </div>
 
-          {aiSuggestions ? (
-            <div className="sub-card stack">
-              <div>
-                <h3>AI Suggestions</h3>
-                <p className="helper-copy">
-                  AI-generated suggestions. Please review before saving.
-                </p>
-              </div>
-              <div className="detail-grid compact-grid">
-                <p><strong>Name suggestion:</strong> {aiSuggestions.dog_name_or_temp_name || 'Not detected'}</p>
-                <p><strong>Approx age:</strong> {aiSuggestions.approx_age || 'Not detected'}</p>
-                <p><strong>Gender:</strong> {aiSuggestions.gender || 'Not detected'}</p>
-                <p><strong>Dog color:</strong> {aiSuggestions.dog_color || 'Not detected'}</p>
-                <p><strong>Dog size:</strong> {aiSuggestions.dog_size || 'Not detected'}</p>
-                <p><strong>Likely breed:</strong> {aiSuggestions.likely_breed || 'Not detected'}</p>
-                <p><strong>Temperament:</strong> {aiSuggestions.temperament || 'Not detected'}</p>
-                <p><strong>Distinctive features:</strong> {aiSuggestions.distinctive_features || 'Not detected'}</p>
-              </div>
-              <p><strong>Health notes suggestion:</strong> {aiSuggestions.health_notes || 'Not detected'}</p>
-            </div>
-          ) : null}
+          <div className="grid gap-5">
+            <Card className="rounded-[2rem] border-white/70 bg-white/90 shadow-soft">
+              <CardHeader>
+                <CardTitle>Dog details</CardTitle>
+                <CardDescription>
+                  Add the core profile details and review them before saving.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-5">
+                <FormField>
+                  <FormLabel>Dog name or temporary name</FormLabel>
+                  <Input
+                    placeholder="Dog name or temporary name"
+                    value={form.dog_name_or_temp_name}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        dog_name_or_temp_name: event.target.value,
+                      }))
+                    }
+                  />
+                </FormField>
 
-          <input
-            placeholder="Dog name or temporary name"
-            value={form.dog_name_or_temp_name}
-            onChange={(event) =>
-              setForm((current) => ({ ...current, dog_name_or_temp_name: event.target.value }))
-            }
-          />
-          <select
-            required
-            value={form.area_id}
-            onChange={(event) => setForm((current) => ({ ...current, area_id: event.target.value }))}
-          >
-            <option value="">Select an area</option>
-            {areas.map((area) => (
-              <option key={area.id} value={area.id}>
-                {area.city} - {area.name}
-              </option>
-            ))}
-          </select>
-          <textarea
-            placeholder="Location description"
-            value={form.location_description}
-            onChange={(event) =>
-              setForm((current) => ({ ...current, location_description: event.target.value }))
-            }
-          />
-          <div className="dual-field">
-            <input
-              type="number"
-              step="any"
-              placeholder="Latitude"
-              value={form.latitude}
-              onChange={(event) => setForm((current) => ({ ...current, latitude: event.target.value }))}
-            />
-            <input
-              type="number"
-              step="any"
-              placeholder="Longitude"
-              value={form.longitude}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, longitude: event.target.value }))
-              }
-            />
+                <FormField>
+                  <FormLabel>Area</FormLabel>
+                  <Select
+                    value={form.area_id}
+                    onValueChange={(value) =>
+                      setForm((current) => ({ ...current, area_id: value }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select an area" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {areas.map((area) => (
+                        <SelectItem key={area.id} value={area.id}>
+                          {area.city} - {area.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormField>
+
+                <FormField>
+                  <FormLabel>Location description</FormLabel>
+                  <Textarea
+                    placeholder="Location description"
+                    value={form.location_description}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        location_description: event.target.value,
+                      }))
+                    }
+                  />
+                </FormField>
+
+                <div className="grid gap-5 md:grid-cols-2">
+                  <FormField>
+                    <FormLabel>Latitude</FormLabel>
+                    <Input
+                      type="number"
+                      step="any"
+                      placeholder="Latitude"
+                      value={form.latitude}
+                      onChange={(event) =>
+                        setForm((current) => ({ ...current, latitude: event.target.value }))
+                      }
+                    />
+                  </FormField>
+                  <FormField>
+                    <FormLabel>Longitude</FormLabel>
+                    <Input
+                      type="number"
+                      step="any"
+                      placeholder="Longitude"
+                      value={form.longitude}
+                      onChange={(event) =>
+                        setForm((current) => ({ ...current, longitude: event.target.value }))
+                      }
+                    />
+                  </FormField>
+                </div>
+
+                <div className="grid gap-5 md:grid-cols-2">
+                  <FormField>
+                    <FormLabel>Gender</FormLabel>
+                    <Select
+                      value={form.gender}
+                      onValueChange={(value) =>
+                        setForm((current) => ({ ...current, gender: value }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select gender" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {genderOptions.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {formatLabel(option)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormField>
+
+                  <FormField>
+                    <FormLabel>Approx age</FormLabel>
+                    <Input
+                      placeholder="Approx age"
+                      value={form.approx_age}
+                      onChange={(event) =>
+                        setForm((current) => ({ ...current, approx_age: event.target.value }))
+                      }
+                    />
+                  </FormField>
+                </div>
+
+                <div className="grid gap-5 md:grid-cols-2">
+                  <FormField>
+                    <FormLabel>Vaccination status</FormLabel>
+                    <Select
+                      value={form.vaccination_status}
+                      onValueChange={(value) =>
+                        setForm((current) => ({ ...current, vaccination_status: value }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Vaccination status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {vaccinationOptions.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {formatLabel(option)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormField>
+
+                  <FormField>
+                    <FormLabel>Sterilization status</FormLabel>
+                    <Select
+                      value={form.sterilization_status}
+                      onValueChange={(value) =>
+                        setForm((current) => ({ ...current, sterilization_status: value }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sterilization status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sterilizationOptions.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {formatLabel(option)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormField>
+                </div>
+
+                <FormField>
+                  <FormLabel>Temperament</FormLabel>
+                  <Input
+                    placeholder="Temperament"
+                    value={form.temperament}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, temperament: event.target.value }))
+                    }
+                  />
+                </FormField>
+
+                <FormField>
+                  <FormLabel>Health notes</FormLabel>
+                  <Textarea
+                    placeholder="Health notes"
+                    value={form.health_notes}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, health_notes: event.target.value }))
+                    }
+                  />
+                </FormField>
+
+                <FormField>
+                  <FormLabel>Visibility</FormLabel>
+                  <Select
+                    value={form.visibility_type}
+                    onValueChange={(value) =>
+                      setForm((current) => ({ ...current, visibility_type: value }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Visibility" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {visibilityOptions.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {formatLabel(option)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    Choose how this record should be visible within the current workflow.
+                  </FormDescription>
+                </FormField>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                  <Button type="button" variant="outline" onClick={() => navigateTo('/dogs')}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={isSaving}>
+                    {isSaving ? 'Saving dog...' : 'Save dog'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-          <div className="dual-field">
-            <select value={form.gender} onChange={(event) => setForm((current) => ({ ...current, gender: event.target.value }))}>
-              {genderOptions.map((option) => (
-                <option key={option} value={option}>
-                  {formatLabel(option)}
-                </option>
-              ))}
-            </select>
-            <input
-              placeholder="Approx age"
-              value={form.approx_age}
-              onChange={(event) => setForm((current) => ({ ...current, approx_age: event.target.value }))}
-            />
-          </div>
-          <div className="dual-field">
-            <select
-              value={form.vaccination_status}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, vaccination_status: event.target.value }))
-              }
-            >
-              {vaccinationOptions.map((option) => (
-                <option key={option} value={option}>
-                  {formatLabel(option)}
-                </option>
-              ))}
-            </select>
-            <select
-              value={form.sterilization_status}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, sterilization_status: event.target.value }))
-              }
-            >
-              {sterilizationOptions.map((option) => (
-                <option key={option} value={option}>
-                  {formatLabel(option)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <input
-            placeholder="Temperament"
-            value={form.temperament}
-            onChange={(event) => setForm((current) => ({ ...current, temperament: event.target.value }))}
-          />
-          <textarea
-            placeholder="Health notes"
-            value={form.health_notes}
-            onChange={(event) => setForm((current) => ({ ...current, health_notes: event.target.value }))}
-          />
-          <select
-            value={form.visibility_type}
-            onChange={(event) =>
-              setForm((current) => ({ ...current, visibility_type: event.target.value }))
-            }
-          >
-            {visibilityOptions.map((option) => (
-              <option key={option} value={option}>
-                {formatLabel(option)}
-              </option>
-            ))}
-          </select>
-          <button type="submit" className="button button-primary" disabled={isSaving}>
-            {isSaving ? 'Saving dog...' : 'Save dog'}
-          </button>
         </form>
       )}
     </section>
+  )
+}
+
+function SuggestionTile({ label, value }) {
+  return (
+    <div className="rounded-2xl bg-secondary/30 p-4">
+      <p className="text-sm font-medium text-muted-foreground">{label}</p>
+      <p className="mt-2 text-sm leading-6 text-foreground">{value}</p>
+    </div>
   )
 }
