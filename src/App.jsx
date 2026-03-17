@@ -1,231 +1,238 @@
 import { useEffect, useState } from 'react'
 import './App.css'
-import { DashboardSection } from './components/DashboardSection'
-import { DogsSection } from './components/DogsSection'
-import { ExpensesSection } from './components/ExpensesSection'
-import { HeroSection } from './components/HeroSection'
-import { InventorySection } from './components/InventorySection'
-import { TasksSection } from './components/TasksSection'
+import { AddDogPage } from './components/AddDogPage'
+import { AdminUsersPage } from './components/AdminUsersPage'
+import { AppLayout } from './components/AppLayout'
+import { AuthPage } from './components/AuthPage'
+import { DashboardPage } from './components/DashboardPage'
+import { DogDetailPage } from './components/DogDetailPage'
+import { DogsPage } from './components/DogsPage'
+import { GuestReportPage } from './components/GuestReportPage'
+import { InventoryAdminPage } from './components/InventoryAdminPage'
+import { InventoryPage } from './components/InventoryPage'
+import { LandingPage } from './components/LandingPage'
+import { LoadingView } from './components/LoadingView'
+import { NewInventoryRequestPage } from './components/NewInventoryRequestPage'
+import { ProfileCompletionPage } from './components/ProfileCompletionPage'
+import { RaiseExpensePage } from './components/RaiseExpensePage'
+import { Toaster } from './components/ui/toaster'
+import { resolveAuthProfileState, signOutUser, subscribeToAuthChanges } from './lib/auth'
 import {
-  createContribution,
-  createDonationAppeal,
-  listContributions,
-  listDonationAppeals,
-  listTasks,
-  updateContribution,
-  updateDonationAppeal,
-} from './lib/communityData'
+  getCurrentPath,
+  getDogIdFromPath,
+  getRaiseExpenseDogIdFromPath,
+  isProtectedPath,
+  isPublicAuthPath,
+  navigateTo,
+} from './lib/navigation'
 import { hasSupabaseEnv } from './lib/supabaseClient'
-import {
-  emptyContributionForm,
-  emptyDogForm,
-  emptyExpenseForm,
-  emptyInventoryForm,
-  initialDogs,
-  initialInventory,
-} from './data/seedData'
-import { usePersistentState } from './hooks/usePersistentState'
 
 function App() {
-  const [dogs, setDogs] = usePersistentState('streetdogs.dogs', initialDogs)
-  const [inventory, setInventory] = usePersistentState('streetdogs.inventory', initialInventory)
-  const [appeals, setAppeals] = useState([])
-  const [contributions, setContributions] = useState([])
-  const [tasks, setTasks] = useState([])
-  const [dogForm, setDogForm] = useState(emptyDogForm)
-  const [inventoryForm, setInventoryForm] = useState(emptyInventoryForm)
-  const [appealForm, setAppealForm] = useState(emptyExpenseForm)
-  const [contributionForm, setContributionForm] = useState(emptyContributionForm)
-  const [isLoadingRemoteData, setIsLoadingRemoteData] = useState(hasSupabaseEnv)
-  const [statusMessage, setStatusMessage] = useState('')
+  const [currentPath, setCurrentPath] = useState(getCurrentPath())
+  const [isBootstrapping, setIsBootstrapping] = useState(true)
+  const [user, setUser] = useState(null)
+  const [profile, setProfile] = useState(null)
+  const [authError, setAuthError] = useState('')
 
-  const totalFoodUnits = inventory.reduce((sum, entry) => sum + Number(entry.quantity), 0)
-  const lowStockCount = inventory.filter((entry) => entry.quantity <= entry.threshold).length
-  const totalRequested = appeals.reduce((sum, entry) => sum + Number(entry.amount_needed), 0)
-  const totalRaised = contributions.reduce((sum, entry) => sum + Number(entry.amount), 0)
-  const fundingProgress = Math.round((totalRaised / totalRequested) * 100) || 0
-  const activeAppealsCount = appeals.filter((entry) => entry.status !== 'closed').length
-  const openTasksCount = tasks.filter((task) => task.status !== 'done').length
-  const contributionsByAppeal = contributions.reduce((grouped, contribution) => {
-    const appealContributions = grouped[contribution.appeal_id] ?? []
-    appealContributions.push(contribution)
-    grouped[contribution.appeal_id] = appealContributions
-    return grouped
-  }, {})
+  useEffect(() => {
+    const handleLocationChange = () => setCurrentPath(getCurrentPath())
+    window.addEventListener('popstate', handleLocationChange)
+    return () => window.removeEventListener('popstate', handleLocationChange)
+  }, [])
 
-  const loadRemoteData = async () => {
+  useEffect(() => {
     if (!hasSupabaseEnv) {
-      setIsLoadingRemoteData(false)
+      setIsBootstrapping(false)
+      return undefined
+    }
+
+    let isMounted = true
+
+    const syncAuthState = async () => {
+      try {
+        setAuthError('')
+        const result = await resolveAuthProfileState()
+
+        if (!isMounted) {
+          return
+        }
+
+        setUser(result.user)
+        setProfile(result.profile)
+      } catch (error) {
+        if (!isMounted) {
+          return
+        }
+
+        setAuthError(error instanceof Error ? error.message : 'Unable to load your session.')
+        setUser(null)
+        setProfile(null)
+      } finally {
+        if (isMounted) {
+          setIsBootstrapping(false)
+        }
+      }
+    }
+
+    syncAuthState()
+
+    const unsubscribe = subscribeToAuthChanges(() => {
+      syncAuthState()
+    })
+
+    return () => {
+      isMounted = false
+      unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isBootstrapping) {
       return
     }
 
-    try {
-      setIsLoadingRemoteData(true)
-      setStatusMessage('')
-      const [appealsData, contributionsData, tasksData] = await Promise.all([
-        listDonationAppeals(),
-        listContributions(),
-        listTasks(),
-      ])
-      setAppeals(appealsData)
-      setContributions(contributionsData)
-      setTasks(tasksData)
-    } catch (error) {
-      setStatusMessage(error.message)
-    } finally {
-      setIsLoadingRemoteData(false)
+    const isAuthenticated = Boolean(user)
+    const needsProfileCompletion = isAuthenticated && !profile?.primary_area_id
+    const onAuthPage = isPublicAuthPath(currentPath)
+    const onProfileCompletionPage = currentPath === '/complete-profile'
+
+    if (!isAuthenticated && (isProtectedPath(currentPath) || onProfileCompletionPage)) {
+      navigateTo('/signin', { replace: true })
+      return
     }
-  }
 
-  useEffect(() => {
-    loadRemoteData()
-  }, [])
-
-  const updateDogForm = (field, value) => {
-    setDogForm((current) => ({ ...current, [field]: value }))
-  }
-
-  const updateInventoryForm = (field, value) => {
-    setInventoryForm((current) => ({ ...current, [field]: value }))
-  }
-
-  const updateAppealForm = (field, value) => {
-    setAppealForm((current) => ({ ...current, [field]: value }))
-  }
-
-  const updateContributionForm = (field, value) => {
-    setContributionForm((current) => ({ ...current, [field]: value }))
-  }
-
-  const handleDogSubmit = (event) => {
-    event.preventDefault()
-    setDogs((current) => [{ id: Date.now(), ...dogForm }, ...current])
-    setDogForm(emptyDogForm)
-  }
-
-  const handleInventorySubmit = (event) => {
-    event.preventDefault()
-    setInventory((current) => [
-      {
-        id: Date.now(),
-        item: inventoryForm.item,
-        quantity: Number(inventoryForm.quantity),
-        unit: inventoryForm.unit,
-        threshold: Number(inventoryForm.threshold),
-        owner: inventoryForm.owner,
-      },
-      ...current,
-    ])
-    setInventoryForm(emptyInventoryForm)
-  }
-
-  const handleAppealSubmit = async (event) => {
-    event.preventDefault()
-
-    try {
-      setStatusMessage('')
-      await createDonationAppeal({
-        ...appealForm,
-        amount_needed: Number(appealForm.amount_needed),
-      })
-      setAppealForm(emptyExpenseForm)
-      await loadRemoteData()
-      setStatusMessage('Donation appeal saved to Supabase.')
-    } catch (error) {
-      setStatusMessage(error.message)
+    if (needsProfileCompletion && !onProfileCompletionPage) {
+      navigateTo('/complete-profile', { replace: true })
+      return
     }
+
+    if (isAuthenticated && !needsProfileCompletion && (onAuthPage || onProfileCompletionPage)) {
+      navigateTo('/dashboard', { replace: true })
+      return
+    }
+
+    if (currentPath === '/sign-in') {
+      navigateTo('/signin', { replace: true })
+      return
+    }
+
+    if (currentPath === '/sign-up') {
+      navigateTo('/signup', { replace: true })
+    }
+  }, [currentPath, isBootstrapping, profile, user])
+
+  const handleSignedIn = async () => {
+    const result = await resolveAuthProfileState()
+    setUser(result.user)
+    setProfile(result.profile)
+    return result
   }
 
-  const handleContributionSubmit = async (event) => {
-    event.preventDefault()
-
-    try {
-      setStatusMessage('')
-      await createContribution({
-        ...contributionForm,
-        amount: Number(contributionForm.amount),
-      })
-      setContributionForm(emptyContributionForm)
-      await loadRemoteData()
-      setStatusMessage('Contribution saved to Supabase.')
-    } catch (error) {
-      setStatusMessage(error.message)
-    }
+  const handleProfileUpdated = (nextProfile) => {
+    setProfile(nextProfile)
+    navigateTo('/dashboard')
   }
 
-  const handleAppealStatusChange = async (appealId, status) => {
-    try {
-      setStatusMessage('')
-      await updateDonationAppeal(appealId, { status })
-      await loadRemoteData()
-      setStatusMessage('Appeal status updated.')
-    } catch (error) {
-      setStatusMessage(error.message)
-    }
+  const handleSignOut = async () => {
+    await signOutUser()
+    setUser(null)
+    setProfile(null)
+    navigateTo('/signin')
   }
 
-  const handleContributionStatusChange = async (contributionId, status) => {
-    try {
-      setStatusMessage('')
-      await updateContribution(contributionId, { status })
-      await loadRemoteData()
-      setStatusMessage('Contribution status updated.')
-    } catch (error) {
-      setStatusMessage(error.message)
+  let content = null
+
+  if (!hasSupabaseEnv) {
+    content = (
+      <LoadingView
+        title="Supabase setup required"
+        message="Add your Supabase URL and anon key to start the Phase 1 authentication flow."
+      />
+    )
+  } else if (isBootstrapping) {
+    content = (
+      <LoadingView title="Checking your session" message="Loading auth and profile details." />
+    )
+  } else if (!user) {
+    if (currentPath === '/') {
+      content = <LandingPage onNavigate={navigateTo} />
+    } else if (currentPath === '/report-dog') {
+      content = <GuestReportPage onNavigate={navigateTo} />
+    } else {
+      content = (
+        <AuthPage
+          currentPath={currentPath}
+          authError={authError}
+          onSignedIn={handleSignedIn}
+          onNavigate={navigateTo}
+        />
+      )
     }
+  } else if (!profile?.primary_area_id) {
+    content = (
+      <ProfileCompletionPage
+        user={user}
+        profile={profile}
+        onComplete={handleProfileUpdated}
+        onSignOut={handleSignOut}
+      />
+    )
+  } else {
+    const dogId = getDogIdFromPath(currentPath)
+    const raiseExpenseDogId = getRaiseExpenseDogIdFromPath(currentPath)
+
+    content = (
+      <AppLayout
+        user={user}
+        profile={profile}
+        currentPath={currentPath}
+        onNavigate={navigateTo}
+        onSignOut={handleSignOut}
+      >
+        {currentPath === '/profile' ? (
+          <ProfileCompletionPage
+            user={user}
+            profile={profile}
+            onComplete={handleProfileUpdated}
+            onSignOut={handleSignOut}
+          />
+        ) : null}
+        {currentPath === '/dogs/new' ? <AddDogPage user={user} profile={profile} /> : null}
+        {currentPath === '/dogs' ? <DogsPage /> : null}
+        {currentPath === '/inventory' ? <InventoryPage user={user} profile={profile} /> : null}
+        {currentPath === '/inventory/admin' ? (
+          <InventoryAdminPage user={user} profile={profile} />
+        ) : null}
+        {currentPath === '/inventory/new' ? (
+          <NewInventoryRequestPage user={user} profile={profile} />
+        ) : null}
+        {currentPath === '/admin/users' ? <AdminUsersPage profile={profile} /> : null}
+        {dogId ? (
+          <DogDetailPage dogId={dogId} isAuthenticated={Boolean(user)} user={user} />
+        ) : null}
+        {raiseExpenseDogId ? <RaiseExpensePage dogId={raiseExpenseDogId} user={user} /> : null}
+        {currentPath === '/dashboard' ? <DashboardPage profile={profile} /> : null}
+        {currentPath !== '/dashboard' &&
+        currentPath !== '/admin/users' &&
+        currentPath !== '/profile' &&
+        currentPath !== '/inventory' &&
+        currentPath !== '/inventory/admin' &&
+        currentPath !== '/inventory/new' &&
+        currentPath !== '/dogs' &&
+        currentPath !== '/dogs/new' &&
+        !dogId &&
+        !raiseExpenseDogId ? (
+          <DashboardPage profile={profile} />
+        ) : null}
+      </AppLayout>
+    )
   }
 
   return (
-    <div className="app-shell">
-      <HeroSection
-        dogsCount={dogs.length}
-        totalFoodUnits={totalFoodUnits}
-        fundingProgress={fundingProgress}
-      />
-
-      <main className="content">
-        <DashboardSection
-          dogsCount={dogs.length}
-          lowStockCount={lowStockCount}
-          totalRequested={totalRequested}
-          totalRaised={totalRaised}
-          activeAppealsCount={activeAppealsCount}
-          openTasksCount={openTasksCount}
-        />
-        <DogsSection
-          dogs={dogs}
-          dogForm={dogForm}
-          onFormChange={updateDogForm}
-          onSubmit={handleDogSubmit}
-        />
-        <InventorySection
-          inventory={inventory}
-          inventoryForm={inventoryForm}
-          onFormChange={updateInventoryForm}
-          onSubmit={handleInventorySubmit}
-        />
-        <ExpensesSection
-          appeals={appeals}
-          appealForm={appealForm}
-          contributionForm={contributionForm}
-          contributionsByAppeal={contributionsByAppeal}
-          statusMessage={statusMessage}
-          onAppealFormChange={updateAppealForm}
-          onContributionFormChange={updateContributionForm}
-          onAppealSubmit={handleAppealSubmit}
-          onContributionSubmit={handleContributionSubmit}
-          onAppealStatusChange={handleAppealStatusChange}
-          onContributionStatusChange={handleContributionStatusChange}
-          isSupabaseReady={hasSupabaseEnv}
-          isLoading={isLoadingRemoteData}
-        />
-        <TasksSection
-          tasks={tasks}
-          isSupabaseReady={hasSupabaseEnv}
-          isLoading={isLoadingRemoteData}
-        />
-      </main>
-    </div>
+    <>
+      {content}
+      <Toaster />
+    </>
   )
 }
 

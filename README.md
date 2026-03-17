@@ -29,9 +29,11 @@ Vite is configured to expose `NEXT_PUBLIC_*` values to the browser, so the same 
 This creates the following tables:
 
 - `users`
+- `dogs`
 - `donation_appeals`
 - `contributions`
 - `tasks`
+- `inventory_items`
 - `food_commitments`
 
 It also enables Row Level Security and adds basic read/insert/update policies for `anon` and `authenticated` roles so the frontend can work with the anon key during local development and Vercel previews.
@@ -68,10 +70,12 @@ Use the same values from your local `.env.local`.
 
 ## What is already connected
 
+- Dog profiles are loaded from Supabase.
+- Dog profile creation writes to Supabase.
+- Inventory items are loaded from Supabase.
+- Inventory item creation writes to Supabase.
 - Donation appeals are loaded from Supabase.
 - Contributions are loaded from Supabase.
 - Tasks are loaded from Supabase.
 - Donation appeal create and status update flows write back to Supabase.
 - Contribution create and status update flows write back to Supabase.
-
-Dogs and local food inventory still use browser storage in this version.

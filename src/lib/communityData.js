@@ -1,96 +1,348 @@
 import { ensureSupabase } from './supabaseClient'
 
+function toErrorMessage(error) {
+  if (!error) {
+    return 'Unknown Supabase error.'
+  }
+
+  const parts = [error.message]
+
+  if (error.code) {
+    parts.push(`Code: ${error.code}`)
+  }
+
+  if (error.details) {
+    parts.push(`Details: ${error.details}`)
+  }
+
+  if (error.hint) {
+    parts.push(`Hint: ${error.hint}`)
+  }
+
+  return parts.filter(Boolean).join(' ')
+}
+
 function unwrap(result) {
   const { data, error } = result
 
   if (error) {
-    throw error
+    throw new Error(toErrorMessage(error))
   }
 
   return data
 }
 
-export async function listUsers() {
-  const client = ensureSupabase()
-  return unwrap(client.from('users').select('*').order('created_at', { ascending: false }))
-}
-
-export async function createUser(payload) {
-  const client = ensureSupabase()
-  return unwrap(client.from('users').insert(payload).select().single())
-}
-
-export async function updateUser(userId, payload) {
-  const client = ensureSupabase()
-  return unwrap(client.from('users').update(payload).eq('id', userId).select().single())
-}
-
-export async function listDonationAppeals() {
+export async function listActiveAreas() {
   const client = ensureSupabase()
   return unwrap(
-    client.from('donation_appeals').select('*').order('created_at', { ascending: false }),
+    await client
+      .from('areas')
+      .select('*')
+      .eq('status', 'active')
+      .order('city', { ascending: true })
+      .order('name', { ascending: true }),
   )
 }
 
-export async function createDonationAppeal(payload) {
-  const client = ensureSupabase()
-  return unwrap(client.from('donation_appeals').insert(payload).select().single())
-}
-
-export async function updateDonationAppeal(appealId, payload) {
+export async function listAreas() {
   const client = ensureSupabase()
   return unwrap(
-    client.from('donation_appeals').update(payload).eq('id', appealId).select().single(),
+    await client.from('areas').select('*').order('city', { ascending: true }).order('name'),
   )
 }
 
-export async function listContributions() {
+export async function getProfile(userId) {
   const client = ensureSupabase()
-  return unwrap(client.from('contributions').select('*').order('created_at', { ascending: false }))
+  return unwrap(await client.from('profiles').select('*').eq('id', userId).maybeSingle())
+}
+
+export async function updateProfile(userId, payload) {
+  const client = ensureSupabase()
+  return unwrap(await client.from('profiles').update(payload).eq('id', userId).select().single())
+}
+
+export async function listProfilesForAdmin() {
+  const client = ensureSupabase()
+  return unwrap(
+    await client
+      .from('profiles')
+      .select(
+        `
+          id,
+          full_name,
+          role,
+          created_at,
+          primary_area:areas!profiles_primary_area_id_fkey (
+            name,
+            city
+          )
+        `,
+      )
+      .order('created_at', { ascending: false }),
+  )
+}
+
+export async function updateUserRole(userId, role) {
+  const client = ensureSupabase()
+  return unwrap(await client.from('profiles').update({ role }).eq('id', userId).select().single())
+}
+
+export async function listInventoryRequestsForArea(areaId) {
+  const client = ensureSupabase()
+  return unwrap(
+    await client
+      .from('inventory_requests')
+      .select(
+        `
+          id,
+          title,
+          description,
+          status,
+          created_at,
+          created_by_profile:profiles!inventory_requests_created_by_user_id_fkey (
+            full_name
+          ),
+          inventory_request_items (
+            id,
+            item_name,
+            category,
+            quantity_required,
+            quantity_committed,
+            quantity_remaining,
+            unit,
+            inventory_commitments (
+              id,
+              committed_by_user_id,
+              quantity,
+              status,
+              notes,
+              created_at
+            )
+          )
+        `,
+      )
+      .eq('area_id', areaId)
+      .eq('status', 'open')
+      .order('created_at', { ascending: false }),
+  )
+}
+
+export async function listInventoryRequestsForReporting({ areaId = null, includeAllAreas = false }) {
+  const client = ensureSupabase()
+  let query = client
+    .from('inventory_requests')
+    .select(
+      `
+        id,
+        title,
+        description,
+        status,
+        created_at,
+        area:areas!inventory_requests_area_id_fkey (
+          id,
+          name,
+          city
+        ),
+        created_by_profile:profiles!inventory_requests_created_by_user_id_fkey (
+          id,
+          full_name
+        ),
+        inventory_request_items (
+          id,
+          item_name,
+          category,
+          quantity_required,
+          quantity_committed,
+          quantity_remaining,
+          unit,
+          inventory_commitments (
+            id,
+            committed_by_user_id,
+            quantity,
+            status,
+            notes,
+            created_at,
+            committed_by_profile:profiles!inventory_commitments_committed_by_user_id_fkey (
+              full_name
+            )
+          )
+        )
+      `,
+    )
+    .order('created_at', { ascending: false })
+
+  if (!includeAllAreas && areaId) {
+    query = query.eq('area_id', areaId)
+  }
+
+  return unwrap(await query)
+}
+
+export async function createInventoryRequest(payload) {
+  const client = ensureSupabase()
+  return unwrap(await client.from('inventory_requests').insert(payload).select().single())
+}
+
+export async function updateInventoryRequestStatus(requestId, status) {
+  const client = ensureSupabase()
+  return unwrap(
+    await client.from('inventory_requests').update({ status }).eq('id', requestId).select().single(),
+  )
+}
+
+export async function createInventoryRequestItems(items) {
+  const client = ensureSupabase()
+  return unwrap(await client.from('inventory_request_items').insert(items).select())
+}
+
+export async function recordInventoryCommitment(itemId, quantity, notes) {
+  const client = ensureSupabase()
+  return unwrap(
+    await client.rpc('record_inventory_commitment', {
+      request_item_row_id: itemId,
+      commitment_quantity: quantity,
+      commitment_notes: notes ?? null,
+    }),
+  )
+}
+
+export async function listDogs() {
+  const client = ensureSupabase()
+  return unwrap(await client.from('dogs').select('*').order('created_at', { ascending: false }))
+}
+
+export async function getDog(dogId) {
+  const client = ensureSupabase()
+  return unwrap(await client.from('dogs').select('*').eq('id', dogId).maybeSingle())
+}
+
+export async function createDog(payload) {
+  const client = ensureSupabase()
+  const safePayload = {
+    dog_name_or_temp_name: payload.dog_name_or_temp_name ?? null,
+    area_id: payload.area_id,
+    added_by_user_id: payload.added_by_user_id ?? null,
+    added_by_guest: Boolean(payload.added_by_guest),
+    guest_contact: payload.guest_contact ?? null,
+    photo_url: payload.photo_url ?? null,
+    location_description: payload.location_description ?? null,
+    latitude: payload.latitude ?? null,
+    longitude: payload.longitude ?? null,
+    gender: payload.gender ?? 'unknown',
+    approx_age: payload.approx_age ?? null,
+    vaccination_status: payload.vaccination_status ?? 'unknown',
+    sterilization_status: payload.sterilization_status ?? 'unknown',
+    health_notes: payload.health_notes ?? null,
+    temperament: payload.temperament ?? null,
+    visibility_type: payload.visibility_type ?? 'normal_area_visible',
+    status: payload.status ?? 'active',
+  }
+
+  return unwrap(await client.from('dogs').insert(safePayload).select().single())
+}
+
+export async function listDogSightings() {
+  const client = ensureSupabase()
+  return unwrap(
+    await client.from('dog_sightings').select('*').order('sighted_at', { ascending: false }),
+  )
+}
+
+export async function listDogSightingsForDog(dogId) {
+  const client = ensureSupabase()
+  return unwrap(
+    await client
+      .from('dog_sightings')
+      .select('*')
+      .eq('dog_id', dogId)
+      .order('sighted_at', { ascending: false }),
+  )
+}
+
+export async function listExpensesForDog(dogId) {
+  const client = ensureSupabase()
+  return unwrap(
+    await client
+    .from('expenses')
+    .select(
+      `
+        *,
+        raised_by_profile:profiles!expenses_raised_by_user_id_fkey (
+          full_name,
+          upi_id
+        ),
+        expense_receipts (
+          id,
+          file_url,
+          uploaded_at
+        ),
+        contributions (
+          id,
+          contributor_user_id,
+          amount,
+          payment_status,
+          contributed_at,
+          contributor_profile:profiles!contributions_contributor_user_id_fkey (
+            full_name
+          )
+        )
+      `,
+    )
+    .eq('dog_id', dogId)
+    .order('created_at', { ascending: false }),
+  )
+}
+
+export async function createExpense(payload) {
+  const client = ensureSupabase()
+  const safePayload = {
+    dog_id: payload.dog_id,
+    raised_by_user_id: payload.raised_by_user_id,
+    area_id: payload.area_id,
+    expense_type: payload.expense_type,
+    description: payload.description ?? null,
+    total_amount: payload.total_amount,
+    amount_contributed: payload.amount_contributed ?? 0,
+    amount_pending: payload.amount_pending,
+    disclaimer_accepted: Boolean(payload.disclaimer_accepted),
+    status: payload.status ?? 'open',
+  }
+
+  return unwrap(await client.from('expenses').insert(safePayload).select().single())
+}
+
+export async function createExpenseReceipt(payload) {
+  const client = ensureSupabase()
+  const safePayload = {
+    expense_id: payload.expense_id,
+    uploaded_by_user_id: payload.uploaded_by_user_id,
+    file_url: payload.file_url,
+  }
+
+  return unwrap(await client.from('expense_receipts').insert(safePayload).select().single())
 }
 
 export async function createContribution(payload) {
   const client = ensureSupabase()
-  return unwrap(client.from('contributions').insert(payload).select().single())
+  const safePayload = {
+    expense_id: payload.expense_id,
+    contributor_user_id: payload.contributor_user_id,
+    amount: payload.amount,
+    payment_method: payload.payment_method ?? 'upi',
+    payment_status: payload.payment_status ?? 'confirmed',
+    notes: payload.notes ?? null,
+  }
+
+  return unwrap(await client.from('contributions').insert(safePayload).select().single())
 }
 
-export async function updateContribution(contributionId, payload) {
+export async function recordContribution(expenseId, contributionAmount, notes) {
   const client = ensureSupabase()
   return unwrap(
-    client.from('contributions').update(payload).eq('id', contributionId).select().single(),
-  )
-}
-
-export async function listTasks() {
-  const client = ensureSupabase()
-  return unwrap(client.from('tasks').select('*').order('created_at', { ascending: false }))
-}
-
-export async function createTask(payload) {
-  const client = ensureSupabase()
-  return unwrap(client.from('tasks').insert(payload).select().single())
-}
-
-export async function updateTask(taskId, payload) {
-  const client = ensureSupabase()
-  return unwrap(client.from('tasks').update(payload).eq('id', taskId).select().single())
-}
-
-export async function listFoodCommitments() {
-  const client = ensureSupabase()
-  return unwrap(
-    client.from('food_commitments').select('*').order('created_at', { ascending: false }),
-  )
-}
-
-export async function createFoodCommitment(payload) {
-  const client = ensureSupabase()
-  return unwrap(client.from('food_commitments').insert(payload).select().single())
-}
-
-export async function updateFoodCommitment(commitmentId, payload) {
-  const client = ensureSupabase()
-  return unwrap(
-    client.from('food_commitments').update(payload).eq('id', commitmentId).select().single(),
+    await client.rpc('record_contribution', {
+      expense_row_id: expenseId,
+      contribution_amount: contributionAmount,
+      contribution_notes: notes ?? null,
+    }),
   )
 }

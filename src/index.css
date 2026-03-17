@@ -1,46 +1,67 @@
-:root {
-  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color: #1e2b26;
-  background:
-    radial-gradient(circle at top, rgba(255, 242, 209, 0.75), transparent 30%),
-    #f6efe3;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@import "tailwindcss";
+
+@theme {
+  --color-background: hsl(38 48% 95%);
+  --color-foreground: hsl(150 20% 18%);
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(150 20% 18%);
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(150 20% 18%);
+  --color-primary: hsl(144 29% 32%);
+  --color-primary-foreground: hsl(48 100% 96%);
+  --color-secondary: hsl(34 57% 88%);
+  --color-secondary-foreground: hsl(28 35% 24%);
+  --color-muted: hsl(42 34% 92%);
+  --color-muted-foreground: hsl(150 10% 38%);
+  --color-accent: hsl(28 78% 60%);
+  --color-accent-foreground: hsl(0 0% 100%);
+  --color-destructive: hsl(0 72% 58%);
+  --color-destructive-foreground: hsl(0 0% 100%);
+  --color-border: hsl(36 24% 84%);
+  --color-input: hsl(36 24% 84%);
+  --color-ring: hsl(144 29% 32%);
+  --shadow-soft: 0 18px 45px rgba(70, 55, 39, 0.1);
+  --shadow-float: 0 28px 60px rgba(70, 55, 39, 0.14);
+  --font-sans: "Trebuchet MS", "Segoe UI", sans-serif;
+  --background-image-hero-wash:
+    radial-gradient(circle at top left, rgba(240, 150, 82, 0.28), transparent 28%),
+    radial-gradient(circle at right 20%, rgba(74, 122, 94, 0.18), transparent 28%),
+    linear-gradient(145deg, rgba(252, 248, 240, 0.98), rgba(244, 235, 221, 0.95));
 }
 
-* {
-  box-sizing: border-box;
-}
+@layer base {
+  * {
+    box-sizing: border-box;
+    border-color: var(--color-border);
+  }
 
-html {
-  scroll-behavior: smooth;
-}
+  html {
+    scroll-behavior: smooth;
+  }
 
-body {
-  margin: 0;
-  min-width: 320px;
-}
+  body {
+    min-width: 320px;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    background-image:
+      radial-gradient(circle at top, rgba(255, 242, 209, 0.6), transparent 30%);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-a {
-  color: inherit;
-  text-decoration: none;
-}
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 
-button,
-input,
-textarea,
-select {
-  font: inherit;
-}
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
 
-button {
-  cursor: pointer;
-}
-
-#root {
-  min-height: 100vh;
+  #root {
+    min-height: 100vh;
+  }
 }

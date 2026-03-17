@@ -1,87 +1,66 @@
-export const initialDogs = [
-  {
-    id: 1,
-    name: 'Ladoo',
-    area: 'Maple Street',
-    age: '3 years',
-    health: 'Vaccinated and energetic',
-    feeding: 'Morning and evening',
-  },
-  {
-    id: 2,
-    name: 'Mitti',
-    area: 'Community Park',
-    age: '5 years',
-    health: 'Needs joint supplements',
-    feeding: 'Soft food at noon',
-  },
-  {
-    id: 3,
-    name: 'Sheru',
-    area: 'Temple Corner',
-    age: '2 years',
-    health: 'Recovering after treatment',
-    feeding: 'Protein mix at night',
-  },
-]
-
-export const initialInventory = [
-  {
-    id: 1,
-    item: 'Dry kibble bags',
-    quantity: 6,
-    unit: 'bags',
-    threshold: 8,
-    owner: 'Inventory admin',
-  },
-  {
-    id: 2,
-    item: 'Rice sacks',
-    quantity: 3,
-    unit: 'sacks',
-    threshold: 4,
-    owner: 'Inventory admin',
-  },
-  {
-    id: 3,
-    item: 'Supplements',
-    quantity: 18,
-    unit: 'packs',
-    threshold: 10,
-    owner: 'Clinic volunteer',
-  },
-]
-
-export const emptyDogForm = {
-  name: '',
-  area: '',
-  age: '',
-  health: '',
-  feeding: '',
+export const emptySignUpForm = {
+  full_name: '',
+  email: '',
+  password: '',
 }
 
-export const emptyInventoryForm = {
-  item: '',
-  quantity: '',
-  unit: 'bags',
-  threshold: '',
-  owner: '',
+export const emptySignInForm = {
+  email: '',
+  password: '',
+}
+
+export const emptyProfileCompletionForm = {
+  full_name: '',
+  primary_area_id: '',
+  upi_id: '',
+}
+
+export const emptyDogForm = {
+  dog_name_or_temp_name: '',
+  area_id: '',
+  added_by_guest: false,
+  guest_contact: '',
+  photo_url: '',
+  location_description: '',
+  latitude: '',
+  longitude: '',
+  gender: 'unknown',
+  approx_age: '',
+  vaccination_status: 'unknown',
+  sterilization_status: 'unknown',
+  health_notes: '',
+  temperament: '',
+  visibility_type: 'normal_area_visible',
+  status: 'active',
+}
+
+export const emptyGuestReportForm = {
+  dog_name_or_temp_name: '',
+  area_id: '',
+  guest_contact: '',
+  location_description: '',
+  photo_url: '',
+  approx_age: '',
+  health_notes: '',
 }
 
 export const emptyExpenseForm = {
-  title: '',
-  requester_name: '',
-  requester_email: '',
-  amount_needed: '',
-  reason: '',
-  status: 'open',
+  expense_type: 'food',
+  total_amount: '',
+  description: '',
+  disclaimer_accepted: false,
+  receipt_url: '',
 }
 
-export const emptyContributionForm = {
-  appeal_id: '',
-  contributor_name: '',
-  contributor_email: '',
-  amount: '',
-  status: 'pledged',
-  notes: '',
+export const emptyInventoryRequestForm = {
+  title: '',
+  description: '',
+  items: [
+    {
+      item_name: '',
+      category: 'food',
+      quantity_required: '',
+      unit: 'kg',
+    },
+  ],
 }
