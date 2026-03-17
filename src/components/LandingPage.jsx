@@ -1,13 +1,25 @@
 import { useEffect, useState } from 'react'
-import { HeartHandshake, PawPrint, ShieldCheck, Sparkles, Stethoscope, Wallet } from 'lucide-react'
+import { HeartHandshake, MapPin, PawPrint, ShieldCheck, Sparkles, Stethoscope, Wallet } from 'lucide-react'
+import { navigateTo } from '../lib/navigation'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
+import { DogCard } from './DogCard'
+import { HeroImageCarousel } from './HeroImageCarousel'
 
 const heroImages = [
-  '/landing/dog1.jpg',
-  '/landing/dog2.jpg',
-  '/landing/dog3.AVIF',
+  {
+    src: '/landing/dog1.jpg',
+    alt: 'Street dog resting calmly in warm afternoon light',
+  },
+  {
+    src: '/landing/dog2.jpg',
+    alt: 'Puppy portrait with soft premium background',
+  },
+  {
+    src: '/landing/dog3.AVIF',
+    alt: 'Street dog looking toward nearby volunteers',
+  },
 ]
 
 const features = [
@@ -42,6 +54,7 @@ export function LandingPage({ onNavigate }) {
     sterilizedDogs: 0,
     expensesRaised: 0,
   })
+  const [featuredDogs, setFeaturedDogs] = useState([])
 
   useEffect(() => {
     let isMounted = true
@@ -53,6 +66,7 @@ export function LandingPage({ onNavigate }) {
 
         if (isMounted && response.ok && payload?.metrics) {
           setMetrics(payload.metrics)
+          setFeaturedDogs(payload.featuredDogs ?? [])
         }
       } catch {
         // Leave fallback values if metrics fail.
@@ -68,67 +82,47 @@ export function LandingPage({ onNavigate }) {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-10 px-4 py-5 sm:px-6 lg:px-8">
-      <section className="grid gap-6 rounded-[2rem] border border-white/70 bg-hero-wash p-6 shadow-float md:grid-cols-[1.1fr_0.9fr] md:p-10">
-        <div className="flex flex-col justify-center gap-5">
-          <Badge className="w-fit" variant="secondary">
-            StreetDog App
-          </Badge>
-          <div className="space-y-4">
-            <h1 className="max-w-2xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-              Community Care for Street Dogs
-            </h1>
-            <p className="max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
-              StreetDog App helps neighborhoods track dogs, organize care, share
-              expenses, and coordinate volunteer support with a warm, easy-to-use
-              workflow built for real community action.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Button size="lg" onClick={() => onNavigate('/report-dog')}>
-              Report a Dog
-            </Button>
-            <Button size="lg" variant="secondary" onClick={() => onNavigate('/dogs')}>
-              Browse Dogs
-            </Button>
-            <Button size="lg" variant="outline" onClick={() => onNavigate('/signin')}>
-              Sign In
-            </Button>
-          </div>
-          <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
-            <div className="rounded-2xl bg-white/80 px-4 py-3 shadow-soft">
-              Guest-friendly dog reporting
+      <section className="relative overflow-hidden rounded-[2.25rem] border border-white/70 bg-hero-wash p-4 shadow-float sm:p-6 lg:p-8">
+        <div className="absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.65),transparent_70%)]" />
+        <div className="relative grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+          <div className="order-2 flex flex-col justify-center gap-5 lg:order-1">
+            <Badge className="w-fit bg-white/85 text-primary shadow-soft" variant="secondary">
+              StreetDog App
+            </Badge>
+            <div className="space-y-4">
+              <h1 className="max-w-xl text-4xl font-semibold leading-[0.98] tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+                Premium community care for the dogs who already belong to your streets.
+              </h1>
+              <p className="max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
+                StreetDog App helps neighborhoods report dogs, track care, share support, and keep
+                local volunteers aligned around one warm, image-first community record.
+              </p>
             </div>
-            <div className="rounded-2xl bg-white/80 px-4 py-3 shadow-soft">
-              Volunteer-ready care workflows
+            <div className="flex flex-wrap gap-3">
+              <Button size="lg" className="shadow-float" onClick={() => onNavigate('/report-dog')}>
+                Report a Dog
+              </Button>
+              <Button size="lg" variant="secondary" className="shadow-soft" onClick={() => onNavigate('/dogs')}>
+                Browse Dogs
+              </Button>
+              <Button size="lg" variant="outline" className="bg-white/75" onClick={() => onNavigate('/signin')}>
+                Sign In
+              </Button>
             </div>
-            <div className="rounded-2xl bg-white/80 px-4 py-3 shadow-soft">
-              Built for trust and coordination
-            </div>
-          </div>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-[1fr_0.9fr]">
-          <div className="overflow-hidden rounded-[1.75rem] border border-white/70 bg-white/80 p-2 shadow-soft">
-            <img
-              src={heroImages[0]}
-              alt="Street dog receiving community care"
-              className="h-full min-h-[340px] w-full rounded-[1.35rem] object-cover"
-            />
-          </div>
-          <div className="grid gap-4">
-            {heroImages.slice(1).map((image, index) => (
-              <div
-                key={image}
-                className="overflow-hidden rounded-[1.75rem] border border-white/70 bg-white/80 p-2 shadow-soft"
-              >
-                <img
-                  src={image}
-                  alt={index === 0 ? 'Puppy portrait' : 'Street dog in the community'}
-                  className="h-[160px] w-full rounded-[1.35rem] object-cover sm:h-[190px]"
-                />
+            <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
+              <div className="rounded-2xl bg-white/82 px-4 py-4 shadow-soft">
+                Guest-friendly dog reporting
               </div>
-            ))}
+              <div className="rounded-2xl bg-white/82 px-4 py-4 shadow-soft">
+                Image-first volunteer coordination
+              </div>
+              <div className="rounded-2xl bg-white/82 px-4 py-4 shadow-soft">
+                Warm, trusted neighborhood action
+              </div>
+            </div>
           </div>
+
+          <HeroImageCarousel slides={heroImages} className="order-1 lg:order-2" />
         </div>
       </section>
 
@@ -159,6 +153,47 @@ export function LandingPage({ onNavigate }) {
       </section>
 
       <section className="space-y-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-2">
+            <Badge variant="outline">Featured dogs</Badge>
+            <h2 className="text-3xl font-semibold tracking-tight">Recent dogs from the community</h2>
+            <p className="max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
+              A quick visual look at dogs recently added or updated in StreetDog App.
+            </p>
+          </div>
+          <Button variant="secondary" onClick={() => onNavigate('/dogs')}>
+            Browse all dogs
+          </Button>
+        </div>
+
+        {featuredDogs.length ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {featuredDogs.map((dog) => (
+              <DogCard
+                key={dog.id}
+                dog={dog}
+                area={dog.area}
+                onViewDetails={() => navigateTo(`/dogs/${dog.id}`)}
+              />
+            ))}
+          </div>
+        ) : (
+          <Card className="rounded-[2rem] border-dashed border-border bg-white/80">
+            <CardContent className="flex flex-col items-center gap-3 p-10 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-secondary text-primary shadow-soft">
+                <MapPin className="h-7 w-7" />
+              </div>
+              <h3 className="text-xl font-semibold">Featured dogs will appear here</h3>
+              <p className="max-w-xl text-sm leading-6 text-muted-foreground">
+                As soon as community dog records with photos are available, this section will turn
+                into an image-first feed.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </section>
+
+      <section className="space-y-5">
         <div className="space-y-2">
           <Badge variant="outline">Impact</Badge>
           <h2 className="text-3xl font-semibold tracking-tight">A live snapshot of local effort</h2>
@@ -181,7 +216,7 @@ export function LandingPage({ onNavigate }) {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-        <Card className="rounded-2xl border-white/70 bg-white/90">
+        <Card className="overflow-hidden rounded-2xl border-white/70 bg-white/90">
           <CardHeader>
             <Badge variant="outline" className="w-fit">How it works</Badge>
             <CardTitle className="text-3xl">A clear 4-step volunteer flow</CardTitle>
@@ -198,7 +233,7 @@ export function LandingPage({ onNavigate }) {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-white/70 bg-white/90">
+        <Card className="overflow-hidden rounded-2xl border-white/70 bg-white/90">
           <CardHeader>
             <Badge variant="outline" className="w-fit">AI support</Badge>
             <CardTitle className="flex items-center gap-3 text-3xl">

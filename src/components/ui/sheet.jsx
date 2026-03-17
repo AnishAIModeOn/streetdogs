@@ -14,10 +14,10 @@ export function SheetContent({ className, side = 'right', children, ...props }) 
 
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm" />
+      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/35 backdrop-blur-md" />
       <DialogPrimitive.Content
         className={cn(
-          'fixed z-50 bg-card p-6 shadow-float border border-border',
+          'fixed z-50 border border-border bg-card/95 p-6 shadow-float backdrop-blur-xl',
           sideClasses[side],
           className,
         )}

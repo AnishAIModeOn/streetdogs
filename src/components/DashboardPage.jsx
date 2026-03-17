@@ -15,6 +15,7 @@ import { navigateTo } from '../lib/navigation'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
+import { DogCard } from './DogCard'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 
 function formatCurrency(value) {
@@ -124,7 +125,7 @@ export function DashboardPage({ profile }) {
 
   return (
     <section className="space-y-6">
-      <div className="grid gap-4 rounded-[2rem] border border-white/70 bg-hero-wash p-6 shadow-float lg:grid-cols-[1.2fr_0.8fr]">
+      <div className="grid gap-4 rounded-[2rem] border border-white/70 bg-hero-wash p-6 shadow-float lg:grid-cols-[1.05fr_0.95fr]">
         <div className="space-y-4">
           <Badge className="w-fit" variant="secondary">
             Volunteer dashboard
@@ -161,7 +162,7 @@ export function DashboardPage({ profile }) {
           </div>
         </div>
 
-        <Card className="rounded-[1.75rem] border-white/70 bg-white/90">
+        <Card className="overflow-hidden rounded-[1.75rem] border-white/70 bg-white/90">
           <CardHeader>
             <CardTitle>Quick actions</CardTitle>
             <CardDescription>
@@ -233,7 +234,7 @@ export function DashboardPage({ profile }) {
               const Icon = stat.icon
 
               return (
-                <Card key={stat.label} className="rounded-3xl border-white/70 bg-white/90">
+                <Card key={stat.label} className="overflow-hidden rounded-3xl border-white/70 bg-white/90">
                   <CardContent className="space-y-4 p-6">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
@@ -261,7 +262,7 @@ export function DashboardPage({ profile }) {
             </TabsList>
 
             <TabsContent value="dogs">
-              <Card className="rounded-3xl border-white/70 bg-white/90">
+              <Card className="overflow-hidden rounded-3xl border-white/70 bg-white/90">
                 <CardHeader>
                   <CardTitle>Recently visible dogs</CardTitle>
                   <CardDescription>
@@ -274,25 +275,12 @@ export function DashboardPage({ profile }) {
                       const area = areaMap[dog.area_id]
 
                       return (
-                        <div
+                        <DogCard
                           key={dog.id}
-                          className="rounded-2xl border border-border/70 bg-secondary/40 p-4"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="space-y-1">
-                              <p className="text-lg font-semibold text-foreground">
-                                {dog.dog_name_or_temp_name || `Dog ${dog.id.slice(0, 6)}`}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {area ? `${area.city} - ${area.name}` : 'Area unavailable'}
-                              </p>
-                            </div>
-                            <Badge variant="outline">{dog.status?.replaceAll('_', ' ')}</Badge>
-                          </div>
-                          <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                            {dog.location_description || 'Location notes will appear as volunteers add them.'}
-                          </p>
-                        </div>
+                          dog={dog}
+                          area={area}
+                          onViewDetails={() => navigateTo(`/dogs/${dog.id}`)}
+                        />
                       )
                     })
                   ) : (
@@ -305,7 +293,7 @@ export function DashboardPage({ profile }) {
             </TabsContent>
 
             <TabsContent value="food">
-              <Card className="rounded-3xl border-white/70 bg-white/90">
+              <Card className="overflow-hidden rounded-3xl border-white/70 bg-white/90">
                 <CardHeader>
                   <CardTitle>Food support watchlist</CardTitle>
                   <CardDescription>
@@ -318,7 +306,7 @@ export function DashboardPage({ profile }) {
                       .filter((dog) => (dog.health_notes || '').toLowerCase().includes('food'))
                       .slice(0, 5)
                       .map((dog) => (
-                        <div key={dog.id} className="rounded-2xl bg-secondary/40 p-4 text-sm">
+                        <div key={dog.id} className="rounded-[1.5rem] border border-white/60 bg-secondary/35 p-4 text-sm shadow-soft transition-transform duration-300 hover:-translate-y-0.5">
                           <p className="font-semibold text-foreground">
                             {dog.dog_name_or_temp_name || `Dog ${dog.id.slice(0, 6)}`}
                           </p>
@@ -337,7 +325,7 @@ export function DashboardPage({ profile }) {
             </TabsContent>
 
             <TabsContent value="medical">
-              <Card className="rounded-3xl border-white/70 bg-white/90">
+              <Card className="overflow-hidden rounded-3xl border-white/70 bg-white/90">
                 <CardHeader>
                   <CardTitle>Medical focus</CardTitle>
                   <CardDescription>
@@ -350,7 +338,7 @@ export function DashboardPage({ profile }) {
                       .filter((dog) => (dog.health_notes || '').toLowerCase().includes('medical'))
                       .slice(0, 5)
                       .map((dog) => (
-                        <div key={dog.id} className="rounded-2xl bg-secondary/40 p-4 text-sm">
+                        <div key={dog.id} className="rounded-[1.5rem] border border-white/60 bg-secondary/35 p-4 text-sm shadow-soft transition-transform duration-300 hover:-translate-y-0.5">
                           <p className="font-semibold text-foreground">
                             {dog.dog_name_or_temp_name || `Dog ${dog.id.slice(0, 6)}`}
                           </p>
@@ -369,7 +357,7 @@ export function DashboardPage({ profile }) {
             </TabsContent>
 
             <TabsContent value="vaccination">
-              <Card className="rounded-3xl border-white/70 bg-white/90">
+              <Card className="overflow-hidden rounded-3xl border-white/70 bg-white/90">
                 <CardHeader>
                   <CardTitle>Vaccination progress</CardTitle>
                   <CardDescription>
@@ -377,11 +365,11 @@ export function DashboardPage({ profile }) {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-4 md:grid-cols-2">
-                  <div className="rounded-2xl bg-secondary/40 p-5">
+                  <div className="rounded-[1.5rem] bg-secondary/40 p-5 shadow-soft">
                     <p className="text-sm font-medium text-muted-foreground">Vaccinated dogs</p>
                     <p className="mt-2 text-3xl font-semibold text-foreground">{vaccinatedDogs}</p>
                   </div>
-                  <div className="rounded-2xl bg-secondary/40 p-5">
+                  <div className="rounded-[1.5rem] bg-secondary/40 p-5 shadow-soft">
                     <p className="text-sm font-medium text-muted-foreground">Sterilized dogs</p>
                     <p className="mt-2 text-3xl font-semibold text-foreground">{sterilizedDogs}</p>
                   </div>
@@ -390,7 +378,7 @@ export function DashboardPage({ profile }) {
             </TabsContent>
 
             <TabsContent value="contributions">
-              <Card className="rounded-3xl border-white/70 bg-white/90">
+              <Card className="overflow-hidden rounded-3xl border-white/70 bg-white/90">
                 <CardHeader>
                   <CardTitle>Contribution summary</CardTitle>
                   <CardDescription>
@@ -403,7 +391,7 @@ export function DashboardPage({ profile }) {
                     { label: 'Recent sightings', value: sightings.length.toString() },
                     { label: 'Active areas', value: areas.length.toString() },
                   ].map((item) => (
-                    <div key={item.label} className="rounded-2xl bg-secondary/40 p-5">
+                    <div key={item.label} className="rounded-[1.5rem] bg-secondary/40 p-5 shadow-soft">
                       <p className="text-sm font-medium text-muted-foreground">{item.label}</p>
                       <p className="mt-2 text-2xl font-semibold text-foreground">{item.value}</p>
                     </div>
@@ -417,7 +405,7 @@ export function DashboardPage({ profile }) {
             </TabsContent>
           </Tabs>
 
-          <Card className="rounded-3xl border-white/70 bg-white/90">
+          <Card className="overflow-hidden rounded-3xl border-white/70 bg-white/90">
             <CardHeader>
               <CardTitle>Recent sightings</CardTitle>
               <CardDescription>
@@ -427,7 +415,7 @@ export function DashboardPage({ profile }) {
             <CardContent className="grid gap-3 md:grid-cols-2">
               {recentSightings.length ? (
                 recentSightings.map((sighting) => (
-                  <div key={sighting.id} className="rounded-2xl border border-border/70 bg-secondary/30 p-4">
+                  <div key={sighting.id} className="rounded-[1.5rem] border border-border/70 bg-secondary/30 p-4 shadow-soft transition-transform duration-300 hover:-translate-y-0.5">
                     <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                       <Activity className="h-4 w-4 text-accent" />
                       {new Date(sighting.sighted_at).toLocaleString()}

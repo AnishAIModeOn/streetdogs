@@ -145,7 +145,7 @@ export function GuestReportPage({ onNavigate }) {
           </div>
         </div>
 
-        <Card className="rounded-[1.75rem] border-white/70 bg-white/90">
+        <Card className="overflow-hidden rounded-[1.75rem] border-white/70 bg-white/90">
           <CardHeader>
             <CardTitle>What to include</CardTitle>
             <CardDescription>
@@ -170,7 +170,7 @@ export function GuestReportPage({ onNavigate }) {
 
       {successMessage ? <StatusBanner variant="success">{successMessage}</StatusBanner> : null}
 
-      <Card className="rounded-[2rem] border-white/70 bg-white/90">
+      <Card className="overflow-hidden rounded-[2rem] border-white/70 bg-white/90">
         <CardHeader>
           <CardTitle>Report a Dog</CardTitle>
           <CardDescription>
@@ -190,7 +190,7 @@ export function GuestReportPage({ onNavigate }) {
           ) : (
             <form className="grid gap-5" onSubmit={handleSubmit}>
               <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-                <Card className="rounded-2xl border-dashed border-border bg-secondary/20">
+                <Card className="overflow-hidden rounded-2xl border-dashed border-border bg-secondary/20">
                   <CardContent className="space-y-4 p-5">
                     <div className="space-y-1">
                       <p className="text-sm font-semibold text-foreground">Photo upload</p>
@@ -233,7 +233,7 @@ export function GuestReportPage({ onNavigate }) {
                   </CardContent>
                 </Card>
 
-                <Card className="rounded-2xl border-dashed border-border bg-secondary/30">
+                <Card className="overflow-hidden rounded-2xl border-dashed border-border bg-secondary/30">
                   <CardContent className="space-y-3 p-5">
                     <p className="text-sm font-semibold text-foreground">AI and volunteer review</p>
                     <p className="text-sm leading-6 text-muted-foreground">

@@ -43,6 +43,8 @@ export default async function handler(req, res) {
       vaccinatedDogsResult,
       sterilizedDogsResult,
       expensesResult,
+      featuredDogsResult,
+      areasResult,
     ] = await Promise.all([
       supabase.from('dogs').select('id', { count: 'exact', head: true }),
       supabase
@@ -54,13 +56,21 @@ export default async function handler(req, res) {
         .select('id', { count: 'exact', head: true })
         .eq('sterilization_status', 'sterilized'),
       supabase.from('expenses').select('total_amount'),
+      supabase
+        .from('dogs')
+        .select('id, dog_name_or_temp_name, photo_url, location_description, area_id, status, vaccination_status, health_notes')
+        .order('created_at', { ascending: false })
+        .limit(3),
+      supabase.from('areas').select('id, name, city'),
     ])
 
     if (
       totalDogsResult.error ||
       vaccinatedDogsResult.error ||
       sterilizedDogsResult.error ||
-      expensesResult.error
+      expensesResult.error ||
+      featuredDogsResult.error ||
+      areasResult.error
     ) {
       throw new Error('Unable to load landing metrics.')
     }
@@ -69,6 +79,11 @@ export default async function handler(req, res) {
       (sum, expense) => sum + Number(expense.total_amount ?? 0),
       0,
     )
+    const areaMap = Object.fromEntries((areasResult.data ?? []).map((area) => [area.id, area]))
+    const featuredDogs = (featuredDogsResult.data ?? []).map((dog) => ({
+      ...dog,
+      area: dog.area_id ? areaMap[dog.area_id] ?? null : null,
+    }))
 
     return res.status(200).json({
       ok: true,
@@ -78,6 +93,7 @@ export default async function handler(req, res) {
         sterilizedDogs: sterilizedDogsResult.count ?? 0,
         expensesRaised,
       },
+      featuredDogs,
     })
   } catch {
     return res.status(200).json({
@@ -88,6 +104,7 @@ export default async function handler(req, res) {
         sterilizedDogs: 0,
         expensesRaised: 0,
       },
+      featuredDogs: [],
     })
   }
 }
