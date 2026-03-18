@@ -56,7 +56,7 @@ export function ProfileCompletionPage({ user, profile, onComplete, onSignOut }) 
       setErrorMessage('')
       await updateProfile(user.id, {
         full_name: form.full_name.trim() || null,
-        primary_area_id: form.primary_area_id,
+        primary_area_id: form.primary_area_id || null,
         upi_id: form.upi_id.trim() || null,
       })
       const nextProfile = await getProfile(user.id)
@@ -71,9 +71,9 @@ export function ProfileCompletionPage({ user, profile, onComplete, onSignOut }) 
   return (
     <AuthShell
       badge="StreetDog App"
-      title="Finish your profile to continue"
-      description="Choose your primary area so StreetDog App can apply the right visibility rules and show the right neighborhood records."
-      asideTitle="Profile setup"
+      title="Update your profile"
+      description="Keep your details current so StreetDog App can personalize neighborhood records and future support flows."
+      asideTitle="Profile settings"
       asideCopy={`Signed in as ${user.email}`}
       footer={
         <Button type="button" variant="ghost" className="justify-start" onClick={onSignOut}>
@@ -133,9 +133,12 @@ export function ProfileCompletionPage({ user, profile, onComplete, onSignOut }) 
                 ))}
               </SelectContent>
             </Select>
+            <FormDescription>
+              Optional for now. You can update this whenever you are ready.
+            </FormDescription>
           </FormField>
           <Button type="submit" size="lg" disabled={isSaving}>
-            {isSaving ? 'Saving profile...' : 'Save and continue'}
+            {isSaving ? 'Saving profile...' : 'Save profile'}
           </Button>
         </form>
       )}

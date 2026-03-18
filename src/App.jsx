@@ -92,22 +92,21 @@ function App() {
     }
 
     const isAuthenticated = Boolean(user)
-    const needsProfileCompletion = isAuthenticated && !profile?.primary_area_id
     const onAuthPage = isPublicAuthPath(currentPath)
-    const onProfileCompletionPage = currentPath === '/complete-profile'
+    const onProfilePage = currentPath === '/profile' || currentPath === '/complete-profile'
 
-    if (!isAuthenticated && (isProtectedPath(currentPath) || onProfileCompletionPage)) {
+    if (!isAuthenticated && (isProtectedPath(currentPath) || onProfilePage)) {
       navigateTo('/signin', { replace: true })
       return
     }
 
-    if (needsProfileCompletion && !onProfileCompletionPage) {
-      navigateTo('/complete-profile', { replace: true })
+    if (isAuthenticated && onAuthPage) {
+      navigateTo('/dashboard', { replace: true })
       return
     }
 
-    if (isAuthenticated && !needsProfileCompletion && (onAuthPage || onProfileCompletionPage)) {
-      navigateTo('/dashboard', { replace: true })
+    if (isAuthenticated && currentPath === '/complete-profile') {
+      navigateTo('/profile', { replace: true })
       return
     }
 
@@ -168,15 +167,6 @@ function App() {
         />
       )
     }
-  } else if (!profile?.primary_area_id) {
-    content = (
-      <ProfileCompletionPage
-        user={user}
-        profile={profile}
-        onComplete={handleProfileUpdated}
-        onSignOut={handleSignOut}
-      />
-    )
   } else {
     const dogId = getDogIdFromPath(currentPath)
     const raiseExpenseDogId = getRaiseExpenseDogIdFromPath(currentPath)

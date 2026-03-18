@@ -130,7 +130,7 @@ export async function resolveAuthProfileState() {
   }
 
   const profile = await getProfileWithRetry(session.user.id)
-  const redirectTo = profile?.primary_area_id ? '/dashboard' : '/complete-profile'
+  const redirectTo = '/dashboard'
 
   return {
     session,
