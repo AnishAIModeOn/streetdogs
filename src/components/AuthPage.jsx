@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Loader2, MapPin } from 'lucide-react'
 import { emptySignInForm, emptySignUpForm } from '../data/seedData'
 import { useSignIn, useSignUp } from '../hooks/use-auth'
-import { createSociety, searchNeighbourhoods, updateProfile } from '../lib/communityData'
+import { createSociety, updateProfile } from '../lib/communityData'
 import { AuthShell } from './AuthShell'
 import { SocietyPicker } from './SocietyPicker'
 import { StatusBanner } from './StatusBanner'
@@ -12,26 +12,48 @@ import { Input } from './ui/input'
 
 const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? ''
 
+function extractComponents(addressComponents) {
+  const get = (...types) => {
+    const match = addressComponents.find((c) => types.some((t) => c.types.includes(t)))
+    return match?.long_name ?? ''
+  }
+  return {
+    pincode: get('postal_code'),
+    neighbourhood:
+      get('sublocality_level_1') ||
+      get('neighborhood') ||
+      get('sublocality') ||
+      get('administrative_area_level_3'),
+    city:
+      get('locality') ||
+      get('administrative_area_level_2') ||
+      get('administrative_area_level_1'),
+  }
+}
+
 async function reverseGeocode(lat, lng) {
   if (!GOOGLE_MAPS_KEY) return { pincode: '', neighbourhood: '', city: '' }
   const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_KEY}`
   const res = await fetch(url)
   const json = await res.json()
-  const components = json?.results?.[0]?.address_components ?? []
-  const get = (...types) => {
-    const match = components.find((c) => types.some((t) => c.types.includes(t)))
-    return match?.long_name ?? ''
-  }
-  const neighbourhood =
-    get('sublocality_level_1') ||
-    get('neighborhood') ||
-    get('sublocality') ||
-    get('administrative_area_level_3')
-  const city =
-    get('locality') ||
-    get('administrative_area_level_2') ||
-    get('administrative_area_level_1')
-  return { pincode: get('postal_code'), neighbourhood, city }
+  return extractComponents(json?.results?.[0]?.address_components ?? [])
+}
+
+// Use Geocoding API to suggest areas from free-text input
+async function geocodeAreaSuggestions(text) {
+  if (!GOOGLE_MAPS_KEY || !text.trim()) return []
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(text)}&components=country:IN&key=${GOOGLE_MAPS_KEY}`
+  const res = await fetch(url)
+  const json = await res.json()
+  const seen = new Set()
+  return (json?.results ?? [])
+    .map((r) => extractComponents(r.address_components ?? []))
+    .filter((r) => {
+      if (!r.pincode || seen.has(r.pincode)) return false
+      seen.add(r.pincode)
+      return true
+    })
+    .slice(0, 5)
 }
 
 /**
@@ -97,29 +119,30 @@ function useAreaDetection() {
     )
   }, [])
 
-  // Fetch neighbourhood suggestions as user types
+  // Geocode typed text to get area suggestions with pincode
   useEffect(() => {
-    if (!manual || areaInput.trim().length < 2) {
+    if (!manual || areaInput.trim().length < 3) {
       setAreaSuggestions([])
       return
     }
     const t = setTimeout(async () => {
       try {
         setIsFetchingSuggestions(true)
-        const results = await searchNeighbourhoods(areaInput)
+        const results = await geocodeAreaSuggestions(areaInput)
         setAreaSuggestions(results)
       } catch {
         setAreaSuggestions([])
       } finally {
         setIsFetchingSuggestions(false)
       }
-    }, 280)
+    }, 500)
     return () => clearTimeout(t)
   }, [areaInput, manual])
 
   function selectSuggestion(suggestion) {
-    setAreaInput(suggestion.neighbourhood)
-    setSelectedNeighbourhood(suggestion.neighbourhood)
+    const label = [suggestion.neighbourhood, suggestion.city].filter(Boolean).join(', ') || suggestion.pincode
+    setAreaInput(label)
+    setSelectedNeighbourhood(suggestion.neighbourhood || suggestion.city || '')
     if (suggestion.pincode) setPincode(suggestion.pincode)
     setAreaSuggestions([])
     setShowSuggestions(false)
@@ -305,13 +328,15 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
             <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 overflow-hidden rounded-2xl border border-white/70 bg-white shadow-float">
               {areaSuggestions.map((s) => (
                 <button
-                  key={s.neighbourhood}
+                  key={s.pincode}
                   type="button"
                   className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-secondary/40 transition-colors"
                   onMouseDown={() => selectSuggestion(s)}
                 >
                   <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  <span className="flex-1">{s.neighbourhood}</span>
+                  <span className="flex-1">
+                    {[s.neighbourhood, s.city].filter(Boolean).join(', ') || s.pincode}
+                  </span>
                   {s.pincode && <span className="text-xs text-muted-foreground">{s.pincode}</span>}
                 </button>
               ))}

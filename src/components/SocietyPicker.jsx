@@ -228,7 +228,11 @@ export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, defe
             }}
           >
             <span className="text-muted-foreground">
-              {neighbourhood || pincode ? `Search societies in ${neighbourhood || pincode}…` : 'Search for your society…'}
+              {societies.length > 0
+                ? `${societies.length} societ${societies.length === 1 ? 'y' : 'ies'} found — tap to select`
+                : neighbourhood || pincode
+                  ? `Search societies in ${neighbourhood || pincode}…`
+                  : 'Search for your society…'}
             </span>
             <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
           </button>
