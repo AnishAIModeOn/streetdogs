@@ -53,9 +53,10 @@ async function trySaveSociety(userId, societyId, attempt = 1) {
 
 function usePincodeDetection() {
   const [pincode, setPincode] = useState('')
-  const [areaLabel, setAreaLabel] = useState('') // e.g. "Bellandur, Bengaluru"
+  const [areaLabel, setAreaLabel] = useState('') // e.g. "Bellandur, Bengaluru" — auto-detected
+  const [manualAreaName, setManualAreaName] = useState('') // typed by user when geo unavailable
   const [detecting, setDetecting] = useState(true)
-  const [manual, setManual] = useState(false)   // true when user overrides auto-detect
+  const [manual, setManual] = useState(false) // true when user overrides or geo fails
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -72,11 +73,9 @@ function usePincodeDetection() {
           )
           if (pc) {
             setPincode(pc)
-            // Build a human-friendly label. Prefer "Neighbourhood, City".
             const parts = [neighbourhood, city].filter(Boolean)
             setAreaLabel(parts.length ? parts.join(', ') : pc)
           } else {
-            // Coords resolved but no pincode (no Maps key or rural area)
             setManual(true)
           }
         } catch {
@@ -86,7 +85,6 @@ function usePincodeDetection() {
         }
       },
       () => {
-        // Denied or timed out
         setDetecting(false)
         setManual(true)
       },
@@ -94,7 +92,21 @@ function usePincodeDetection() {
     )
   }, [])
 
-  return { pincode, setPincode, areaLabel, detecting, manual, setManual }
+  // The effective label passed to SocietyPicker:
+  // auto-detected label when resolved, otherwise whatever the user typed
+  const effectiveAreaLabel = manual ? manualAreaName : areaLabel
+
+  return {
+    pincode,
+    setPincode,
+    areaLabel,
+    manualAreaName,
+    setManualAreaName,
+    effectiveAreaLabel,
+    detecting,
+    manual,
+    setManual,
+  }
 }
 
 export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
@@ -104,7 +116,17 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
   const [errorMessage, setErrorMessage] = useState(authError)
   const [selectedSociety, setSelectedSociety] = useState(null)
 
-  const { pincode, setPincode, areaLabel, detecting, manual, setManual } = usePincodeDetection()
+  const {
+    pincode,
+    setPincode,
+    areaLabel,
+    manualAreaName,
+    setManualAreaName,
+    effectiveAreaLabel,
+    detecting,
+    manual,
+    setManual,
+  } = usePincodeDetection()
 
   const signInMutation = useSignIn()
   const signUpMutation = useSignUp()
@@ -216,23 +238,21 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
         </>
       )}
 
-      {/* Manual — PIN code input (geo denied, no Maps key, or user overrode) */}
+      {/* Manual — neighbourhood name input (geo denied, no Maps key, or user overrode) */}
       {!detecting && (manual || !areaLabel) && (
         <>
-          <div className="relative">
-            <Input
-              placeholder="Enter PIN code (e.g. 560001)"
-              maxLength={6}
-              value={pincode}
-              onChange={(e) => setPincode(e.target.value.replace(/\D/g, ''))}
-            />
-          </div>
+          <Input
+            placeholder="e.g. Bellandur, Koramangala, Baner…"
+            value={manualAreaName}
+            onChange={(e) => setManualAreaName(e.target.value)}
+            autoComplete="off"
+          />
           {manual && areaLabel && (
             <FormDescription>
               <button
                 type="button"
                 className="underline underline-offset-2 hover:text-foreground transition-colors"
-                onClick={() => { setManual(false); }}
+                onClick={() => { setManual(false); setManualAreaName('') }}
               >
                 ← use detected area instead
               </button>
@@ -240,7 +260,7 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
           )}
           {!areaLabel && (
             <FormDescription>
-              Used to find societies near you.
+              Type your neighbourhood to find societies nearby.
             </FormDescription>
           )}
         </>
@@ -252,7 +272,7 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
     <div className="rounded-[1.5rem] border border-border/60 bg-secondary/20 p-4">
       <SocietyPicker
         pincode={pincode}
-        areaLabel={areaLabel}
+        areaLabel={effectiveAreaLabel}
         onSelect={setSelectedSociety}
         deferCreate
       />

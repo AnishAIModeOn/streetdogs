@@ -54,6 +54,15 @@ export function SocietyPicker({ pincode = '', areaLabel = '', onSelect, deferCre
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedPincode])
 
+  // When there's no pincode (manual area name entry), seed the search term
+  // from areaLabel so the picker starts searching as the user types their area.
+  useEffect(() => {
+    if (!pincode && areaLabel && !selected) {
+      setSearchTerm(areaLabel)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [areaLabel, pincode])
+
   // Fetch societies whenever pincode or search term changes
   const fetchSocieties = useCallback(async (pc, term) => {
     if (!pc && !term) {
