@@ -145,7 +145,7 @@ export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, defe
         id: null,
         name: name.trim(),
         pincode,
-        neighbourhood: null,
+        neighbourhood: neighbourhood || null,
         _pending: true,
       })
       return
@@ -153,7 +153,7 @@ export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, defe
     try {
       setIsCreating(true)
       setFetchError('')
-      const newSociety = await createSociety({ name, pincode, neighbourhood: null, coordinates: null })
+      const newSociety = await createSociety({ name, pincode, neighbourhood: neighbourhood || null, coordinates: null })
       commitSelection(newSociety)
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'Unable to create society.')
@@ -277,7 +277,7 @@ export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, defe
                 </p>
               )}
 
-              {!isFetching && !fetchError && !pincode && !searchTerm && (
+              {!isFetching && !fetchError && !pincode && !neighbourhood && !searchTerm && (
                 <p className="px-3 py-4 text-center text-xs text-muted-foreground">
                   Type a society name to search…
                 </p>

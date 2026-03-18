@@ -72,22 +72,26 @@ export async function searchSocieties(pincode, searchTerm = '', neighbourhood = 
  */
 export async function searchNeighbourhoods(term) {
   const client = ensureSupabase()
+  const t = term.trim()
+  // Search neighbourhood name OR pincode so results appear even when neighbourhood is null
   const results = unwrap(
     await client
       .from('societies')
       .select('neighbourhood, pincode')
-      .ilike('neighbourhood', `%${term.trim()}%`)
-      .not('neighbourhood', 'is', null)
-      .order('neighbourhood', { ascending: true })
-      .limit(20),
+      .or(`neighbourhood.ilike.%${t}%,pincode.ilike.%${t}%`)
+      .order('neighbourhood', { ascending: true, nullsFirst: false })
+      .limit(30),
   )
-  // Deduplicate by neighbourhood name
+  // Deduplicate: prefer rows with a neighbourhood name; fall back to pincode as label
   const seen = new Set()
-  return results.filter((r) => {
-    if (!r.neighbourhood || seen.has(r.neighbourhood)) return false
-    seen.add(r.neighbourhood)
-    return true
-  })
+  return results
+    .map((r) => ({ neighbourhood: r.neighbourhood || r.pincode, pincode: r.pincode }))
+    .filter((r) => {
+      if (!r.neighbourhood || seen.has(r.neighbourhood)) return false
+      seen.add(r.neighbourhood)
+      return true
+    })
+    .slice(0, 10)
 }
 
 /**
