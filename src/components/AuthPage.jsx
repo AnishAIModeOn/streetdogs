@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Loader2, MapPin } from 'lucide-react'
 import { emptySignInForm, emptySignUpForm } from '../data/seedData'
 import { useSignIn, useSignUp } from '../hooks/use-auth'
-import { createSociety, updateProfile } from '../lib/communityData'
+import { createSociety, searchNeighbourhoods, updateProfile } from '../lib/communityData'
 import { AuthShell } from './AuthShell'
 import { SocietyPicker } from './SocietyPicker'
 import { StatusBanner } from './StatusBanner'
@@ -51,12 +51,19 @@ async function trySaveSociety(userId, societyId, attempt = 1) {
   }
 }
 
-function usePincodeDetection() {
+function useAreaDetection() {
   const [pincode, setPincode] = useState('')
-  const [areaLabel, setAreaLabel] = useState('') // e.g. "Bellandur, Bengaluru" — auto-detected
-  const [manualAreaName, setManualAreaName] = useState('') // typed by user when geo unavailable
+  const [detectedLabel, setDetectedLabel] = useState('') // "Bellandur, Bengaluru"
+  const [detectedNeighbourhood, setDetectedNeighbourhood] = useState('')
   const [detecting, setDetecting] = useState(true)
-  const [manual, setManual] = useState(false) // true when user overrides or geo fails
+  const [manual, setManual] = useState(false)
+
+  // Typeahead state for manual area input
+  const [areaInput, setAreaInput] = useState('')
+  const [areaSuggestions, setAreaSuggestions] = useState([])
+  const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false)
+  const [selectedNeighbourhood, setSelectedNeighbourhood] = useState('') // confirmed neighbourhood
+  const [showSuggestions, setShowSuggestions] = useState(false)
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -73,8 +80,9 @@ function usePincodeDetection() {
           )
           if (pc) {
             setPincode(pc)
+            setDetectedNeighbourhood(neighbourhood)
             const parts = [neighbourhood, city].filter(Boolean)
-            setAreaLabel(parts.length ? parts.join(', ') : pc)
+            setDetectedLabel(parts.length ? parts.join(', ') : pc)
           } else {
             setManual(true)
           }
@@ -84,28 +92,65 @@ function usePincodeDetection() {
           setDetecting(false)
         }
       },
-      () => {
-        setDetecting(false)
-        setManual(true)
-      },
+      () => { setDetecting(false); setManual(true) },
       { timeout: 9000, maximumAge: 60_000 },
     )
   }, [])
 
-  // The effective label passed to SocietyPicker:
-  // auto-detected label when resolved, otherwise whatever the user typed
-  const effectiveAreaLabel = manual ? manualAreaName : areaLabel
+  // Fetch neighbourhood suggestions as user types
+  useEffect(() => {
+    if (!manual || areaInput.trim().length < 2) {
+      setAreaSuggestions([])
+      return
+    }
+    const t = setTimeout(async () => {
+      try {
+        setIsFetchingSuggestions(true)
+        const results = await searchNeighbourhoods(areaInput)
+        setAreaSuggestions(results)
+      } catch {
+        setAreaSuggestions([])
+      } finally {
+        setIsFetchingSuggestions(false)
+      }
+    }, 280)
+    return () => clearTimeout(t)
+  }, [areaInput, manual])
+
+  function selectSuggestion(suggestion) {
+    setAreaInput(suggestion.neighbourhood)
+    setSelectedNeighbourhood(suggestion.neighbourhood)
+    if (suggestion.pincode) setPincode(suggestion.pincode)
+    setAreaSuggestions([])
+    setShowSuggestions(false)
+  }
+
+  function resetToManual() {
+    setManual(true)
+    setPincode('')
+    setSelectedNeighbourhood('')
+    setAreaInput('')
+  }
+
+  // The neighbourhood to pass to SocietyPicker for filtering
+  const effectiveNeighbourhood = manual ? selectedNeighbourhood : detectedNeighbourhood
 
   return {
     pincode,
-    setPincode,
-    areaLabel,
-    manualAreaName,
-    setManualAreaName,
-    effectiveAreaLabel,
+    detectedLabel,
     detecting,
     manual,
-    setManual,
+    setManual: resetToManual,
+    areaInput,
+    setAreaInput,
+    areaSuggestions,
+    isFetchingSuggestions,
+    showSuggestions,
+    setShowSuggestions,
+    selectSuggestion,
+    selectedNeighbourhood,
+    effectiveNeighbourhood,
+    detectedNeighbourhood,
   }
 }
 
@@ -118,15 +163,19 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
 
   const {
     pincode,
-    setPincode,
-    areaLabel,
-    manualAreaName,
-    setManualAreaName,
-    effectiveAreaLabel,
+    detectedLabel,
     detecting,
     manual,
     setManual,
-  } = usePincodeDetection()
+    areaInput,
+    setAreaInput,
+    areaSuggestions,
+    isFetchingSuggestions,
+    showSuggestions,
+    setShowSuggestions,
+    selectSuggestion,
+    effectiveNeighbourhood,
+  } = useAreaDetection()
 
   const signInMutation = useSignIn()
   const signUpMutation = useSignUp()
@@ -218,19 +267,19 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
         </div>
       )}
 
-      {/* Auto-detected — show friendly label */}
-      {!detecting && !manual && areaLabel && (
+      {/* Auto-detected */}
+      {!detecting && !manual && detectedLabel && (
         <>
           <div className="flex h-11 items-center gap-2 rounded-2xl border border-emerald-200/80 bg-emerald-50/60 px-4 text-sm">
             <MapPin className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
-            <span className="flex-1 font-medium text-emerald-800">{areaLabel}</span>
+            <span className="flex-1 font-medium text-emerald-800">{detectedLabel}</span>
           </div>
           <FormDescription>
             Auto-detected ·{' '}
             <button
               type="button"
               className="underline underline-offset-2 hover:text-foreground transition-colors"
-              onClick={() => { setManual(true); setPincode('') }}
+              onClick={() => setManual()}
             >
               not your area?
             </button>
@@ -238,32 +287,40 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
         </>
       )}
 
-      {/* Manual — neighbourhood name input (geo denied, no Maps key, or user overrode) */}
-      {!detecting && (manual || !areaLabel) && (
-        <>
+      {/* Manual typeahead input */}
+      {!detecting && (manual || !detectedLabel) && (
+        <div className="relative">
           <Input
             placeholder="e.g. Bellandur, Koramangala, Baner…"
-            value={manualAreaName}
-            onChange={(e) => setManualAreaName(e.target.value)}
+            value={areaInput}
+            onChange={(e) => { setAreaInput(e.target.value); setShowSuggestions(true) }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
             autoComplete="off"
           />
-          {manual && areaLabel && (
-            <FormDescription>
-              <button
-                type="button"
-                className="underline underline-offset-2 hover:text-foreground transition-colors"
-                onClick={() => { setManual(false); setManualAreaName('') }}
-              >
-                ← use detected area instead
-              </button>
-            </FormDescription>
+          {isFetchingSuggestions && (
+            <Loader2 className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
           )}
-          {!areaLabel && (
-            <FormDescription>
-              Type your neighbourhood to find societies nearby.
-            </FormDescription>
+          {showSuggestions && areaSuggestions.length > 0 && (
+            <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 overflow-hidden rounded-2xl border border-white/70 bg-white shadow-float">
+              {areaSuggestions.map((s) => (
+                <button
+                  key={s.neighbourhood}
+                  type="button"
+                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-secondary/40 transition-colors"
+                  onMouseDown={() => selectSuggestion(s)}
+                >
+                  <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <span className="flex-1">{s.neighbourhood}</span>
+                  {s.pincode && <span className="text-xs text-muted-foreground">{s.pincode}</span>}
+                </button>
+              ))}
+            </div>
           )}
-        </>
+          <FormDescription>
+            Type your neighbourhood to find societies nearby.
+          </FormDescription>
+        </div>
       )}
     </FormField>
   )
@@ -272,7 +329,7 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
     <div className="rounded-[1.5rem] border border-border/60 bg-secondary/20 p-4">
       <SocietyPicker
         pincode={pincode}
-        areaLabel={effectiveAreaLabel}
+        neighbourhood={effectiveNeighbourhood}
         onSelect={setSelectedSociety}
         deferCreate
       />

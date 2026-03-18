@@ -29,7 +29,7 @@ function useDebouncedValue(value, delay = 280) {
   return debounced
 }
 
-export function SocietyPicker({ pincode = '', areaLabel = '', onSelect, deferCreate = false }) {
+export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, deferCreate = false }) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [societies, setSocieties] = useState([])
@@ -45,34 +45,27 @@ export function SocietyPicker({ pincode = '', areaLabel = '', onSelect, deferCre
 
   const debouncedSearch = useDebouncedValue(searchTerm)
   const debouncedPincode = useDebouncedValue(pincode, 400)
+  const debouncedNeighbourhood = useDebouncedValue(neighbourhood, 400)
 
-  // Reset selection when pincode changes
+  // Reset selection and societies when the area changes
   useEffect(() => {
     setSelected(null)
     onSelect(null)
     setSocieties([])
+    setSearchTerm('')
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedPincode])
+  }, [debouncedPincode, debouncedNeighbourhood])
 
-  // When there's no pincode (manual area name entry), seed the search term
-  // from areaLabel so the picker starts searching as the user types their area.
-  useEffect(() => {
-    if (!pincode && areaLabel && !selected) {
-      setSearchTerm(areaLabel)
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [areaLabel, pincode])
-
-  // Fetch societies whenever pincode or search term changes
-  const fetchSocieties = useCallback(async (pc, term) => {
-    if (!pc && !term) {
+  // Fetch societies whenever pincode, neighbourhood, or search term changes
+  const fetchSocieties = useCallback(async (pc, nb, term) => {
+    if (!pc && !nb && !term) {
       setSocieties([])
       return
     }
     try {
       setIsFetching(true)
       setFetchError('')
-      const results = await searchSocieties(pc, term)
+      const results = await searchSocieties(pc, term, nb)
       setSocieties(results)
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'Unable to load societies.')
@@ -83,12 +76,12 @@ export function SocietyPicker({ pincode = '', areaLabel = '', onSelect, deferCre
   }, [])
 
   useEffect(() => {
-    if (debouncedPincode || debouncedSearch) {
-      fetchSocieties(debouncedPincode, debouncedSearch)
+    if (debouncedPincode || debouncedNeighbourhood || debouncedSearch) {
+      fetchSocieties(debouncedPincode, debouncedNeighbourhood, debouncedSearch)
     } else {
       setSocieties([])
     }
-  }, [debouncedPincode, debouncedSearch, fetchSocieties])
+  }, [debouncedPincode, debouncedNeighbourhood, debouncedSearch, fetchSocieties])
 
   // Close on outside click/touch
   useEffect(() => {
@@ -105,7 +98,7 @@ export function SocietyPicker({ pincode = '', areaLabel = '', onSelect, deferCre
     }
   }, [])
 
-  const allOptions = buildOptions(societies, searchTerm, pincode)
+  const allOptions = buildOptions(societies, searchTerm)
 
   function handleKeyDown(e) {
     if (!isOpen) {
@@ -235,7 +228,7 @@ export function SocietyPicker({ pincode = '', areaLabel = '', onSelect, deferCre
             }}
           >
             <span className="text-muted-foreground">
-              {areaLabel || pincode ? `Search societies in ${areaLabel || pincode}…` : 'Search for your society…'}
+              {neighbourhood || pincode ? `Search societies in ${neighbourhood || pincode}…` : 'Search for your society…'}
             </span>
             <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
           </button>
@@ -249,7 +242,7 @@ export function SocietyPicker({ pincode = '', areaLabel = '', onSelect, deferCre
               <input
                 ref={inputRef}
                 className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                placeholder={areaLabel || pincode ? `Search in ${areaLabel || pincode}…` : 'Type society name…'}
+                placeholder={neighbourhood || pincode ? `Search in ${neighbourhood || pincode}…` : 'Type society name…'}
                 value={searchTerm}
                 onChange={(e) => { setSearchTerm(e.target.value); setActiveIndex(-1) }}
                 onKeyDown={handleKeyDown}
@@ -278,9 +271,9 @@ export function SocietyPicker({ pincode = '', areaLabel = '', onSelect, deferCre
                 <p className="px-3 py-3 text-xs text-red-600">{fetchError}</p>
               )}
 
-              {!isFetching && !fetchError && allOptions.length === 0 && pincode && !searchTerm && (
+              {!isFetching && !fetchError && allOptions.length === 0 && (pincode || neighbourhood) && !searchTerm && (
                 <p className="px-3 py-3 text-xs text-muted-foreground">
-                  No societies found for {pincode} yet. Type a name to add one.
+                  No societies found for this area yet. Type a name to add one.
                 </p>
               )}
 
@@ -343,7 +336,7 @@ export function SocietyPicker({ pincode = '', areaLabel = '', onSelect, deferCre
   )
 }
 
-function buildOptions(societies, searchTerm, pincode) {
+function buildOptions(societies, searchTerm) {
   const societyOptions = societies.map((s) => ({
     key: s.id,
     type: 'existing',

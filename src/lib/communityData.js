@@ -47,22 +47,47 @@ function unwrap(result) {
  *
  * Returns up to 15 results ordered alphabetically.
  */
-export async function searchSocieties(pincode, searchTerm = '') {
+export async function searchSocieties(pincode, searchTerm = '', neighbourhood = '') {
   const client = ensureSupabase()
   let query = client.from('societies').select('*')
 
   if (pincode) {
     query = query.eq('pincode', pincode)
+  } else if (neighbourhood.trim()) {
+    // No pincode — filter by neighbourhood so only societies in that area show
+    query = query.ilike('neighbourhood', `%${neighbourhood.trim()}%`)
   }
 
   const term = searchTerm.trim()
   if (term) {
-    // Match the term against EITHER society name OR the tagged neighbourhood,
-    // so area-name searches ("Bellandur") surface all societies in that area.
-    query = query.or(`name.ilike.%${term}%,neighbourhood.ilike.%${term}%`)
+    query = query.ilike('name', `%${term}%`)
   }
 
   return unwrap(await query.order('name', { ascending: true }).limit(15))
+}
+
+/**
+ * Returns distinct neighbourhood names matching the search term.
+ * Used to power the area typeahead in the auth flow.
+ */
+export async function searchNeighbourhoods(term) {
+  const client = ensureSupabase()
+  const results = unwrap(
+    await client
+      .from('societies')
+      .select('neighbourhood, pincode')
+      .ilike('neighbourhood', `%${term.trim()}%`)
+      .not('neighbourhood', 'is', null)
+      .order('neighbourhood', { ascending: true })
+      .limit(20),
+  )
+  // Deduplicate by neighbourhood name
+  const seen = new Set()
+  return results.filter((r) => {
+    if (!r.neighbourhood || seen.has(r.neighbourhood)) return false
+    seen.add(r.neighbourhood)
+    return true
+  })
 }
 
 /**
