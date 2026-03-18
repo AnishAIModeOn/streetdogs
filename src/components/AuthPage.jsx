@@ -49,8 +49,10 @@ async function geocodeAreaSuggestions(text) {
   return (json?.results ?? [])
     .map((r) => extractComponents(r.address_components ?? []))
     .filter((r) => {
-      if (!r.pincode || seen.has(r.pincode)) return false
-      seen.add(r.pincode)
+      // Include results even without pincode — use neighbourhood+city as dedup key
+      const key = r.pincode || [r.neighbourhood, r.city].filter(Boolean).join(',')
+      if (!key || seen.has(key)) return false
+      seen.add(key)
       return true
     })
     .slice(0, 5)
@@ -129,8 +131,10 @@ function useAreaDetection() {
       try {
         setIsFetchingSuggestions(true)
         const results = await geocodeAreaSuggestions(areaInput)
+        console.log('[AreaTypeahead] results:', results)
         setAreaSuggestions(results)
-      } catch {
+      } catch (err) {
+        console.error('[AreaTypeahead] error:', err)
         setAreaSuggestions([])
       } finally {
         setIsFetchingSuggestions(false)
@@ -326,9 +330,9 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
           )}
           {showSuggestions && areaSuggestions.length > 0 && (
             <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 overflow-hidden rounded-2xl border border-white/70 bg-white shadow-float">
-              {areaSuggestions.map((s) => (
+              {areaSuggestions.map((s, i) => (
                 <button
-                  key={s.pincode}
+                  key={s.pincode || i}
                   type="button"
                   className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-secondary/40 transition-colors"
                   onMouseDown={() => selectSuggestion(s)}
