@@ -63,15 +63,15 @@ async function geocodeAreaSuggestions(text) {
  * Retries up to 3 times with a 600 ms delay in case the DB trigger
  * hasn't created the profile row yet (race condition on fresh sign-up).
  */
-async function trySaveSociety(userId, societyId, attempt = 1) {
+async function tryUpdateProfile(userId, payload, attempt = 1) {
   try {
-    await updateProfile(userId, { society_id: societyId })
+    await updateProfile(userId, payload)
   } catch (err) {
     if (attempt < 3) {
       await new Promise((r) => setTimeout(r, 600))
-      return trySaveSociety(userId, societyId, attempt + 1)
+      return tryUpdateProfile(userId, payload, attempt + 1)
     }
-    console.warn('[SocietyPicker] Could not save society_id:', err?.message)
+    console.warn('[AuthPage] Could not update profile:', err?.message)
   }
 }
 
@@ -245,9 +245,15 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
         password: signUpForm.password,
       })
 
-      if (result?.user?.id && selectedSociety) {
-        const societyId = await resolveSociety(selectedSociety)
-        if (societyId) trySaveSociety(result.user.id, societyId)
+      if (result?.user?.id) {
+        const profileUpdate = {}
+        if (effectiveNeighbourhood) profileUpdate.neighbourhood = effectiveNeighbourhood
+        if (pincode) profileUpdate.pincode = pincode
+        if (selectedSociety) {
+          const societyId = await resolveSociety(selectedSociety)
+          if (societyId) profileUpdate.society_id = societyId
+        }
+        if (Object.keys(profileUpdate).length) tryUpdateProfile(result.user.id, profileUpdate)
       }
 
       const authState = await onSignedIn()
@@ -267,9 +273,15 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
         password: signInForm.password,
       })
 
-      if (result?.user?.id && selectedSociety) {
-        const societyId = await resolveSociety(selectedSociety)
-        if (societyId) trySaveSociety(result.user.id, societyId)
+      if (result?.user?.id) {
+        const profileUpdate = {}
+        if (effectiveNeighbourhood) profileUpdate.neighbourhood = effectiveNeighbourhood
+        if (pincode) profileUpdate.pincode = pincode
+        if (selectedSociety) {
+          const societyId = await resolveSociety(selectedSociety)
+          if (societyId) profileUpdate.society_id = societyId
+        }
+        if (Object.keys(profileUpdate).length) tryUpdateProfile(result.user.id, profileUpdate)
       }
 
       const authState = await onSignedIn()
