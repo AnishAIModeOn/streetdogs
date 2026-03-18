@@ -69,7 +69,6 @@ function useAreaDetection() {
   const [areaInput, setAreaInput] = useState('')
   const [areaSuggestions, setAreaSuggestions] = useState([])
   const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false)
-  const [selectedNeighbourhood, setSelectedNeighbourhood] = useState('') // confirmed neighbourhood
   const [showSuggestions, setShowSuggestions] = useState(false)
 
   useEffect(() => {
@@ -125,23 +124,27 @@ function useAreaDetection() {
   }, [areaInput, manual])
 
   function selectSuggestion(suggestion) {
-    const label = suggestion.neighbourhood || suggestion.pincode
+    const label = suggestion.neighbourhood || ''
     setAreaInput(label)
-    setSelectedNeighbourhood(suggestion.neighbourhood || '')
     if (suggestion.pincode) setPincode(suggestion.pincode)
     setAreaSuggestions([])
     setShowSuggestions(false)
   }
 
+  function handleAreaInputChange(value) {
+    setAreaInput(value)
+    setPincode('')
+    setShowSuggestions(true)
+  }
+
   function resetToManual() {
     setManual(true)
     setPincode('')
-    setSelectedNeighbourhood('')
     setAreaInput('')
   }
 
   // The neighbourhood to pass to SocietyPicker for filtering
-  const effectiveNeighbourhood = manual ? selectedNeighbourhood : detectedNeighbourhood
+  const effectiveNeighbourhood = manual ? areaInput.trim() : detectedNeighbourhood
 
   // The human-readable label the user sees — used for saving to profile
   const areaLabel = manual ? areaInput.trim() : detectedLabel
@@ -153,13 +156,12 @@ function useAreaDetection() {
     manual,
     setManual: resetToManual,
     areaInput,
-    setAreaInput,
+    setAreaInput: handleAreaInputChange,
     areaSuggestions,
     isFetchingSuggestions,
     showSuggestions,
     setShowSuggestions,
     selectSuggestion,
-    selectedNeighbourhood,
     effectiveNeighbourhood,
     detectedNeighbourhood,
     areaLabel,
@@ -318,7 +320,7 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
           <Input
             placeholder="e.g. Bellandur, Koramangala, Baner…"
             value={areaInput}
-            onChange={(e) => { setAreaInput(e.target.value); setShowSuggestions(true) }}
+            onChange={(e) => setAreaInput(e.target.value)}
             onFocus={() => setShowSuggestions(true)}
             onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
             autoComplete="off"

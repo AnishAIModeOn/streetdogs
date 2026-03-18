@@ -50,12 +50,12 @@ function unwrap(result) {
 export async function searchSocieties(pincode, searchTerm = '', neighbourhood = '') {
   const client = ensureSupabase()
   let query = client.from('societies').select('*')
+  const normalizedNeighbourhood = neighbourhood.trim()
 
-  if (pincode) {
+  if (normalizedNeighbourhood) {
+    query = query.ilike('neighbourhood', normalizedNeighbourhood)
+  } else if (pincode) {
     query = query.eq('pincode', pincode)
-  } else if (neighbourhood.trim()) {
-    // No pincode — filter by neighbourhood so only societies in that area show
-    query = query.ilike('neighbourhood', `%${neighbourhood.trim()}%`)
   }
 
   const term = searchTerm.trim()
@@ -73,22 +73,28 @@ export async function searchSocieties(pincode, searchTerm = '', neighbourhood = 
 export async function searchNeighbourhoods(term) {
   const client = ensureSupabase()
   const t = term.trim()
-  // Search neighbourhood name OR pincode so results appear even when neighbourhood is null
+  if (!t) {
+    return []
+  }
   const results = unwrap(
     await client
       .from('societies')
       .select('neighbourhood, pincode')
-      .or(`neighbourhood.ilike.%${t}%,pincode.ilike.%${t}%`)
+      .not('neighbourhood', 'is', null)
+      .ilike('neighbourhood', `%${t}%`)
       .order('neighbourhood', { ascending: true, nullsFirst: false })
       .limit(30),
   )
-  // Deduplicate: prefer rows with a neighbourhood name; fall back to pincode as label
   const seen = new Set()
   return results
-    .map((r) => ({ neighbourhood: r.neighbourhood || r.pincode, pincode: r.pincode }))
+    .map((r) => ({
+      neighbourhood: r.neighbourhood?.trim() || '',
+      pincode: r.pincode,
+    }))
     .filter((r) => {
-      if (!r.neighbourhood || seen.has(r.neighbourhood)) return false
-      seen.add(r.neighbourhood)
+      const key = r.neighbourhood.toLowerCase()
+      if (!key || seen.has(key)) return false
+      seen.add(key)
       return true
     })
     .slice(0, 10)
