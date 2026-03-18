@@ -37,6 +37,7 @@ export const emptyDogForm = {
 export const emptyGuestReportForm = {
   dog_name_or_temp_name: '',
   area_id: '',
+  guest_name: '',
   guest_contact: '',
   location_description: '',
   photo_url: '',

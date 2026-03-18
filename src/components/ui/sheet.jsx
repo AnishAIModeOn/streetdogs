@@ -10,6 +10,7 @@ export function SheetContent({ className, side = 'right', children, ...props }) 
   const sideClasses = {
     left: 'left-0 top-0 h-full w-[88vw] max-w-sm rounded-r-3xl',
     right: 'right-0 top-0 h-full w-[88vw] max-w-sm rounded-l-3xl',
+    bottom: 'bottom-0 left-0 w-full rounded-t-3xl',
   }
 
   return (

@@ -11,6 +11,7 @@ export interface UpsertDogInput {
   dog_name_or_temp_name?: string | null
   area_id?: string | null
   added_by_user_id?: string | null
+  tagged_by_user_id?: string | null
   added_by_guest?: boolean
   guest_contact?: string | null
   city?: string | null
@@ -89,6 +90,7 @@ export async function createDog(input: UpsertDogInput) {
       dog_name_or_temp_name: input.dog_name_or_temp_name ?? null,
       area_id: input.area_id ?? null,
       added_by_user_id: input.added_by_user_id ?? user?.id ?? null,
+      tagged_by_user_id: input.tagged_by_user_id ?? user?.id ?? null,
       added_by_guest: input.added_by_guest ?? !user,
       guest_contact: input.guest_contact ?? null,
       photo_url: input.photo_url ?? null,
