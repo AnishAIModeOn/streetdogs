@@ -13,7 +13,7 @@ import { Input } from './ui/input'
 const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? ''
 
 async function reverseGeocode(lat, lng) {
-  if (!GOOGLE_MAPS_KEY) return { pincode: '', neighbourhood: '' }
+  if (!GOOGLE_MAPS_KEY) return { pincode: '', neighbourhood: '', city: '' }
   const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_KEY}`
   const res = await fetch(url)
   const json = await res.json()
@@ -22,14 +22,16 @@ async function reverseGeocode(lat, lng) {
     const match = components.find((c) => types.some((t) => c.types.includes(t)))
     return match?.long_name ?? ''
   }
-  return {
-    pincode: get('postal_code'),
-    neighbourhood:
-      get('sublocality_level_1') ||
-      get('neighborhood') ||
-      get('sublocality') ||
-      get('administrative_area_level_3'),
-  }
+  const neighbourhood =
+    get('sublocality_level_1') ||
+    get('neighborhood') ||
+    get('sublocality') ||
+    get('administrative_area_level_3')
+  const city =
+    get('locality') ||
+    get('administrative_area_level_2') ||
+    get('administrative_area_level_1')
+  return { pincode: get('postal_code'), neighbourhood, city }
 }
 
 /**
@@ -51,33 +53,48 @@ async function trySaveSociety(userId, societyId, attempt = 1) {
 
 function usePincodeDetection() {
   const [pincode, setPincode] = useState('')
+  const [areaLabel, setAreaLabel] = useState('') // e.g. "Bellandur, Bengaluru"
   const [detecting, setDetecting] = useState(true)
+  const [manual, setManual] = useState(false)   // true when user overrides auto-detect
 
   useEffect(() => {
     if (!navigator.geolocation) {
       setDetecting(false)
+      setManual(true)
       return
     }
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
-          const { pincode: detected } = await reverseGeocode(
+          const { pincode: pc, neighbourhood, city } = await reverseGeocode(
             pos.coords.latitude,
             pos.coords.longitude,
           )
-          if (detected) setPincode(detected)
+          if (pc) {
+            setPincode(pc)
+            // Build a human-friendly label. Prefer "Neighbourhood, City".
+            const parts = [neighbourhood, city].filter(Boolean)
+            setAreaLabel(parts.length ? parts.join(', ') : pc)
+          } else {
+            // Coords resolved but no pincode (no Maps key or rural area)
+            setManual(true)
+          }
         } catch {
-          // silent — user can type manually
+          setManual(true)
         } finally {
           setDetecting(false)
         }
       },
-      () => setDetecting(false),
+      () => {
+        // Denied or timed out
+        setDetecting(false)
+        setManual(true)
+      },
       { timeout: 9000, maximumAge: 60_000 },
     )
   }, [])
 
-  return { pincode, setPincode, detecting }
+  return { pincode, setPincode, areaLabel, detecting, manual, setManual }
 }
 
 export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
@@ -87,7 +104,7 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
   const [errorMessage, setErrorMessage] = useState(authError)
   const [selectedSociety, setSelectedSociety] = useState(null)
 
-  const { pincode, setPincode, detecting } = usePincodeDetection()
+  const { pincode, setPincode, areaLabel, detecting, manual, setManual } = usePincodeDetection()
 
   const signInMutation = useSignIn()
   const signUpMutation = useSignUp()
@@ -164,25 +181,69 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
     }
   }
 
-  const pincodeField = (
+  const areaField = (
     <FormField>
       <FormLabel className="flex items-center gap-1.5">
         <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-        PIN Code
+        Your area
       </FormLabel>
-      <div className="relative">
-        <Input
-          placeholder={detecting ? 'Detecting location…' : 'Enter PIN code (e.g. 560001)'}
-          maxLength={6}
-          value={pincode}
-          onChange={(e) => setPincode(e.target.value.replace(/\D/g, ''))}
-        />
-        {detecting && (
-          <Loader2 className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
-        )}
-      </div>
-      {!detecting && pincode && (
-        <FormDescription>Auto-detected · you can edit if needed.</FormDescription>
+
+      {/* Detecting */}
+      {detecting && (
+        <div className="flex h-11 items-center gap-2.5 rounded-2xl border border-input bg-secondary/30 px-4 text-sm text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          Detecting your location…
+        </div>
+      )}
+
+      {/* Auto-detected — show friendly label */}
+      {!detecting && !manual && areaLabel && (
+        <>
+          <div className="flex h-11 items-center gap-2 rounded-2xl border border-emerald-200/80 bg-emerald-50/60 px-4 text-sm">
+            <MapPin className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+            <span className="flex-1 font-medium text-emerald-800">{areaLabel}</span>
+          </div>
+          <FormDescription>
+            Auto-detected ·{' '}
+            <button
+              type="button"
+              className="underline underline-offset-2 hover:text-foreground transition-colors"
+              onClick={() => { setManual(true); setPincode('') }}
+            >
+              not your area?
+            </button>
+          </FormDescription>
+        </>
+      )}
+
+      {/* Manual — PIN code input (geo denied, no Maps key, or user overrode) */}
+      {!detecting && (manual || !areaLabel) && (
+        <>
+          <div className="relative">
+            <Input
+              placeholder="Enter PIN code (e.g. 560001)"
+              maxLength={6}
+              value={pincode}
+              onChange={(e) => setPincode(e.target.value.replace(/\D/g, ''))}
+            />
+          </div>
+          {manual && areaLabel && (
+            <FormDescription>
+              <button
+                type="button"
+                className="underline underline-offset-2 hover:text-foreground transition-colors"
+                onClick={() => { setManual(false); }}
+              >
+                ← use detected area instead
+              </button>
+            </FormDescription>
+          )}
+          {!areaLabel && (
+            <FormDescription>
+              Used to find societies near you.
+            </FormDescription>
+          )}
+        </>
       )}
     </FormField>
   )
@@ -191,6 +252,7 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
     <div className="rounded-[1.5rem] border border-border/60 bg-secondary/20 p-4">
       <SocietyPicker
         pincode={pincode}
+        areaLabel={areaLabel}
         onSelect={setSelectedSociety}
         deferCreate
       />
@@ -275,7 +337,7 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
             </FormDescription>
           </FormField>
 
-          {pincodeField}
+          {areaField}
           {societyPicker}
 
           <Button type="submit" size="lg" disabled={isSubmitting}>
@@ -317,7 +379,7 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
             />
           </FormField>
 
-          {pincodeField}
+          {areaField}
           {societyPicker}
 
           <Button type="submit" size="lg" disabled={isSubmitting}>

@@ -29,7 +29,7 @@ function useDebouncedValue(value, delay = 280) {
   return debounced
 }
 
-export function SocietyPicker({ pincode = '', onSelect, deferCreate = false }) {
+export function SocietyPicker({ pincode = '', areaLabel = '', onSelect, deferCreate = false }) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [societies, setSocieties] = useState([])
@@ -226,7 +226,7 @@ export function SocietyPicker({ pincode = '', onSelect, deferCreate = false }) {
             }}
           >
             <span className="text-muted-foreground">
-              {pincode ? `Search societies in ${pincode}…` : 'Search for your society…'}
+              {areaLabel || pincode ? `Search societies in ${areaLabel || pincode}…` : 'Search for your society…'}
             </span>
             <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
           </button>
@@ -240,7 +240,7 @@ export function SocietyPicker({ pincode = '', onSelect, deferCreate = false }) {
               <input
                 ref={inputRef}
                 className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                placeholder={pincode ? `Search in ${pincode}…` : 'Type society name…'}
+                placeholder={areaLabel || pincode ? `Search in ${areaLabel || pincode}…` : 'Type society name…'}
                 value={searchTerm}
                 onChange={(e) => { setSearchTerm(e.target.value); setActiveIndex(-1) }}
                 onKeyDown={handleKeyDown}
