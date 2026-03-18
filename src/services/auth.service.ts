@@ -4,7 +4,11 @@ import type { AuthSessionState, Profile } from '../types/supabase'
 
 async function getProfile(userId: string) {
   const supabase = requireSupabase()
-  const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single()
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*, societies(id, name, pincode, neighbourhood)')
+    .eq('id', userId)
+    .single()
 
   if (error) {
     throw error

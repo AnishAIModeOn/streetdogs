@@ -240,6 +240,9 @@ export function AddDogPage({ user, profile }) {
     try {
       setIsSaving(true)
       setErrorMessage('')
+      // Derive the tagger's area from their linked society (joined in profile).
+      // Falls back to null so legacy dogs without a society stay visible to all.
+      const society = profile?.societies ?? null
       const createdDog = await createDog({
         ...form,
         added_by_user_id: user.id,
@@ -247,6 +250,9 @@ export function AddDogPage({ user, profile }) {
         guest_contact: form.guest_contact.trim() || null,
         latitude: form.latitude ? Number(form.latitude) : null,
         longitude: form.longitude ? Number(form.longitude) : null,
+        tagged_by_user_id: user.id,
+        tagged_area_pincode: society?.pincode ?? null,
+        tagged_area_neighbourhood: society?.neighbourhood ?? null,
       })
       navigateTo(`/dogs/${createdDog.id}`)
     } catch (error) {

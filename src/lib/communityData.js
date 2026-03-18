@@ -317,6 +317,11 @@ export async function createDog(payload) {
     temperament: payload.temperament ?? null,
     visibility_type: payload.visibility_type ?? 'normal_area_visible',
     status: payload.status ?? 'active',
+    // Area-tagging: written at create time so RLS pincode scoping works correctly.
+    // tagged_by_user_id lets the user always see their own dogs regardless of area.
+    tagged_by_user_id: payload.tagged_by_user_id ?? null,
+    tagged_area_pincode: payload.tagged_area_pincode ?? null,
+    tagged_area_neighbourhood: payload.tagged_area_neighbourhood ?? null,
   }
 
   return unwrap(await client.from('dogs').insert(safePayload).select().single())
