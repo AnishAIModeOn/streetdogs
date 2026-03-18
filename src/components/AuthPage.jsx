@@ -170,7 +170,7 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
       <div className="relative">
         <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          className="pl-10"
+          className="pl-11"
           placeholder={detecting ? 'Detecting location…' : 'Enter PIN code (e.g. 560001)'}
           maxLength={6}
           value={pincode}
