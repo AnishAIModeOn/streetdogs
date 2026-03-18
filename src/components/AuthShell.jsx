@@ -1,7 +1,7 @@
 import { HeartHandshake, PawPrint, Star } from 'lucide-react'
 import { Badge } from './ui/badge'
 
-export function AuthShell({ badge, title, description, asideTitle, asideCopy, children, footer }) {
+export function AuthShell({ badge, title, description, asideTitle, asideCopy, children, footer, hideFeatures = false }) {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
       <section className="grid gap-5 rounded-[2rem] border border-white/65 bg-hero-wash p-6 shadow-float lg:grid-cols-[1.05fr_0.95fr]">
@@ -20,23 +20,25 @@ export function AuthShell({ badge, title, description, asideTitle, asideCopy, ch
           </div>
 
           {/* Feature highlights */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <FeatureTile
-              icon={PawPrint}
-              title="Simple, warm workflow"
-              body="Forms stay approachable for volunteers and neighbors on mobile and desktop."
-            />
-            <FeatureTile
-              icon={HeartHandshake}
-              title="Built for community trust"
-              body="Area-based records help people coordinate care without feeling overwhelmed."
-            />
-            <FeatureTile
-              icon={Star}
-              title="Care without accounts"
-              body="Guests can report dogs without signing up — local volunteers take it from there."
-            />
-          </div>
+          {!hideFeatures && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FeatureTile
+                icon={PawPrint}
+                title="Simple, warm workflow"
+                body="Forms stay approachable for volunteers and neighbors on mobile and desktop."
+              />
+              <FeatureTile
+                icon={HeartHandshake}
+                title="Built for community trust"
+                body="Area-based records help people coordinate care without feeling overwhelmed."
+              />
+              <FeatureTile
+                icon={Star}
+                title="Care without accounts"
+                body="Guests can report dogs without signing up — local volunteers take it from there."
+              />
+            </div>
+          )}
         </div>
 
         {/* Right: form card */}

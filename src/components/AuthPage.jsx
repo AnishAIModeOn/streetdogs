@@ -168,10 +168,10 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
     <FormField>
       <FormLabel>PIN Code</FormLabel>
       <div className="relative">
-        <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          className="pl-10"
-          placeholder={detecting ? 'Detecting location…' : 'e.g. 560001'}
+          className="pl-9"
+          placeholder={detecting ? 'Detecting location…' : 'Enter PIN code (e.g. 560001)'}
           maxLength={6}
           value={pincode}
           onChange={(e) => setPincode(e.target.value.replace(/\D/g, ''))}
@@ -199,6 +199,7 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
   return (
     <AuthShell
       badge="StreetDog App"
+      hideFeatures={!isSignUp}
       title={isSignUp ? 'Create your account' : 'Sign in to your area dashboard'}
       description={
         isSignUp
