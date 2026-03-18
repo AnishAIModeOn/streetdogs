@@ -44,7 +44,7 @@ export default {
         float: '0 28px 60px rgba(70, 55, 39, 0.14)',
       },
       fontFamily: {
-        sans: ['"Trebuchet MS"', '"Segoe UI"', 'sans-serif'],
+        sans: ['"Plus Jakarta Sans"', '"Inter"', '"Segoe UI"', 'sans-serif'],
       },
       backgroundImage: {
         'hero-wash':

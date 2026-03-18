@@ -2,31 +2,31 @@
 
 @theme {
   --color-background: hsl(38 48% 95%);
-  --color-foreground: hsl(150 20% 18%);
+  --color-foreground: hsl(150 22% 16%);
   --color-card: hsl(0 0% 100%);
-  --color-card-foreground: hsl(150 20% 18%);
+  --color-card-foreground: hsl(150 22% 16%);
   --color-popover: hsl(0 0% 100%);
-  --color-popover-foreground: hsl(150 20% 18%);
-  --color-primary: hsl(144 29% 32%);
+  --color-popover-foreground: hsl(150 22% 16%);
+  --color-primary: hsl(144 30% 30%);
   --color-primary-foreground: hsl(48 100% 96%);
-  --color-secondary: hsl(34 57% 88%);
+  --color-secondary: hsl(34 55% 88%);
   --color-secondary-foreground: hsl(28 35% 24%);
   --color-muted: hsl(42 34% 92%);
-  --color-muted-foreground: hsl(150 10% 38%);
-  --color-accent: hsl(28 78% 60%);
+  --color-muted-foreground: hsl(150 10% 40%);
+  --color-accent: hsl(28 80% 58%);
   --color-accent-foreground: hsl(0 0% 100%);
   --color-destructive: hsl(0 72% 58%);
   --color-destructive-foreground: hsl(0 0% 100%);
-  --color-border: hsl(36 24% 84%);
-  --color-input: hsl(36 24% 84%);
-  --color-ring: hsl(144 29% 32%);
-  --shadow-soft: 0 18px 45px rgba(70, 55, 39, 0.1);
-  --shadow-float: 0 28px 60px rgba(70, 55, 39, 0.14);
-  --font-sans: "Trebuchet MS", "Segoe UI", sans-serif;
+  --color-border: hsl(36 26% 84%);
+  --color-input: hsl(36 26% 88%);
+  --color-ring: hsl(144 30% 30%);
+  --shadow-soft: 0 4px 24px rgba(70, 55, 39, 0.08), 0 1px 4px rgba(70, 55, 39, 0.05);
+  --shadow-float: 0 16px 48px rgba(70, 55, 39, 0.14), 0 4px 12px rgba(70, 55, 39, 0.07);
+  --font-sans: "Plus Jakarta Sans", "Inter", "Segoe UI", sans-serif;
   --background-image-hero-wash:
-    radial-gradient(circle at top left, rgba(240, 150, 82, 0.28), transparent 28%),
-    radial-gradient(circle at right 20%, rgba(74, 122, 94, 0.18), transparent 28%),
-    linear-gradient(145deg, rgba(252, 248, 240, 0.98), rgba(244, 235, 221, 0.95));
+    radial-gradient(circle at top left, rgba(240, 150, 82, 0.22), transparent 30%),
+    radial-gradient(circle at right 20%, rgba(74, 122, 94, 0.15), transparent 30%),
+    linear-gradient(145deg, rgba(253, 250, 243, 0.99), rgba(245, 237, 223, 0.97));
 }
 
 @layer base {
@@ -44,9 +44,11 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     background-image:
-      radial-gradient(circle at top, rgba(255, 242, 209, 0.6), transparent 30%);
+      radial-gradient(ellipse at top, rgba(255, 246, 220, 0.55), transparent 40%),
+      radial-gradient(ellipse at bottom right, rgba(200, 230, 215, 0.25), transparent 40%);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.01em;
   }
 
   a {
@@ -63,5 +65,24 @@
 
   #root {
     min-height: 100vh;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer utilities {
+  .text-gradient-warm {
+    background: linear-gradient(135deg, hsl(144 30% 30%), hsl(28 80% 52%));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .card-premium {
+    background: linear-gradient(145deg, rgba(255,255,255,0.97), rgba(252,249,241,0.96));
+    border: 1px solid rgba(255,255,255,0.75);
+    box-shadow: var(--shadow-soft);
   }
 }

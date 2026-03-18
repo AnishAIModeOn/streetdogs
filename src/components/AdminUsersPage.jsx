@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { MapPin, ShieldCheck, Users } from 'lucide-react'
 import { countPendingContributions, listProfilesForAdmin, updateUserRole } from '../lib/communityData'
 import { StatusBanner } from './StatusBanner'
 import { Badge } from './ui/badge'
@@ -11,6 +12,39 @@ const roleOptions = ['end_user', 'inventory_admin', 'superadmin']
 
 function formatRole(role) {
   return role ? role.replaceAll('_', ' ') : 'Not set'
+}
+
+function getRoleVariant(role) {
+  switch (role) {
+    case 'superadmin':
+      return 'default'
+    case 'inventory_admin':
+      return 'warning'
+    default:
+      return 'outline'
+  }
+}
+
+function getRoleColor(role) {
+  switch (role) {
+    case 'superadmin':
+      return 'bg-primary/10 text-primary border-primary/20'
+    case 'inventory_admin':
+      return 'bg-amber-50 text-amber-700 border-amber-200'
+    default:
+      return 'bg-secondary/60 text-muted-foreground border-border'
+  }
+}
+
+function UserAvatar({ name }) {
+  const initials = name
+    ? name.split(' ').filter(Boolean).slice(0, 2).map((n) => n[0]).join('').toUpperCase()
+    : '?'
+  return (
+    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+      {initials}
+    </div>
+  )
 }
 
 export function AdminUsersPage({ profile }) {
@@ -55,11 +89,9 @@ export function AdminUsersPage({ profile }) {
 
     setDraftRoles((current) => {
       const nextDrafts = Object.fromEntries(users.map((user) => [user.id, user.role || 'end_user']))
-
       if (JSON.stringify(current) === JSON.stringify(nextDrafts)) {
         return current
       }
-
       return nextDrafts
     })
   }, [users])
@@ -94,7 +126,10 @@ export function AdminUsersPage({ profile }) {
       <section className="space-y-6">
         <Card className="rounded-[2rem] border-dashed border-border bg-white/90">
           <CardContent className="space-y-2 p-10 text-center">
-            <h3 className="text-xl font-semibold text-foreground">Unauthorized</h3>
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-secondary text-muted-foreground">
+              <ShieldCheck className="h-7 w-7" />
+            </div>
+            <h3 className="text-xl font-bold text-foreground">Restricted area</h3>
             <p className="text-sm leading-6 text-muted-foreground">
               Only superadmin users can manage roles on this page.
             </p>
@@ -111,33 +146,54 @@ export function AdminUsersPage({ profile }) {
 
   return (
     <section className="space-y-6">
-      <div className="grid gap-4 rounded-[2rem] border border-white/70 bg-hero-wash p-6 shadow-float lg:grid-cols-[1.05fr_0.95fr]">
+      {/* Page header */}
+      <div className="grid gap-4 rounded-[2rem] border border-white/65 bg-hero-wash p-6 shadow-float lg:grid-cols-[1.05fr_0.95fr]">
         <div className="space-y-4">
           <Badge className="w-fit" variant="secondary">
             Admin
           </Badge>
           <div className="space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-              Manage user roles
+            <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+              Manage community roles
             </h1>
-            <p className="max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
-              Review area assignments and update one role at a time without leaving the StreetDog
-              App admin flow.
+            <p className="max-w-lg text-sm leading-7 text-muted-foreground sm:text-[0.95rem]">
+              Review area assignments and update access levels so the right people can take care of
+              the right dogs.
             </p>
           </div>
         </div>
 
-        <Card className="rounded-[1.75rem] border-white/70 bg-white/90">
-          <CardHeader>
-            <CardTitle>Admin snapshot</CardTitle>
+        {/* Stats snapshot */}
+        <Card className="rounded-[1.75rem] border-white/65 bg-white/92">
+          <CardHeader className="pb-3">
+            <CardTitle>Community snapshot</CardTitle>
             <CardDescription>Quick totals from visible profile records.</CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-            <StatTile label="Total users" value={stats.total} />
-            <StatTile label="Admin roles" value={stats.admins} />
-            <StatTile label="Missing area" value={stats.missingArea} />
-            <StatTile label="Pending approvals" value={pendingContributions} />
-            <StatTile label="Inactive profiles" value={stats.inactiveProfiles} />
+          <CardContent className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-1">
+            <StatTile
+              label="Total members"
+              value={stats.total}
+              icon={Users}
+              color="bg-primary/10 text-primary"
+            />
+            <StatTile
+              label="Admin roles"
+              value={stats.admins}
+              icon={ShieldCheck}
+              color="bg-amber-50 text-amber-600"
+            />
+            <StatTile
+              label="Missing area"
+              value={stats.missingArea}
+              icon={MapPin}
+              color="bg-rose-50 text-rose-500"
+            />
+            <StatTile
+              label="Pending approvals"
+              value={pendingContributions}
+              icon={ShieldCheck}
+              color="bg-emerald-50 text-emerald-600"
+            />
           </CardContent>
         </Card>
       </div>
@@ -150,44 +206,57 @@ export function AdminUsersPage({ profile }) {
           {Array.from({ length: 4 }).map((_, index) => (
             <div
               key={index}
-              className="h-40 animate-pulse rounded-[2rem] border border-border/70 bg-white/70"
+              className="h-36 animate-pulse rounded-[2rem] border border-border/50 bg-white/65"
             />
           ))}
         </div>
       ) : (
         <div className="grid gap-4">
           {usersWithDrafts.map((user) => (
-            <Card key={user.id} className="rounded-[2rem] border-white/70 bg-white/90">
-              <CardHeader className="space-y-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="space-y-1">
-                    <CardTitle>{user.full_name || 'Name not added'}</CardTitle>
-                    <CardDescription>
-                      {user.primary_area
-                        ? `${user.primary_area.city} - ${user.primary_area.name}`
-                        : 'Primary area not set'}
-                    </CardDescription>
+            <Card
+              key={user.id}
+              className="overflow-hidden rounded-[2rem] border-white/65 bg-white/95 shadow-soft transition-shadow hover:shadow-float"
+            >
+              <CardContent className="p-5">
+                {/* Top row: avatar + name + role badge */}
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex items-start gap-3">
+                    <UserAvatar name={user.full_name} />
+                    <div className="space-y-0.5 pt-0.5">
+                      <p className="text-[0.95rem] font-bold text-foreground">
+                        {user.full_name || 'Name not added'}
+                      </p>
+                      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <MapPin className="h-3 w-3" />
+                        {user.primary_area
+                          ? `${user.primary_area.city} · ${user.primary_area.name}`
+                          : 'Primary area not set'}
+                      </p>
+                      <p className="text-[0.7rem] font-mono text-muted-foreground/60 break-all">
+                        {user.id}
+                      </p>
+                    </div>
                   </div>
-                  <Badge variant="outline">{formatRole(user.role)}</Badge>
-                </div>
-              </CardHeader>
-
-              <CardContent className="grid gap-4">
-                <div className="grid gap-3 md:grid-cols-2">
-                  <InfoTile label="Created" value={new Date(user.created_at).toLocaleString()} />
-                  <InfoTile label="User ID" value={user.id} mono />
+                  <div
+                    className={`self-start rounded-full border px-3 py-1 text-xs font-semibold capitalize ${getRoleColor(user.role)}`}
+                  >
+                    {formatRole(user.role)}
+                  </div>
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium text-foreground">Role</p>
+                {/* Divider */}
+                <div className="my-4 h-px bg-border/50" />
+
+                {/* Role editor */}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <div className="flex-1 space-y-1.5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                      Update role
+                    </p>
                     <Select
                       value={user.draftRole}
                       onValueChange={(value) =>
-                        setDraftRoles((current) => ({
-                          ...current,
-                          [user.id]: value,
-                        }))
+                        setDraftRoles((current) => ({ ...current, [user.id]: value }))
                       }
                     >
                       <SelectTrigger>
@@ -207,8 +276,18 @@ export function AdminUsersPage({ profile }) {
                     disabled={isSavingUserId === user.id || user.draftRole === user.role}
                     onClick={() => handleSaveRole(user.id)}
                   >
-                    {isSavingUserId === user.id ? 'Saving...' : 'Update role'}
+                    {isSavingUserId === user.id ? 'Saving...' : 'Save Role'}
                   </Button>
+                </div>
+
+                {/* Metadata row */}
+                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  <span>
+                    Joined{' '}
+                    <span className="font-medium text-foreground">
+                      {new Date(user.created_at).toLocaleDateString()}
+                    </span>
+                  </span>
                 </div>
               </CardContent>
             </Card>
@@ -219,24 +298,16 @@ export function AdminUsersPage({ profile }) {
   )
 }
 
-function StatTile({ label, value }) {
+function StatTile({ label, value, icon: Icon, color = 'bg-secondary/40 text-foreground' }) {
   return (
-    <div className="rounded-2xl bg-secondary/35 p-4 shadow-soft">
-      <p className="text-sm font-medium text-muted-foreground">{label}</p>
-      <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">{value}</p>
-    </div>
-  )
-}
-
-function InfoTile({ label, value, mono = false }) {
-  return (
-    <div className="rounded-2xl bg-secondary/30 p-4">
-      <p className="text-sm font-medium text-muted-foreground">{label}</p>
-      <p
-        className={`mt-2 text-sm font-medium text-foreground ${mono ? 'break-all font-mono text-xs' : ''}`}
-      >
-        {value}
-      </p>
+    <div className="flex items-center gap-3 rounded-[1.3rem] bg-secondary/30 px-4 py-3">
+      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${color}`}>
+        <Icon className="h-4 w-4" />
+      </div>
+      <div>
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="text-xl font-extrabold tracking-tight text-foreground">{value}</p>
+      </div>
     </div>
   )
 }

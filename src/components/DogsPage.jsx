@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { PawPrint, Search } from 'lucide-react'
+import { PawPrint, Plus, Search, SlidersHorizontal } from 'lucide-react'
 import { useDogs } from '../hooks/use-dogs'
 import { listAreas } from '../lib/communityData'
 import { navigateTo } from '../lib/navigation'
 import { DogCard } from './DogCard'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
-import { Card, CardContent } from './ui/card'
 import { Input } from './ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 
@@ -23,16 +22,11 @@ export function DogsPage() {
 
   useEffect(() => {
     let isMounted = true
-
     const loadData = async () => {
       try {
         setErrorMessage('')
         const nextAreas = await listAreas()
-
-        if (!isMounted) {
-          return
-        }
-
+        if (!isMounted) return
         setAreas(
           nextAreas.reduce((grouped, area) => {
             grouped[area.id] = area
@@ -45,17 +39,12 @@ export function DogsPage() {
         }
       }
     }
-
     loadData()
-
-    return () => {
-      isMounted = false
-    }
+    return () => { isMounted = false }
   }, [])
 
   const filteredDogs = useMemo(() => {
     const normalizedQuery = searchTerm.trim().toLowerCase()
-
     return dogs.filter((dog) => {
       const area = areas[dog.area_id]
       const dogStatus = dog.status || dog.dog_status || 'active'
@@ -70,10 +59,8 @@ export function DogsPage() {
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
-
       const matchesSearch = normalizedQuery ? haystack.includes(normalizedQuery) : true
       const matchesStatus = statusFilter === 'all' ? true : dogStatus === statusFilter
-
       return matchesSearch && matchesStatus
     })
   }, [areas, dogs, searchTerm, statusFilter])
@@ -83,32 +70,39 @@ export function DogsPage() {
 
   return (
     <section className="space-y-6">
-      <div className="grid gap-4 rounded-[2rem] border border-white/70 bg-hero-wash p-6 shadow-float lg:grid-cols-[1.1fr_0.9fr]">
+      {/* Page header */}
+      <div className="grid gap-4 rounded-[2rem] border border-white/65 bg-hero-wash p-6 shadow-float lg:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-3">
           <Badge className="w-fit" variant="secondary">
             Dog directory
           </Badge>
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-            Dogs visible to your StreetDog App account
+          <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+            Dogs visible to your account
           </h1>
-          <p className="max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
-            Browse community records, scan location notes, and open the full dog profile when you
-            are ready to help.
+          <p className="max-w-lg text-sm leading-7 text-muted-foreground sm:text-[0.95rem]">
+            Browse community records, scan location notes, and open the full dog profile when
+            you&apos;re ready to help.
           </p>
         </div>
-        <Card className="rounded-[1.75rem] border-white/70 bg-white/90">
-          <CardContent className="space-y-4 p-5">
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">Find a dog faster</p>
-              <p className="text-sm leading-6 text-muted-foreground">
-                Search by name, location, health notes, or area.
-              </p>
+
+        {/* Search & filter card */}
+        <div className="rounded-[1.75rem] border border-white/65 bg-white/92 p-5 shadow-soft">
+          <div className="mb-4 flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <SlidersHorizontal className="h-3.5 w-3.5" />
             </div>
+            <div>
+              <p className="text-sm font-bold text-foreground">Find a dog</p>
+              <p className="text-xs text-muted-foreground">Search by name, area, or care notes</p>
+            </div>
+          </div>
+
+          <div className="grid gap-3">
             <div className="relative">
-              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                className="pl-11"
-                placeholder="Search dogs, area, or notes"
+                className="pl-10"
+                placeholder="Search dogs, area, or notes…"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
               />
@@ -125,25 +119,47 @@ export function DogsPage() {
                 <SelectItem value="deceased">Deceased</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" onClick={() => navigateTo('/dogs/new')}>
-              Add a new dog record
+            <Button onClick={() => navigateTo('/dogs/new')}>
+              <Plus className="h-4 w-4" />
+              Add a dog record
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {activeErrorMessage ? (
-        <Card className="rounded-3xl border-red-200 bg-red-50/80">
-          <CardContent className="p-5 text-sm text-red-700">{activeErrorMessage}</CardContent>
-        </Card>
+        <div className="rounded-2xl border border-red-200 bg-red-50/80 px-5 py-4 text-sm text-red-700">
+          {activeErrorMessage}
+        </div>
       ) : null}
 
+      {/* Results count */}
+      {!isLoading && dogs.length > 0 && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Showing{' '}
+            <span className="font-semibold text-foreground">{filteredDogs.length}</span>
+            {filteredDogs.length !== dogs.length ? ` of ${dogs.length}` : ''} dog
+            {filteredDogs.length !== 1 ? 's' : ''}
+          </p>
+          {searchTerm || statusFilter !== 'all' ? (
+            <button
+              className="text-xs font-semibold text-primary hover:underline"
+              onClick={() => { setSearchTerm(''); setStatusFilter('all') }}
+            >
+              Clear filters
+            </button>
+          ) : null}
+        </div>
+      )}
+
+      {/* Dog grid */}
       {isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 6 }).map((_, index) => (
             <div
               key={index}
-              className="h-[340px] animate-pulse rounded-3xl border border-border/70 bg-white/70"
+              className="h-[320px] animate-pulse rounded-3xl border border-border/50 bg-white/65"
             />
           ))}
         </div>
@@ -151,7 +167,6 @@ export function DogsPage() {
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filteredDogs.map((dog) => {
             const area = areas[dog.area_id]
-
             return (
               <DogCard
                 key={dog.id}
@@ -163,21 +178,27 @@ export function DogsPage() {
           })}
 
           {filteredDogs.length === 0 ? (
-            <Card className="rounded-3xl border-dashed border-border bg-white/80 sm:col-span-2 xl:col-span-3">
-              <CardContent className="flex flex-col items-center gap-3 p-10 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-secondary text-primary">
-                  <PawPrint className="h-7 w-7" />
-                </div>
-                <h3 className="text-xl font-semibold text-foreground">
-                  {dogs.length === 0 ? 'No dogs visible yet' : 'No matches for that search'}
+            <div className="flex flex-col items-center gap-4 rounded-[2rem] border border-dashed border-border bg-white/80 p-12 text-center sm:col-span-2 xl:col-span-3">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-secondary text-primary">
+                <PawPrint className="h-8 w-8" />
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-xl font-bold text-foreground">
+                  {dogs.length === 0 ? 'No dogs visible yet' : 'No matches found'}
                 </h3>
-                <p className="max-w-md text-sm leading-6 text-muted-foreground">
+                <p className="max-w-sm text-sm leading-6 text-muted-foreground">
                   {dogs.length === 0
                     ? 'Add the first dog in your area or wait for visible records to appear.'
                     : 'Try a broader search by area, location, or health notes.'}
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+              {dogs.length === 0 && (
+                <Button onClick={() => navigateTo('/dogs/new')}>
+                  <Plus className="h-4 w-4" />
+                  Add first dog
+                </Button>
+              )}
+            </div>
           ) : null}
         </div>
       )}

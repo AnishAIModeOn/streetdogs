@@ -187,18 +187,18 @@ export function RaiseExpensePage({ dogId, user }) {
 
   return (
     <section className="space-y-6">
-      <div className="grid gap-4 rounded-[2rem] border border-white/70 bg-hero-wash p-6 shadow-float lg:grid-cols-[1.05fr_0.95fr]">
+      <div className="grid gap-4 rounded-[2rem] border border-white/65 bg-hero-wash p-6 shadow-float lg:grid-cols-[1.05fr_0.95fr]">
         <div className="space-y-4">
           <Badge className="w-fit" variant="secondary">
             Raise Expense
           </Badge>
           <div className="space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-              Create an expense for {dog.dog_name_or_temp_name || 'this dog'}
+            <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+              Start an expense appeal
             </h1>
-            <p className="max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
-              Start a clear, trustworthy expense request so supporters can understand the need and
-              help with confidence.
+            <p className="max-w-lg text-sm leading-7 text-muted-foreground sm:text-[0.95rem]">
+              A clear, trustworthy request helps supporters understand the need and contribute
+              with confidence.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -208,23 +208,23 @@ export function RaiseExpensePage({ dogId, user }) {
           </div>
         </div>
 
-        <Card className="overflow-hidden rounded-[1.75rem] border-white/70 bg-white/90">
-          <CardHeader>
+        <Card className="overflow-hidden rounded-[1.75rem] border-white/65 bg-white/92">
+          <CardHeader className="pb-3">
             <CardTitle>Expense context</CardTitle>
             <CardDescription>
               Keep requests specific and verifiable so the community can support quickly.
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3 text-sm leading-6 text-muted-foreground">
-            <div className="rounded-2xl bg-secondary/40 p-4">
-              <span className="font-semibold text-foreground">Dog:</span>{' '}
-              {dog.dog_name_or_temp_name || 'Unnamed dog'}
+          <CardContent className="space-y-2.5 text-sm leading-6">
+            <div className="flex items-center gap-3 rounded-xl bg-secondary/35 px-4 py-3">
+              <span className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground">Dog</span>
+              <span className="font-semibold text-foreground">{dog.dog_name_or_temp_name || 'Unnamed dog'}</span>
             </div>
-            <div className="rounded-2xl bg-secondary/40 p-4">
-              <span className="font-semibold text-foreground">Area:</span>{' '}
-              {area ? `${area.city} - ${area.name}` : 'Area unavailable'}
+            <div className="flex items-center gap-3 rounded-xl bg-secondary/35 px-4 py-3">
+              <span className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground">Area</span>
+              <span className="font-semibold text-foreground">{area ? `${area.city} · ${area.name}` : 'Area unavailable'}</span>
             </div>
-            <div className="rounded-2xl bg-secondary/40 p-4">
+            <div className="rounded-xl bg-secondary/25 px-4 py-3 text-muted-foreground">
               Add a short description and receipt link if available so contributors have context.
             </div>
           </CardContent>

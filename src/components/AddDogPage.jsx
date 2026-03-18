@@ -258,16 +258,16 @@ export function AddDogPage({ user, profile }) {
 
   return (
     <section className="space-y-6">
-      <div className="grid gap-4 rounded-[2rem] border border-white/70 bg-hero-wash p-6 shadow-float lg:grid-cols-[1.05fr_0.95fr]">
+      <div className="grid gap-4 rounded-[2rem] border border-white/65 bg-hero-wash p-6 shadow-float lg:grid-cols-[1.05fr_0.95fr]">
         <div className="space-y-4">
           <Badge className="w-fit" variant="secondary">
             Add Dog
           </Badge>
           <div className="space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+            <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
               Create a new dog record
             </h1>
-            <p className="max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
+            <p className="max-w-lg text-sm leading-7 text-muted-foreground sm:text-[0.95rem]">
               Add a dog profile with clear location and care notes so volunteers can track support
               with confidence.
             </p>
@@ -279,24 +279,26 @@ export function AddDogPage({ user, profile }) {
           </div>
         </div>
 
-        <Card className="overflow-hidden rounded-[1.75rem] border-white/70 bg-white/90">
-          <CardHeader>
+        <Card className="overflow-hidden rounded-[1.75rem] border-white/65 bg-white/92">
+          <CardHeader className="pb-3">
             <CardTitle>Before you save</CardTitle>
             <CardDescription>
-              One clear photo and a short location description usually create the most useful first
-              record.
+              One clear photo and a short location description usually create the most useful first record.
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3 text-sm leading-6 text-muted-foreground">
-            <div className="rounded-2xl bg-secondary/40 p-4">
-              Pick the correct area so the dog is visible to the right local volunteers.
-            </div>
-            <div className="rounded-2xl bg-secondary/40 p-4">
-              AI analysis can help suggest age, gender, temperament, and care notes from the photo.
-            </div>
-            <div className="rounded-2xl bg-secondary/40 p-4">
-              You can review all AI suggestions before saving anything.
-            </div>
+          <CardContent className="space-y-2.5 text-sm leading-6 text-muted-foreground">
+            {[
+              'Pick the correct area so the dog is visible to the right local volunteers.',
+              'AI analysis can suggest age, gender, temperament, and care notes from the photo.',
+              'You can review all AI suggestions before saving anything.',
+            ].map((tip, i) => (
+              <div key={i} className="flex items-start gap-3 rounded-xl bg-secondary/35 px-4 py-3">
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[0.65rem] font-bold text-primary">
+                  {i + 1}
+                </span>
+                <span>{tip}</span>
+              </div>
+            ))}
           </CardContent>
         </Card>
       </div>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Boxes, HeartHandshake, PackageCheck } from 'lucide-react'
+import { Boxes, HeartHandshake, PackageCheck, PackagePlus } from 'lucide-react'
 import {
   getProfile,
   listInventoryRequestsForArea,
@@ -74,25 +74,17 @@ export function InventoryPage({ user, profile }) {
         const currentProfile = await getProfile(user.id)
         const filterAreaId = currentProfile?.primary_area_id || profile?.primary_area_id || null
 
-        console.log('[inventory-debug] auth user id:', user.id)
-        console.log('[inventory-debug] profile.primary_area_id:', currentProfile?.primary_area_id)
-        console.log('[inventory-debug] inventory query filter value:', filterAreaId)
-
         if (!filterAreaId) {
           throw new Error('Your profile does not have a primary area yet.')
         }
 
         const nextRequests = await listInventoryRequestsForArea(filterAreaId)
-        console.log('[inventory-debug] inventory query result:', nextRequests)
-
         if (isMounted) {
           setRequests(nextRequests)
         }
       } catch (error) {
         if (isMounted) {
-          setErrorMessage(
-            error instanceof Error ? error.message : 'Unable to load inventory requests.',
-          )
+          setErrorMessage(error instanceof Error ? error.message : 'Unable to load inventory requests.')
         }
       } finally {
         if (isMounted) {
@@ -102,10 +94,7 @@ export function InventoryPage({ user, profile }) {
     }
 
     loadRequests()
-
-    return () => {
-      isMounted = false
-    }
+    return () => { isMounted = false }
   }, [profile?.primary_area_id, user?.id])
 
   const reloadRequests = async () => {
@@ -117,24 +106,12 @@ export function InventoryPage({ user, profile }) {
     const matches = (item.inventory_commitments ?? []).filter(
       (commitment) => commitment.committed_by_user_id === user?.id,
     )
-
-    if (matches.length === 0) {
-      return null
-    }
-
-    const totalQuantity = matches.reduce(
-      (sum, commitment) => sum + Number(commitment.quantity ?? 0),
-      0,
-    )
+    if (matches.length === 0) return null
+    const totalQuantity = matches.reduce((sum, c) => sum + Number(c.quantity ?? 0), 0)
     const latestCommitment = [...matches].sort(
-      (left, right) => new Date(right.created_at) - new Date(left.created_at),
+      (l, r) => new Date(r.created_at) - new Date(l.created_at),
     )[0]
-
-    return {
-      quantity: totalQuantity,
-      created_at: latestCommitment.created_at,
-      status: latestCommitment.status,
-    }
+    return { quantity: totalQuantity, created_at: latestCommitment.created_at, status: latestCommitment.status }
   }
 
   const openCommitmentForm = (itemId) => {
@@ -151,17 +128,14 @@ export function InventoryPage({ user, profile }) {
 
   const handleCommitmentSubmit = async (item) => {
     const quantity = Number(commitmentForm.quantity)
-
     if (!commitmentForm.quantity || quantity <= 0) {
       setErrorMessage('Please enter a quantity greater than 0.')
       return
     }
-
     if (quantity > Number(item.quantity_remaining)) {
       setErrorMessage('Commitment quantity cannot exceed the remaining quantity.')
       return
     }
-
     try {
       setIsSubmitting(true)
       setErrorMessage('')
@@ -169,11 +143,9 @@ export function InventoryPage({ user, profile }) {
       await recordInventoryCommitment(item.id, quantity, commitmentForm.notes.trim() || null)
       await reloadRequests()
       closeCommitmentForm()
-      setSuccessMessage('Commitment recorded successfully.')
+      setSuccessMessage('Commitment recorded. Thank you for helping out!')
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Unable to save your commitment.',
-      )
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to save your commitment.')
     } finally {
       setIsSubmitting(false)
     }
@@ -181,7 +153,6 @@ export function InventoryPage({ user, profile }) {
 
   const stats = useMemo(() => {
     const items = requests.flatMap((request) => request.inventory_request_items ?? [])
-
     return {
       requests: requests.length,
       items: items.length,
@@ -191,52 +162,51 @@ export function InventoryPage({ user, profile }) {
 
   return (
     <section className="space-y-6">
-      <div className="grid gap-4 rounded-[2rem] border border-white/70 bg-hero-wash p-6 shadow-float lg:grid-cols-[1.05fr_0.95fr]">
+      {/* Page header */}
+      <div className="grid gap-4 rounded-[2rem] border border-white/65 bg-hero-wash p-6 shadow-float lg:grid-cols-[1.05fr_0.95fr]">
         <div className="space-y-4">
           <Badge className="w-fit" variant="secondary">
-            Inventory
+            Community supplies
           </Badge>
           <div className="space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-              Requests for your area
+            <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+              Supply needs for your area
             </h1>
-            <p className="max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
-              Review supply needs, see what is still open, and record commitments without leaving
-              the StreetDog App workflow.
+            <p className="max-w-lg text-sm leading-7 text-muted-foreground sm:text-[0.95rem]">
+              Browse open requests, see what&apos;s still needed, and commit to help — no admin
+              access required.
             </p>
           </div>
           {canCreateInventory ? (
-            <div className="flex flex-wrap gap-3">
-              <Button onClick={() => navigateTo('/inventory/new')}>New inventory request</Button>
-            </div>
+            <Button onClick={() => navigateTo('/inventory/new')}>
+              <PackagePlus className="h-4 w-4" />
+              New supply request
+            </Button>
           ) : null}
         </div>
 
-        <Card className="rounded-[1.75rem] border-white/70 bg-white/90">
-          <CardHeader>
-            <CardTitle>Inventory snapshot</CardTitle>
-            <CardDescription>
-              A quick view of what your area still needs.
-            </CardDescription>
+        {/* Snapshot */}
+        <Card className="rounded-[1.75rem] border-white/65 bg-white/92">
+          <CardHeader className="pb-3">
+            <CardTitle>Area snapshot</CardTitle>
+            <CardDescription>A quick view of what your area still needs.</CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+          <CardContent className="grid gap-2.5 sm:grid-cols-3 lg:grid-cols-1">
             {[
-              { label: 'Open requests', value: stats.requests, icon: Boxes },
-              { label: 'Items listed', value: stats.items, icon: PackageCheck },
-              { label: 'Qty remaining', value: stats.remaining, icon: HeartHandshake },
+              { label: 'Open requests', value: stats.requests, icon: Boxes, color: 'bg-primary/10 text-primary' },
+              { label: 'Items listed', value: stats.items, icon: PackageCheck, color: 'bg-amber-50 text-amber-600' },
+              { label: 'Qty still needed', value: stats.remaining, icon: HeartHandshake, color: 'bg-rose-50 text-rose-500' },
             ].map((item) => {
               const Icon = item.icon
               return (
-                <div key={item.label} className="rounded-2xl bg-secondary/35 p-4 shadow-soft">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-medium text-muted-foreground">{item.label}</p>
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                      <Icon className="h-5 w-5" />
-                    </div>
+                <div key={item.label} className="flex items-center gap-3 rounded-[1.3rem] bg-secondary/30 px-4 py-3">
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${item.color}`}>
+                    <Icon className="h-4 w-4" />
                   </div>
-                  <p className="mt-3 text-2xl font-semibold tracking-tight text-foreground">
-                    {item.value}
-                  </p>
+                  <div>
+                    <p className="text-xs text-muted-foreground">{item.label}</p>
+                    <p className="text-xl font-extrabold tracking-tight text-foreground">{item.value}</p>
+                  </div>
                 </div>
               )
             })}
@@ -250,45 +220,51 @@ export function InventoryPage({ user, profile }) {
       {isLoading ? (
         <div className="grid gap-4">
           {Array.from({ length: 3 }).map((_, index) => (
-            <div
-              key={index}
-              className="h-48 animate-pulse rounded-[2rem] border border-border/70 bg-white/70"
-            />
+            <div key={index} className="h-48 animate-pulse rounded-[2rem] border border-border/50 bg-white/65" />
           ))}
         </div>
       ) : requests.length === 0 ? (
         <Card className="rounded-[2rem] border-dashed border-border bg-white/90">
-          <CardContent className="space-y-3 p-10 text-center">
-            <h3 className="text-xl font-semibold text-foreground">No requests yet</h3>
+          <CardContent className="flex flex-col items-center gap-3 p-10 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-secondary text-primary">
+              <PackageCheck className="h-7 w-7" />
+            </div>
+            <h3 className="text-xl font-bold text-foreground">All supplied!</h3>
             <p className="text-sm leading-6 text-muted-foreground">
-              Create the first inventory request for your area.
+              No open supply requests for your area right now.
             </p>
             {canCreateInventory ? (
-              <div>
-                <Button onClick={() => navigateTo('/inventory/new')}>Create request</Button>
-              </div>
+              <Button onClick={() => navigateTo('/inventory/new')}>Create first request</Button>
             ) : null}
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-4">
           {requests.map((request) => (
-            <Card key={request.id} className="rounded-[2rem] border-white/70 bg-white/90">
-              <CardHeader className="space-y-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="space-y-2">
-                    <CardTitle>{request.title}</CardTitle>
+            <Card key={request.id} className="overflow-hidden rounded-[2rem] border-white/65 bg-white/95 shadow-soft">
+              <CardHeader className="space-y-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1">
+                    <CardTitle className="text-lg">{request.title}</CardTitle>
                     <CardDescription>
-                      Created by {request.created_by_profile?.full_name || 'Name not available'}
+                      Requested by{' '}
+                      {request.created_by_profile?.full_name || 'a community member'}
                     </CardDescription>
                   </div>
-                  <Badge variant="outline">{formatLabel(request.status)}</Badge>
+                  <Badge
+                    variant={request.status === 'closed' ? 'outline' : 'success'}
+                    className="self-start"
+                  >
+                    {formatLabel(request.status)}
+                  </Badge>
                 </div>
-                <p className="text-sm leading-6 text-muted-foreground">
-                  {request.description || 'No description added.'}
-                </p>
-                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                  Created {new Date(request.created_at).toLocaleString()}
+                {request.description ? (
+                  <p className="text-sm leading-6 text-muted-foreground">{request.description}</p>
+                ) : null}
+                <p className="text-[0.68rem] text-muted-foreground/70">
+                  {new Date(request.created_at).toLocaleDateString('en-IN', {
+                    day: 'numeric', month: 'long', year: 'numeric',
+                  })}
                 </p>
               </CardHeader>
 
@@ -299,63 +275,55 @@ export function InventoryPage({ user, profile }) {
                   return (
                     <div
                       key={item.id}
-                      className="rounded-[1.5rem] border border-border/70 bg-secondary/25 p-5 shadow-soft"
+                      className="rounded-[1.5rem] border border-border/55 bg-secondary/20 p-5"
                     >
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="space-y-1">
-                          <p className="text-lg font-semibold text-foreground">{item.item_name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {formatLabel(item.category)} - {item.quantity_required} {item.unit}
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="text-base font-bold text-foreground">{item.item_name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatLabel(item.category)} · {item.quantity_required} {item.unit} needed
                           </p>
                         </div>
-                        <Badge
-                          variant={Number(item.quantity_remaining) > 0 ? 'warning' : 'success'}
-                        >
+                        <Badge variant={Number(item.quantity_remaining) > 0 ? 'warning' : 'success'}>
                           {Number(item.quantity_remaining) > 0 ? 'Open' : 'Fully committed'}
                         </Badge>
                       </div>
 
-                      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                        <MetricCard
-                          label="Required"
-                          value={`${item.quantity_required} ${item.unit}`}
-                        />
-                        <MetricCard
-                          label="Committed"
-                          value={`${item.quantity_committed} ${item.unit}`}
-                        />
-                        <MetricCard
-                          label="Remaining"
-                          value={`${item.quantity_remaining} ${item.unit}`}
-                        />
+                      {/* Progress tiles */}
+                      <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                        <MetricTile label="Required" value={`${item.quantity_required} ${item.unit}`} />
+                        <MetricTile label="Committed" value={`${item.quantity_committed} ${item.unit}`} />
+                        <MetricTile label="Still needed" value={`${item.quantity_remaining} ${item.unit}`} highlight={Number(item.quantity_remaining) > 0} />
                       </div>
 
+                      {/* User's commitment */}
                       {userCommitment ? (
-                        <div className="mt-4 rounded-2xl bg-white/80 p-4">
+                        <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-sm font-semibold text-foreground">Your commitment</p>
                             <Badge variant={getStatusBadge(userCommitment.status)}>
                               {formatCommitmentStatus(userCommitment.status)}
                             </Badge>
                           </div>
-                          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                            Quantity committed: {userCommitment.quantity} {item.unit}
-                          </p>
-                          <p className="text-sm leading-6 text-muted-foreground">
-                            Commitment date: {new Date(userCommitment.created_at).toLocaleString()}
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {userCommitment.quantity} {item.unit} · {new Date(userCommitment.created_at).toLocaleDateString()}
                           </p>
                         </div>
                       ) : null}
 
                       {Number(item.quantity_remaining) > 0 ? (
-                        <div className="mt-4 flex flex-wrap gap-3">
-                          <Button variant="secondary" onClick={() => openCommitmentForm(item.id)}>
-                            I&apos;ll get this
+                        <div className="mt-4">
+                          <Button
+                            variant="secondary"
+                            onClick={() => openCommitmentForm(item.id)}
+                          >
+                            <HeartHandshake className="h-4 w-4" />
+                            I&apos;ll contribute this
                           </Button>
                         </div>
                       ) : (
-                        <p className="mt-4 text-sm leading-6 text-muted-foreground">
-                          This item has already been fully committed.
+                        <p className="mt-4 text-sm text-muted-foreground">
+                          This item has been fully committed. Thank you, community!
                         </p>
                       )}
 
@@ -365,9 +333,9 @@ export function InventoryPage({ user, profile }) {
                       >
                         <DialogContent>
                           <DialogHeader>
-                            <DialogTitle>Confirm commitment</DialogTitle>
+                            <DialogTitle>Confirm your commitment</DialogTitle>
                             <DialogDescription>
-                              Record how much of {item.item_name} you can bring for this request.
+                              How much {item.item_name} can you bring for this request?
                             </DialogDescription>
                           </DialogHeader>
                           <form
@@ -378,32 +346,26 @@ export function InventoryPage({ user, profile }) {
                             }}
                           >
                             <FormField>
-                              <FormLabel>Quantity to commit</FormLabel>
+                              <FormLabel>Quantity</FormLabel>
                               <Input
                                 required
                                 type="number"
                                 min="1"
                                 step="0.01"
-                                placeholder="Quantity to commit"
+                                placeholder={`Quantity (max ${item.quantity_remaining} ${item.unit})`}
                                 value={commitmentForm.quantity}
                                 onChange={(event) =>
-                                  setCommitmentForm((current) => ({
-                                    ...current,
-                                    quantity: event.target.value,
-                                  }))
+                                  setCommitmentForm((current) => ({ ...current, quantity: event.target.value }))
                                 }
                               />
                             </FormField>
                             <FormField>
-                              <FormLabel>Notes</FormLabel>
+                              <FormLabel>Notes (optional)</FormLabel>
                               <Textarea
-                                placeholder="Notes (optional)"
+                                placeholder="Any details for the area coordinator…"
                                 value={commitmentForm.notes}
                                 onChange={(event) =>
-                                  setCommitmentForm((current) => ({
-                                    ...current,
-                                    notes: event.target.value,
-                                  }))
+                                  setCommitmentForm((current) => ({ ...current, notes: event.target.value }))
                                 }
                               />
                             </FormField>
@@ -412,7 +374,7 @@ export function InventoryPage({ user, profile }) {
                                 Cancel
                               </Button>
                               <Button type="submit" disabled={isSubmitting}>
-                                {isSubmitting ? 'Saving...' : 'Confirm Commitment'}
+                                {isSubmitting ? 'Saving…' : 'Confirm commitment'}
                               </Button>
                             </div>
                           </form>
@@ -430,11 +392,13 @@ export function InventoryPage({ user, profile }) {
   )
 }
 
-function MetricCard({ label, value }) {
+function MetricTile({ label, value, highlight = false }) {
   return (
-    <div className="rounded-2xl bg-white/80 p-4 shadow-soft">
-      <p className="text-sm font-medium text-muted-foreground">{label}</p>
-      <p className="mt-2 text-lg font-semibold text-foreground">{value}</p>
+    <div
+      className={`rounded-xl px-3 py-2.5 ${highlight ? 'bg-amber-50 border border-amber-100' : 'bg-white/80'}`}
+    >
+      <p className="text-[0.65rem] font-semibold uppercase tracking-[0.15em] text-muted-foreground">{label}</p>
+      <p className={`mt-1 text-sm font-bold ${highlight ? 'text-amber-700' : 'text-foreground'}`}>{value}</p>
     </div>
   )
 }

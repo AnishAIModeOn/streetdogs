@@ -1,7 +1,6 @@
 import { ArrowUpRight, MapPin, PawPrint } from 'lucide-react'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from './ui/card'
 
 function formatLabel(value) {
   return value ? value.replaceAll('_', ' ') : 'Unknown'
@@ -19,68 +18,77 @@ export function DogCard({ dog, area, onViewDetails }) {
   }
 
   if ((dog.health_notes || '').toLowerCase().includes('medical')) {
-    badges.push({ label: 'Medical Attention', variant: 'danger' })
+    badges.push({ label: 'Medical', variant: 'danger' })
   }
 
   if (badges.length === 0) {
     badges.push({ label: formatLabel(dog.status), variant: 'outline' })
   }
 
+  const dogName = dog.dog_name_or_temp_name || `Dog ${dog.id.slice(0, 6)}`
+  const areaLabel = area ? `${area.city} · ${area.name}` : 'Area unavailable'
+
   return (
-    <Card className="group overflow-hidden rounded-[1.75rem] border-white/60 bg-white/90 transition-all duration-500 hover:-translate-y-1 hover:shadow-float">
-      <div className="relative aspect-[4/3] overflow-hidden bg-secondary/50">
+    <div className="group flex flex-col overflow-hidden rounded-[1.75rem] border border-white/55 bg-white/95 shadow-soft transition-all duration-500 hover:-translate-y-1 hover:shadow-float">
+      {/* Photo */}
+      <div className="relative aspect-[16/10] shrink-0 overflow-hidden bg-secondary/40">
         {dog.photo_url ? (
           <img
             src={dog.photo_url}
-            alt={dog.dog_name_or_temp_name || 'Dog profile'}
-            className="h-full w-full object-cover transition-transform duration-[1600ms] ease-out group-hover:scale-[1.04]"
+            alt={dogName}
+            className="h-full w-full object-cover transition-transform duration-[1800ms] ease-out group-hover:scale-[1.05]"
           />
         ) : (
-          <div className="flex h-full items-center justify-center bg-hero-wash text-primary">
-            <PawPrint className="h-12 w-12" />
+          <div className="flex h-full items-center justify-center bg-hero-wash">
+            <PawPrint className="h-14 w-14 text-primary/30" />
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
-        <div className="absolute left-4 right-4 top-4 flex flex-wrap gap-2">
+
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent" />
+
+        {/* Care status badges — top left */}
+        <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
           {badges.map((badge) => (
-            <Badge key={badge.label} variant={badge.variant} className="border border-white/30 bg-white/88 backdrop-blur-sm">
+            <Badge
+              key={badge.label}
+              variant={badge.variant}
+              className="border border-white/30 bg-white/90 shadow-sm backdrop-blur-sm text-[0.7rem]"
+            >
               {badge.label}
             </Badge>
           ))}
         </div>
-        <div className="absolute bottom-4 left-4 right-4">
-          <div className="max-w-[85%] rounded-[1.25rem] border border-white/20 bg-black/25 px-4 py-3 backdrop-blur-md">
-            <p className="text-lg font-semibold text-white">
-              {dog.dog_name_or_temp_name || `Dog ${dog.id.slice(0, 6)}`}
-            </p>
-            <p className="mt-1 text-sm text-white/80">
-              {area ? `${area.city} - ${area.name}` : 'Area unavailable'}
-            </p>
+
+        {/* Name + area pill — bottom of photo */}
+        <div className="absolute bottom-3 left-3 right-3">
+          <div className="rounded-[1.1rem] border border-white/18 bg-black/30 px-3.5 py-2.5 backdrop-blur-md">
+            <p className="text-[0.95rem] font-bold leading-tight text-white">{dogName}</p>
+            <p className="mt-0.5 text-xs font-medium text-white/75">{areaLabel}</p>
           </div>
         </div>
       </div>
-      <CardHeader className="space-y-2 pb-3">
-        <CardTitle className="text-xl">
-          {dog.dog_name_or_temp_name || `Dog ${dog.id.slice(0, 6)}`}
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          {area ? `${area.city} - ${area.name}` : 'Area unavailable'}
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-3 pt-0 text-sm text-muted-foreground">
-        <div className="flex items-start gap-2">
-          <MapPin className="mt-0.5 h-4 w-4 text-accent" />
-          <div className="space-y-1">
-            <p>{dog.location_description || 'Location details will be added by volunteers.'}</p>
-          </div>
+
+      {/* Card body */}
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        {/* Location */}
+        <div className="flex items-start gap-2 text-sm text-muted-foreground">
+          <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />
+          <p className="line-clamp-2 leading-5">
+            {dog.location_description || 'Location details will be added by volunteers.'}
+          </p>
         </div>
-      </CardContent>
-      <CardFooter>
-        <Button variant="secondary" className="w-full justify-between" onClick={onViewDetails}>
-          View Details
+
+        {/* View Details CTA */}
+        <Button
+          variant="secondary"
+          className="mt-auto w-full justify-between rounded-xl font-semibold"
+          onClick={onViewDetails}
+        >
+          View Full Profile
           <ArrowUpRight className="h-4 w-4" />
         </Button>
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
   )
 }

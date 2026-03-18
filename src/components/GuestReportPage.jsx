@@ -125,60 +125,66 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-      <section className="grid gap-4 rounded-[2rem] border border-white/70 bg-hero-wash p-6 shadow-float lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="space-y-4">
+      <section className="grid gap-5 rounded-[2rem] border border-white/65 bg-hero-wash p-6 shadow-float lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="space-y-5">
           <Badge className="w-fit" variant="secondary">
-            Public report flow
+            Public sighting report
           </Badge>
           <div className="space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-              Report a dog without signing in
+            <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+              Spotted a dog that needs help?
             </h1>
-            <p className="max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
-              Share a quick report so volunteers in the area can review the dog, update the record,
-              and coordinate the next steps.
+            <p className="max-w-lg text-sm leading-7 text-muted-foreground sm:text-[0.95rem]">
+              Share a quick report and local volunteers will pick it up from here. No account
+              required.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl bg-white/85 p-4 shadow-soft">
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <MapPin className="h-4 w-4 text-accent" />
-                Local context matters
+            <div className="rounded-2xl border border-white/60 bg-white/80 p-4 shadow-soft">
+              <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/10 text-accent">
+                  <MapPin className="h-3.5 w-3.5" />
+                </div>
+                Location matters most
               </div>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Pick the area and tell us exactly where you saw the dog so volunteers can follow up.
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                Pick the area and describe exactly where you saw the dog so volunteers can find it.
               </p>
             </div>
-            <div className="rounded-2xl bg-white/85 p-4 shadow-soft">
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <HeartHandshake className="h-4 w-4 text-accent" />
-                Friendly for guests
+            <div className="rounded-2xl border border-white/60 bg-white/80 p-4 shadow-soft">
+              <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <HeartHandshake className="h-3.5 w-3.5" />
+                </div>
+                Guests welcome
               </div>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                You can submit a report without creating an account. We only need enough detail to
-                review the dog safely.
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                No account needed. We only ask for enough detail to review and coordinate safely.
               </p>
             </div>
           </div>
         </div>
 
-        <Card className="overflow-hidden rounded-[1.75rem] border-white/70 bg-white/90">
-          <CardHeader>
+        <Card className="overflow-hidden rounded-[1.75rem] border-white/65 bg-white/92">
+          <CardHeader className="pb-3">
             <CardTitle>What to include</CardTitle>
             <CardDescription>
-              Short, clear details are usually enough for a useful first report.
+              Short, clear details are enough for a useful first report.
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3 text-sm leading-6 text-muted-foreground">
-            <div className="rounded-2xl bg-secondary/50 p-4">
-              The nearest landmark, street, or feeding spot where the dog was seen.
-            </div>
-            <div className="rounded-2xl bg-secondary/50 p-4">
-              Any visible concerns like limping, wounds, hunger, or unusual behavior.
-            </div>
-            <div className="rounded-2xl bg-secondary/50 p-4">
-              A photo link if you have one, so the community can recognize the dog faster.
-            </div>
+          <CardContent className="space-y-2.5 text-sm leading-6 text-muted-foreground">
+            {[
+              'The nearest landmark, street, or feeding spot where the dog was seen.',
+              'Any visible concerns — limping, wounds, hunger, or unusual behavior.',
+              'A photo or quick photo link so volunteers can identify the dog faster.',
+            ].map((tip, i) => (
+              <div key={i} className="flex items-start gap-3 rounded-xl bg-secondary/40 px-4 py-3">
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[0.65rem] font-bold text-primary">
+                  {i + 1}
+                </span>
+                <span>{tip}</span>
+              </div>
+            ))}
           </CardContent>
         </Card>
       </section>
