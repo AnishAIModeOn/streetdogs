@@ -166,11 +166,12 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
 
   const pincodeField = (
     <FormField>
-      <FormLabel>PIN Code</FormLabel>
+      <FormLabel className="flex items-center gap-1.5">
+        <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+        PIN Code
+      </FormLabel>
       <div className="relative">
-        <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          className="pl-11"
           placeholder={detecting ? 'Detecting location…' : 'Enter PIN code (e.g. 560001)'}
           maxLength={6}
           value={pincode}
