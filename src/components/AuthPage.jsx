@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, MapPin } from 'lucide-react'
 import { emptySignInForm, emptySignUpForm } from '../data/seedData'
 import { useSignIn, useSignUp } from '../hooks/use-auth'
 import { createSociety, updateProfile } from '../lib/communityData'
@@ -10,11 +10,32 @@ import { Button } from './ui/button'
 import { FormDescription, FormField, FormLabel, FormMessage } from './ui/form'
 import { Input } from './ui/input'
 
+const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? ''
+
+async function reverseGeocode(lat, lng) {
+  if (!GOOGLE_MAPS_KEY) return { pincode: '', neighbourhood: '' }
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_KEY}`
+  const res = await fetch(url)
+  const json = await res.json()
+  const components = json?.results?.[0]?.address_components ?? []
+  const get = (...types) => {
+    const match = components.find((c) => types.some((t) => c.types.includes(t)))
+    return match?.long_name ?? ''
+  }
+  return {
+    pincode: get('postal_code'),
+    neighbourhood:
+      get('sublocality_level_1') ||
+      get('neighborhood') ||
+      get('sublocality') ||
+      get('administrative_area_level_3'),
+  }
+}
+
 /**
  * Attempts to update the user's profile with their chosen society.
  * Retries up to 3 times with a 600 ms delay in case the DB trigger
  * hasn't created the profile row yet (race condition on fresh sign-up).
- * Silently swallows the error because society selection is optional.
  */
 async function trySaveSociety(userId, societyId, attempt = 1) {
   try {
@@ -24,9 +45,39 @@ async function trySaveSociety(userId, societyId, attempt = 1) {
       await new Promise((r) => setTimeout(r, 600))
       return trySaveSociety(userId, societyId, attempt + 1)
     }
-    // non-fatal — user can set society from profile later
     console.warn('[SocietyPicker] Could not save society_id:', err?.message)
   }
+}
+
+function usePincodeDetection() {
+  const [pincode, setPincode] = useState('')
+  const [detecting, setDetecting] = useState(true)
+
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setDetecting(false)
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { pincode: detected } = await reverseGeocode(
+            pos.coords.latitude,
+            pos.coords.longitude,
+          )
+          if (detected) setPincode(detected)
+        } catch {
+          // silent — user can type manually
+        } finally {
+          setDetecting(false)
+        }
+      },
+      () => setDetecting(false),
+      { timeout: 9000, maximumAge: 60_000 },
+    )
+  }, [])
+
+  return { pincode, setPincode, detecting }
 }
 
 export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
@@ -35,6 +86,8 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
   const [signInForm, setSignInForm] = useState(emptySignInForm)
   const [errorMessage, setErrorMessage] = useState(authError)
   const [selectedSociety, setSelectedSociety] = useState(null)
+
+  const { pincode, setPincode, detecting } = usePincodeDetection()
 
   const signInMutation = useSignIn()
   const signUpMutation = useSignUp()
@@ -46,10 +99,25 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
     setErrorMessage(authError)
   }, [authError])
 
-  // Reset society pick when switching between sign-in / sign-up
   useEffect(() => {
     setSelectedSociety(null)
   }, [isSignUp])
+
+  async function resolveSociety(society) {
+    if (!society) return null
+    if (!society._pending) return society.id
+    try {
+      const created = await createSociety({
+        name: society.name,
+        pincode: society.pincode,
+        neighbourhood: society.neighbourhood || null,
+        coordinates: null,
+      })
+      return created?.id ?? null
+    } catch {
+      return null
+    }
+  }
 
   // ── Sign-up ────────────────────────────────────────────────
   const handleSignUpSubmit = async (event) => {
@@ -62,23 +130,8 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
         password: signUpForm.password,
       })
 
-      // If the society was deferred (created during sign-up before auth),
-      // insert it now that the user is authenticated, then save to profile.
       if (result?.user?.id && selectedSociety) {
-        let societyId = selectedSociety.id
-        if (selectedSociety._pending) {
-          try {
-            const created = await createSociety({
-              name: selectedSociety.name,
-              pincode: selectedSociety.pincode,
-              neighbourhood: selectedSociety.neighbourhood || null,
-              coordinates: null,
-            })
-            societyId = created?.id
-          } catch {
-            societyId = null
-          }
-        }
+        const societyId = await resolveSociety(selectedSociety)
         if (societyId) trySaveSociety(result.user.id, societyId)
       }
 
@@ -99,22 +152,8 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
         password: signInForm.password,
       })
 
-      // If user selected / created a society on the sign-in form, update profile
       if (result?.user?.id && selectedSociety) {
-        let societyId = selectedSociety.id
-        if (selectedSociety._pending) {
-          try {
-            const created = await createSociety({
-              name: selectedSociety.name,
-              pincode: selectedSociety.pincode,
-              neighbourhood: selectedSociety.neighbourhood || null,
-              coordinates: null,
-            })
-            societyId = created?.id
-          } catch {
-            societyId = null
-          }
-        }
+        const societyId = await resolveSociety(selectedSociety)
         if (societyId) trySaveSociety(result.user.id, societyId)
       }
 
@@ -124,6 +163,38 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to sign you in.')
     }
   }
+
+  const pincodeField = (
+    <FormField>
+      <FormLabel>PIN Code</FormLabel>
+      <div className="relative">
+        <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          className="pl-10"
+          placeholder={detecting ? 'Detecting location…' : 'e.g. 560001'}
+          maxLength={6}
+          value={pincode}
+          onChange={(e) => setPincode(e.target.value.replace(/\D/g, ''))}
+        />
+        {detecting && (
+          <Loader2 className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+        )}
+      </div>
+      {!detecting && pincode && (
+        <FormDescription>Auto-detected · you can edit if needed.</FormDescription>
+      )}
+    </FormField>
+  )
+
+  const societyPicker = (
+    <div className="rounded-[1.5rem] border border-border/60 bg-secondary/20 p-4">
+      <SocietyPicker
+        pincode={pincode}
+        onSelect={setSelectedSociety}
+        deferCreate
+      />
+    </div>
+  )
 
   return (
     <AuthShell
@@ -160,7 +231,6 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
 
       {isSignUp ? (
         <form className="grid gap-4" onSubmit={handleSignUpSubmit}>
-          {/* ── Core sign-up fields ── */}
           <FormField>
             <FormLabel>Full name</FormLabel>
             <Input
@@ -203,12 +273,9 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
             </FormDescription>
           </FormField>
 
-          {/* ── Society picker ── */}
-          <div className="rounded-[1.5rem] border border-border/60 bg-secondary/20 p-4">
-            <SocietyPicker onSelect={setSelectedSociety} deferCreate />
-          </div>
+          {pincodeField}
+          {societyPicker}
 
-          {/* ── Submit ── */}
           <Button type="submit" size="lg" disabled={isSubmitting}>
             {isSubmitting ? (
               <>
@@ -222,7 +289,6 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
         </form>
       ) : (
         <form className="grid gap-4" onSubmit={handleSignInSubmit}>
-          {/* ── Core sign-in fields ── */}
           <FormField>
             <FormLabel>Email</FormLabel>
             <Input
@@ -249,12 +315,9 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
             />
           </FormField>
 
-          {/* ── Society picker ── */}
-          <div className="rounded-[1.5rem] border border-border/60 bg-secondary/20 p-4">
-            <SocietyPicker onSelect={setSelectedSociety} deferCreate />
-          </div>
+          {pincodeField}
+          {societyPicker}
 
-          {/* ── Submit ── */}
           <Button type="submit" size="lg" disabled={isSubmitting}>
             {isSubmitting ? (
               <>
