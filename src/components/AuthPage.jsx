@@ -200,7 +200,7 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
   return (
     <AuthShell
       badge="StreetDog App"
-      hideFeatures={!isSignUp}
+      hideFeatures
       title={isSignUp ? 'Create your account' : 'Sign in to your area dashboard'}
       description={
         isSignUp
