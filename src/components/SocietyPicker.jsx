@@ -28,10 +28,6 @@ import {
   X,
 } from 'lucide-react'
 import { createSociety, searchSocieties } from '../lib/communityData'
-import { Alert, AlertDescription, AlertTitle } from './ui/alert'
-import { Button } from './ui/button'
-import { Input } from './ui/input'
-import { Skeleton } from './ui/skeleton'
 
 // ─── helpers ────────────────────────────────────────────────
 
@@ -280,11 +276,6 @@ export function SocietyPicker({ onSelect, deferCreate = false }) {
   // ─── Render ──────────────────────────────────────────────
 
   const isDetecting = geoStatus === 'detecting'
-  const isDenied = geoStatus === 'denied'
-  const isError = geoStatus === 'error'
-  const isNoApi = geoStatus === 'no-api'
-  const needsManualPincode = isDenied || isError || isNoApi
-  const canSearch = Boolean(activePincode) || Boolean(debouncedSearch)
 
   return (
     <div className="space-y-3">
@@ -297,59 +288,6 @@ export function SocietyPicker({ onSelect, deferCreate = false }) {
         </span>
       </div>
 
-      {/* ── Detecting skeleton ──────────────────────── */}
-      {isDetecting && (
-        <div className="space-y-2">
-          <Skeleton className="h-11 w-full" />
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            Detecting your location…
-          </div>
-        </div>
-      )}
-
-      {/* ── Geo denied / error Alert ────────────────── */}
-      {(isDenied || isError) && (
-        <Alert variant="warning">
-          <AlertTitle>
-            {isDenied ? 'Location access denied' : 'Location unavailable'}
-          </AlertTitle>
-          <AlertDescription>
-            {isDenied
-              ? 'Enter your PIN code below to search for societies in your area.'
-              : geoError || 'Could not determine your location. Enter your PIN code manually.'}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* ── No Maps API key info ─────────────────────── */}
-      {isNoApi && !GOOGLE_MAPS_KEY && (
-        <Alert variant="default">
-          <AlertDescription>
-            Auto-detect is unavailable. Enter your PIN code below to find your society.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* ── Manual pincode input ─────────────────────── */}
-      {(needsManualPincode || isNoApi) && !isDetecting && (
-        <div className="relative">
-          <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="pl-10"
-            placeholder="Enter PIN code (e.g. 560001)"
-            maxLength={6}
-            value={manualPincode}
-            onChange={(e) => {
-              const v = e.target.value.replace(/\D/g, '')
-              setManualPincode(v)
-              // Reset selection when pincode changes
-              if (selected) clearSelection()
-            }}
-          />
-        </div>
-      )}
-
       {/* ── Detected location banner ─────────────────── */}
       {geoStatus === 'resolved' && detectedPincode && (
         <div className="flex items-center gap-2 rounded-xl bg-emerald-50/70 px-3 py-2 text-xs text-emerald-700">
@@ -361,8 +299,16 @@ export function SocietyPicker({ onSelect, deferCreate = false }) {
         </div>
       )}
 
-      {/* ── Combobox (shown once we have a pincode or user just wants to search) */}
-      {!isDetecting && (
+      {/* ── Detecting indicator ──────────────────────── */}
+      {isDetecting && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Detecting your location…
+        </div>
+      )}
+
+      {/* ── Combobox (always shown) */}
+      {true && (
         <div ref={containerRef} className="relative">
           {/* Trigger button / selected display */}
           {selected ? (
@@ -389,10 +335,9 @@ export function SocietyPicker({ onSelect, deferCreate = false }) {
                 setIsOpen((o) => !o)
                 setTimeout(() => inputRef.current?.focus(), 10)
               }}
-              disabled={!canSearch && !activePincode && geoStatus !== 'resolved'}
             >
               <span className="text-muted-foreground">
-                {canSearch ? 'Search for your society…' : 'Enter PIN code to search'}
+                Search for your society…
               </span>
               <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </button>
