@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { emptySignInForm, emptySignUpForm } from '../data/seedData'
 import { useSignIn, useSignUp } from '../hooks/use-auth'
-import { updateProfile } from '../lib/communityData'
+import { createSociety, updateProfile } from '../lib/communityData'
 import { AuthShell } from './AuthShell'
 import { SocietyPicker } from './SocietyPicker'
 import { StatusBanner } from './StatusBanner'
@@ -62,9 +62,24 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
         password: signUpForm.password,
       })
 
-      // Persist society in parallel — non-blocking, optional
-      if (selectedSociety?.id && result?.user?.id) {
-        trySaveSociety(result.user.id, selectedSociety.id)
+      // If the society was deferred (created during sign-up before auth),
+      // insert it now that the user is authenticated, then save to profile.
+      if (result?.user?.id && selectedSociety) {
+        let societyId = selectedSociety.id
+        if (selectedSociety._pending) {
+          try {
+            const created = await createSociety({
+              name: selectedSociety.name,
+              pincode: selectedSociety.pincode,
+              neighbourhood: selectedSociety.neighbourhood || null,
+              coordinates: null,
+            })
+            societyId = created?.id
+          } catch {
+            societyId = null
+          }
+        }
+        if (societyId) trySaveSociety(result.user.id, societyId)
       }
 
       const authState = await onSignedIn()
@@ -176,7 +191,7 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
 
           {/* ── Society picker ── */}
           <div className="rounded-[1.5rem] border border-border/60 bg-secondary/20 p-4">
-            <SocietyPicker onSelect={setSelectedSociety} />
+            <SocietyPicker onSelect={setSelectedSociety} deferCreate />
           </div>
 
           {/* ── Submit ── */}

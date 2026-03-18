@@ -76,7 +76,7 @@ function useDebouncedValue(value, delay = 280) {
 /**
  * @param {{ onSelect: (society: object | null) => void }} props
  */
-export function SocietyPicker({ onSelect }) {
+export function SocietyPicker({ onSelect, deferCreate = false }) {
   // geo state
   const [geoStatus, setGeoStatus] = useState('detecting') // detecting | resolved | denied | error | no-api
   const [geoError, setGeoError] = useState('')
@@ -226,6 +226,18 @@ export function SocietyPicker({ onSelect }) {
   }
 
   async function handleCreate(name) {
+    // When deferCreate is true (e.g. during sign-up before auth),
+    // skip the DB insert and pass a pending society object instead.
+    if (deferCreate) {
+      commitSelection({
+        id: null,
+        name: name.trim(),
+        pincode: activePincode,
+        neighbourhood: detectedNeighbourhood || null,
+        _pending: true,
+      })
+      return
+    }
     try {
       setIsCreating(true)
       setFetchError('')
