@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Loader2, MapPin } from 'lucide-react'
 import { emptySignInForm, emptySignUpForm } from '../data/seedData'
 import { useSignIn, useSignUp } from '../hooks/use-auth'
-import { createSociety } from '../lib/communityData'
+import { createSociety, searchNeighbourhoods } from '../lib/communityData'
 import { updateMyProfile } from '../services/auth.service'
 import { AuthShell } from './AuthShell'
 import { SocietyPicker } from './SocietyPicker'
@@ -40,24 +40,6 @@ async function reverseGeocode(lat, lng) {
   return extractComponents(json?.results?.[0]?.address_components ?? [])
 }
 
-// Use Geocoding API to suggest areas from free-text input
-async function geocodeAreaSuggestions(text) {
-  if (!GOOGLE_MAPS_KEY || !text.trim()) return []
-  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(text)}&components=country:IN&key=${GOOGLE_MAPS_KEY}`
-  const res = await fetch(url)
-  const json = await res.json()
-  const seen = new Set()
-  return (json?.results ?? [])
-    .map((r) => extractComponents(r.address_components ?? []))
-    .filter((r) => {
-      // Include results even without pincode — use neighbourhood+city as dedup key
-      const key = r.pincode || [r.neighbourhood, r.city].filter(Boolean).join(',')
-      if (!key || seen.has(key)) return false
-      seen.add(key)
-      return true
-    })
-    .slice(0, 5)
-}
 
 /**
  * Attempts to update the user's profile with their chosen society.
@@ -122,32 +104,30 @@ function useAreaDetection() {
     )
   }, [])
 
-  // Geocode typed text to get area suggestions with pincode
+  // Fetch area suggestions from Supabase societies table
   useEffect(() => {
-    if (!manual || areaInput.trim().length < 3) {
+    if (!manual || areaInput.trim().length < 2) {
       setAreaSuggestions([])
       return
     }
     const t = setTimeout(async () => {
       try {
         setIsFetchingSuggestions(true)
-        const results = await geocodeAreaSuggestions(areaInput)
-        console.log('[AreaTypeahead] results:', results)
+        const results = await searchNeighbourhoods(areaInput)
         setAreaSuggestions(results)
-      } catch (err) {
-        console.error('[AreaTypeahead] error:', err)
+      } catch {
         setAreaSuggestions([])
       } finally {
         setIsFetchingSuggestions(false)
       }
-    }, 500)
+    }, 300)
     return () => clearTimeout(t)
   }, [areaInput, manual])
 
   function selectSuggestion(suggestion) {
-    const label = [suggestion.neighbourhood, suggestion.city].filter(Boolean).join(', ') || suggestion.pincode
+    const label = suggestion.neighbourhood || suggestion.pincode
     setAreaInput(label)
-    setSelectedNeighbourhood(suggestion.neighbourhood || suggestion.city || '')
+    setSelectedNeighbourhood(suggestion.neighbourhood || '')
     if (suggestion.pincode) setPincode(suggestion.pincode)
     setAreaSuggestions([])
     setShowSuggestions(false)
@@ -356,10 +336,10 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
                   onMouseDown={() => selectSuggestion(s)}
                 >
                   <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  <span className="flex-1">
-                    {[s.neighbourhood, s.city].filter(Boolean).join(', ') || s.pincode}
-                  </span>
-                  {s.pincode && <span className="text-xs text-muted-foreground">{s.pincode}</span>}
+                  <span className="flex-1">{s.neighbourhood || s.pincode}</span>
+                  {s.pincode && s.neighbourhood && (
+                    <span className="text-xs text-muted-foreground">{s.pincode}</span>
+                  )}
                 </button>
               ))}
             </div>
