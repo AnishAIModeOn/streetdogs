@@ -8,6 +8,7 @@ import {
   type DogFilters,
   type UpsertDogInput,
 } from '../services/dogs.service'
+import { listMyOutOfAreaDogs } from '../lib/communityData'
 
 export function useDogs(filters: DogFilters = {}) {
   return useQuery({
@@ -51,5 +52,13 @@ export function useUpdateDog(dogId: string) {
 export function useUploadDogPhoto() {
   return useMutation({
     mutationFn: ({ file, userId }: { file: File; userId: string }) => uploadDogPhoto(file, userId),
+  })
+}
+
+/** Dogs the current user tagged in a pincode outside their home society. */
+export function useMyOutOfAreaDogs() {
+  return useQuery({
+    queryKey: ['dogs', 'out-of-area'],
+    queryFn: listMyOutOfAreaDogs,
   })
 }

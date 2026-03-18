@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { PawPrint, Plus, Search, SlidersHorizontal } from 'lucide-react'
-import { useDogs } from '../hooks/use-dogs'
+import { MapPin, PawPrint, Plus, Search, SlidersHorizontal } from 'lucide-react'
+import { useDogs, useMyOutOfAreaDogs } from '../hooks/use-dogs'
 import { listAreas } from '../lib/communityData'
 import { navigateTo } from '../lib/navigation'
 import { DogCard } from './DogCard'
@@ -14,11 +14,12 @@ export function DogsPage() {
   const [errorMessage, setErrorMessage] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+
+  const { data: dogs = [], isLoading, error } = useDogs()
   const {
-    data: dogs = [],
-    isLoading,
-    error,
-  } = useDogs()
+    data: outOfAreaDogs = [],
+    isLoading: isOutOfAreaLoading,
+  } = useMyOutOfAreaDogs()
 
   useEffect(() => {
     let isMounted = true
@@ -53,6 +54,8 @@ export function DogsPage() {
         dog.location_description,
         dog.health_notes,
         dog.notes,
+        dog.tagged_area_neighbourhood,
+        dog.tagged_area_pincode,
         area?.name,
         area?.city,
       ]
@@ -64,6 +67,14 @@ export function DogsPage() {
       return matchesSearch && matchesStatus
     })
   }, [areas, dogs, searchTerm, statusFilter])
+
+  // Out-of-area dogs: deduplicate against home feed (RLS may already handle this,
+  // but be defensive — don't show the same dog twice)
+  const homeAreaDogIds = useMemo(() => new Set(dogs.map((d) => d.id)), [dogs])
+  const uniqueOutOfAreaDogs = useMemo(
+    () => outOfAreaDogs.filter((d) => !homeAreaDogIds.has(d.id)),
+    [outOfAreaDogs, homeAreaDogIds],
+  )
 
   const activeErrorMessage =
     errorMessage || (error instanceof Error ? error.message : error ? 'Unable to load dog listing.' : '')
@@ -133,27 +144,27 @@ export function DogsPage() {
         </div>
       ) : null}
 
-      {/* Results count */}
+      {/* Results count + clear filters */}
       {!isLoading && dogs.length > 0 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             Showing{' '}
             <span className="font-semibold text-foreground">{filteredDogs.length}</span>
             {filteredDogs.length !== dogs.length ? ` of ${dogs.length}` : ''} dog
-            {filteredDogs.length !== 1 ? 's' : ''}
+            {filteredDogs.length !== 1 ? 's' : ''} in your area
           </p>
-          {searchTerm || statusFilter !== 'all' ? (
+          {(searchTerm || statusFilter !== 'all') && (
             <button
               className="text-xs font-semibold text-primary hover:underline"
               onClick={() => { setSearchTerm(''); setStatusFilter('all') }}
             >
               Clear filters
             </button>
-          ) : null}
+          )}
         </div>
       )}
 
-      {/* Dog grid */}
+      {/* ── Home area dog grid ─────────────────────────────── */}
       {isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 6 }).map((_, index) => (
@@ -165,19 +176,16 @@ export function DogsPage() {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {filteredDogs.map((dog) => {
-            const area = areas[dog.area_id]
-            return (
-              <DogCard
-                key={dog.id}
-                dog={dog}
-                area={area}
-                onViewDetails={() => navigateTo(`/dogs/${dog.id}`)}
-              />
-            )
-          })}
+          {filteredDogs.map((dog) => (
+            <DogCard
+              key={dog.id}
+              dog={dog}
+              area={areas[dog.area_id]}
+              onViewDetails={() => navigateTo(`/dogs/${dog.id}`)}
+            />
+          ))}
 
-          {filteredDogs.length === 0 ? (
+          {filteredDogs.length === 0 && (
             <div className="flex flex-col items-center gap-4 rounded-[2rem] border border-dashed border-border bg-white/80 p-12 text-center sm:col-span-2 xl:col-span-3">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-secondary text-primary">
                 <PawPrint className="h-8 w-8" />
@@ -199,9 +207,114 @@ export function DogsPage() {
                 </Button>
               )}
             </div>
-          ) : null}
+          )}
+        </div>
+      )}
+
+      {/* ── Out-of-area dogs you tagged ────────────────────── */}
+      {(isOutOfAreaLoading || uniqueOutOfAreaDogs.length > 0) && (
+        <div className="space-y-4">
+          {/* Section divider */}
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-border/60" />
+            <div className="flex items-center gap-2 rounded-full border border-amber-200/80 bg-amber-50/70 px-3 py-1.5">
+              <MapPin className="h-3.5 w-3.5 text-amber-600" />
+              <span className="text-xs font-bold text-amber-700">
+                Dogs you&apos;ve tagged in other areas
+              </span>
+            </div>
+            <div className="h-px flex-1 bg-border/60" />
+          </div>
+
+          <p className="text-sm text-muted-foreground">
+            These dogs were tagged outside your home society&apos;s PIN code. Only you can see
+            them here — local volunteers in those areas will see them in their own feed.
+          </p>
+
+          {isOutOfAreaLoading ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-[280px] animate-pulse rounded-3xl border border-amber-100 bg-amber-50/40"
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {uniqueOutOfAreaDogs.map((dog) => (
+                <OutOfAreaDogCard
+                  key={dog.id}
+                  dog={dog}
+                  onViewDetails={() => navigateTo(`/dogs/${dog.id}`)}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </section>
+  )
+}
+
+// ─── Out-of-area card variant ─────────────────────────────────
+function OutOfAreaDogCard({ dog, onViewDetails }) {
+  const dogName = dog.dog_name_or_temp_name || `Dog ${dog.id.slice(0, 6)}`
+  const locationLabel =
+    dog.tagged_area_neighbourhood
+      ? `${dog.tagged_area_neighbourhood} · ${dog.tagged_area_pincode}`
+      : dog.tagged_area_pincode || dog.location_description || 'Unknown location'
+
+  return (
+    <div className="group flex flex-col overflow-hidden rounded-[1.75rem] border border-amber-200/70 bg-amber-50/40 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-float">
+      {/* Photo */}
+      <div className="relative aspect-[16/10] shrink-0 overflow-hidden bg-amber-100/40">
+        {dog.photo_url ? (
+          <img
+            src={dog.photo_url}
+            alt={dogName}
+            className="h-full w-full object-cover transition-transform duration-[1600ms] ease-out group-hover:scale-[1.04]"
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center">
+            <PawPrint className="h-12 w-12 text-amber-300" />
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/5 to-transparent" />
+
+        {/* Out-of-area badge */}
+        <div className="absolute left-3 top-3">
+          <span className="inline-flex items-center gap-1 rounded-full border border-amber-200/40 bg-amber-100/90 px-2.5 py-1 text-[0.65rem] font-bold text-amber-800 backdrop-blur-sm">
+            <MapPin className="h-3 w-3" />
+            Out of area
+          </span>
+        </div>
+
+        {/* Name pill */}
+        <div className="absolute bottom-3 left-3 right-3">
+          <div className="rounded-[1.1rem] border border-white/15 bg-black/30 px-3.5 py-2.5 backdrop-blur-md">
+            <p className="text-[0.95rem] font-bold leading-tight text-white">{dogName}</p>
+            <p className="mt-0.5 text-xs font-medium text-white/75">{locationLabel}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        {dog.location_description && (
+          <div className="flex items-start gap-2 text-sm text-muted-foreground">
+            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+            <p className="line-clamp-2 leading-5">{dog.location_description}</p>
+          </div>
+        )}
+        <button
+          onClick={onViewDetails}
+          className="mt-auto flex w-full items-center justify-between rounded-xl bg-amber-100/70 px-4 py-2.5 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-200/70"
+        >
+          View Full Profile
+          <MapPin className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
   )
 }

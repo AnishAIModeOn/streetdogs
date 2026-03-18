@@ -32,6 +32,72 @@ function unwrap(result) {
   return data
 }
 
+// ── Societies ────────────────────────────────────────────────
+
+/**
+ * Search societies by pincode and an optional name fragment.
+ * Returns up to 10 results ordered alphabetically.
+ */
+export async function searchSocieties(pincode, searchTerm = '') {
+  const client = ensureSupabase()
+  let query = client.from('societies').select('*')
+
+  if (pincode) {
+    query = query.eq('pincode', pincode)
+  }
+
+  if (searchTerm.trim()) {
+    query = query.ilike('name', `%${searchTerm.trim()}%`)
+  }
+
+  return unwrap(await query.order('name', { ascending: true }).limit(10))
+}
+
+/**
+ * Create a new society row, but first check for an exact case-insensitive
+ * name+pincode match to avoid duplicates.  Returns the existing row if found.
+ */
+export async function createSociety({ name, pincode, neighbourhood = null, coordinates = null }) {
+  const client = ensureSupabase()
+  const trimmedName = name.trim()
+
+  // Check for existing match (case-insensitive)
+  const existing = unwrap(
+    await client
+      .from('societies')
+      .select('*')
+      .ilike('name', trimmedName)
+      .eq('pincode', pincode)
+      .maybeSingle(),
+  )
+
+  if (existing) return existing
+
+  return unwrap(
+    await client
+      .from('societies')
+      .insert({ name: trimmedName, pincode, neighbourhood, coordinates })
+      .select()
+      .single(),
+  )
+}
+
+/**
+ * List dogs tagged by the current user outside their home society pincode.
+ * Queries the `my_out_of_area_dogs` view (created by the migration).
+ */
+export async function listMyOutOfAreaDogs() {
+  const client = ensureSupabase()
+  return unwrap(
+    await client
+      .from('my_out_of_area_dogs')
+      .select('*')
+      .order('created_at', { ascending: false }),
+  )
+}
+
+// ── Areas ────────────────────────────────────────────────────
+
 export async function listActiveAreas() {
   const client = ensureSupabase()
   return unwrap(

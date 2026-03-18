@@ -1,17 +1,41 @@
 import { useEffect, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { emptySignInForm, emptySignUpForm } from '../data/seedData'
 import { useSignIn, useSignUp } from '../hooks/use-auth'
+import { updateProfile } from '../lib/communityData'
 import { AuthShell } from './AuthShell'
+import { SocietyPicker } from './SocietyPicker'
 import { StatusBanner } from './StatusBanner'
 import { Button } from './ui/button'
 import { FormDescription, FormField, FormLabel, FormMessage } from './ui/form'
 import { Input } from './ui/input'
+
+/**
+ * Attempts to update the user's profile with their chosen society.
+ * Retries up to 3 times with a 600 ms delay in case the DB trigger
+ * hasn't created the profile row yet (race condition on fresh sign-up).
+ * Silently swallows the error because society selection is optional.
+ */
+async function trySaveSociety(userId, societyId, attempt = 1) {
+  try {
+    await updateProfile(userId, { society_id: societyId })
+  } catch (err) {
+    if (attempt < 3) {
+      await new Promise((r) => setTimeout(r, 600))
+      return trySaveSociety(userId, societyId, attempt + 1)
+    }
+    // non-fatal — user can set society from profile later
+    console.warn('[SocietyPicker] Could not save society_id:', err?.message)
+  }
+}
 
 export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
   const isSignUp = currentPath === '/signup' || currentPath === '/sign-up'
   const [signUpForm, setSignUpForm] = useState(emptySignUpForm)
   const [signInForm, setSignInForm] = useState(emptySignInForm)
   const [errorMessage, setErrorMessage] = useState(authError)
+  const [selectedSociety, setSelectedSociety] = useState(null)
+
   const signInMutation = useSignIn()
   const signUpMutation = useSignUp()
   const isSubmitting = signInMutation.isPending || signUpMutation.isPending
@@ -22,16 +46,27 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
     setErrorMessage(authError)
   }, [authError])
 
+  // Reset society pick when switching between sign-in / sign-up
+  useEffect(() => {
+    setSelectedSociety(null)
+  }, [isSignUp])
+
+  // ── Sign-up ────────────────────────────────────────────────
   const handleSignUpSubmit = async (event) => {
     event.preventDefault()
-
     try {
       setErrorMessage('')
-      await signUpMutation.mutateAsync({
+      const result = await signUpMutation.mutateAsync({
         fullName: signUpForm.full_name.trim(),
         email: signUpForm.email.trim(),
         password: signUpForm.password,
       })
+
+      // Persist society in parallel — non-blocking, optional
+      if (selectedSociety?.id && result?.user?.id) {
+        trySaveSociety(result.user.id, selectedSociety.id)
+      }
+
       const authState = await onSignedIn()
       onNavigate(authState.redirectTo)
     } catch (error) {
@@ -39,15 +74,21 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
     }
   }
 
+  // ── Sign-in ────────────────────────────────────────────────
   const handleSignInSubmit = async (event) => {
     event.preventDefault()
-
     try {
       setErrorMessage('')
-      await signInMutation.mutateAsync({
+      const result = await signInMutation.mutateAsync({
         email: signInForm.email.trim(),
         password: signInForm.password,
       })
+
+      // If user selected a society on the sign-in form, update profile
+      if (selectedSociety?.id && result?.user?.id) {
+        trySaveSociety(result.user.id, selectedSociety.id)
+      }
+
       const authState = await onSignedIn()
       onNavigate(authState.redirectTo)
     } catch (error) {
@@ -90,17 +131,19 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
 
       {isSignUp ? (
         <form className="grid gap-4" onSubmit={handleSignUpSubmit}>
+          {/* ── Core sign-up fields ── */}
           <FormField>
             <FormLabel>Full name</FormLabel>
             <Input
               required
               placeholder="Volunteer or caregiver name"
               value={signUpForm.full_name}
-              onChange={(event) =>
-                setSignUpForm((current) => ({ ...current, full_name: event.target.value }))
+              onChange={(e) =>
+                setSignUpForm((c) => ({ ...c, full_name: e.target.value }))
               }
             />
           </FormField>
+
           <FormField>
             <FormLabel>Email</FormLabel>
             <Input
@@ -108,11 +151,12 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
               type="email"
               placeholder="name@example.com"
               value={signUpForm.email}
-              onChange={(event) =>
-                setSignUpForm((current) => ({ ...current, email: event.target.value }))
+              onChange={(e) =>
+                setSignUpForm((c) => ({ ...c, email: e.target.value }))
               }
             />
           </FormField>
+
           <FormField>
             <FormLabel>Password</FormLabel>
             <Input
@@ -121,20 +165,35 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
               minLength="6"
               placeholder="At least 6 characters"
               value={signUpForm.password}
-              onChange={(event) =>
-                setSignUpForm((current) => ({ ...current, password: event.target.value }))
+              onChange={(e) =>
+                setSignUpForm((c) => ({ ...c, password: e.target.value }))
               }
             />
             <FormDescription>
               Choose a password you can remember easily on mobile.
             </FormDescription>
           </FormField>
+
+          {/* ── Society picker ── */}
+          <div className="rounded-[1.5rem] border border-border/60 bg-secondary/20 p-4">
+            <SocietyPicker onSelect={setSelectedSociety} />
+          </div>
+
+          {/* ── Submit ── */}
           <Button type="submit" size="lg" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating account...' : 'Create account'}
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Creating account…
+              </>
+            ) : (
+              'Create account'
+            )}
           </Button>
         </form>
       ) : (
         <form className="grid gap-4" onSubmit={handleSignInSubmit}>
+          {/* ── Core sign-in fields ── */}
           <FormField>
             <FormLabel>Email</FormLabel>
             <Input
@@ -142,11 +201,12 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
               type="email"
               placeholder="name@example.com"
               value={signInForm.email}
-              onChange={(event) =>
-                setSignInForm((current) => ({ ...current, email: event.target.value }))
+              onChange={(e) =>
+                setSignInForm((c) => ({ ...c, email: e.target.value }))
               }
             />
           </FormField>
+
           <FormField>
             <FormLabel>Password</FormLabel>
             <Input
@@ -154,14 +214,29 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
               type="password"
               placeholder="Enter your password"
               value={signInForm.password}
-              onChange={(event) =>
-                setSignInForm((current) => ({ ...current, password: event.target.value }))
+              onChange={(e) =>
+                setSignInForm((c) => ({ ...c, password: e.target.value }))
               }
             />
           </FormField>
+
+          {/* ── Society picker ── */}
+          <div className="rounded-[1.5rem] border border-border/60 bg-secondary/20 p-4">
+            <SocietyPicker onSelect={setSelectedSociety} />
+          </div>
+
+          {/* ── Submit ── */}
           <Button type="submit" size="lg" disabled={isSubmitting}>
-            {isSubmitting ? 'Signing in...' : 'Sign in'}
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Signing in…
+              </>
+            ) : (
+              'Sign in'
+            )}
           </Button>
+
           <FormMessage className="text-muted-foreground">
             Area-specific visibility is applied after sign-in.
           </FormMessage>
