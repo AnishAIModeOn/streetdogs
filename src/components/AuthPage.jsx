@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Loader2, MapPin } from 'lucide-react'
 import { emptySignInForm, emptySignUpForm } from '../data/seedData'
 import { useSignIn, useSignUp } from '../hooks/use-auth'
-import { createSociety, updateProfile } from '../lib/communityData'
+import { createSociety } from '../lib/communityData'
+import { updateMyProfile } from '../services/auth.service'
 import { AuthShell } from './AuthShell'
 import { SocietyPicker } from './SocietyPicker'
 import { StatusBanner } from './StatusBanner'
@@ -63,13 +64,13 @@ async function geocodeAreaSuggestions(text) {
  * Retries up to 3 times with a 600 ms delay in case the DB trigger
  * hasn't created the profile row yet (race condition on fresh sign-up).
  */
-async function tryUpdateProfile(userId, payload, attempt = 1) {
+async function tryUpdateProfile(payload, attempt = 1) {
   try {
-    await updateProfile(userId, payload)
+    await updateMyProfile(payload)
   } catch (err) {
     if (attempt < 3) {
       await new Promise((r) => setTimeout(r, 600))
-      return tryUpdateProfile(userId, payload, attempt + 1)
+      return tryUpdateProfile(payload, attempt + 1)
     }
     console.warn('[AuthPage] Could not update profile:', err?.message)
   }
@@ -253,7 +254,7 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
           const societyId = await resolveSociety(selectedSociety)
           if (societyId) profileUpdate.society_id = societyId
         }
-        if (Object.keys(profileUpdate).length) tryUpdateProfile(result.user.id, profileUpdate)
+        if (Object.keys(profileUpdate).length) tryUpdateProfile(profileUpdate)
       }
 
       const authState = await onSignedIn()
@@ -281,7 +282,7 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
           const societyId = await resolveSociety(selectedSociety)
           if (societyId) profileUpdate.society_id = societyId
         }
-        if (Object.keys(profileUpdate).length) tryUpdateProfile(result.user.id, profileUpdate)
+        if (Object.keys(profileUpdate).length) tryUpdateProfile(profileUpdate)
       }
 
       const authState = await onSignedIn()
