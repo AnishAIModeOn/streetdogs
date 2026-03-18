@@ -99,9 +99,23 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
         password: signInForm.password,
       })
 
-      // If user selected a society on the sign-in form, update profile
-      if (selectedSociety?.id && result?.user?.id) {
-        trySaveSociety(result.user.id, selectedSociety.id)
+      // If user selected / created a society on the sign-in form, update profile
+      if (result?.user?.id && selectedSociety) {
+        let societyId = selectedSociety.id
+        if (selectedSociety._pending) {
+          try {
+            const created = await createSociety({
+              name: selectedSociety.name,
+              pincode: selectedSociety.pincode,
+              neighbourhood: selectedSociety.neighbourhood || null,
+              coordinates: null,
+            })
+            societyId = created?.id
+          } catch {
+            societyId = null
+          }
+        }
+        if (societyId) trySaveSociety(result.user.id, societyId)
       }
 
       const authState = await onSignedIn()
@@ -237,7 +251,7 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
 
           {/* ── Society picker ── */}
           <div className="rounded-[1.5rem] border border-border/60 bg-secondary/20 p-4">
-            <SocietyPicker onSelect={setSelectedSociety} />
+            <SocietyPicker onSelect={setSelectedSociety} deferCreate />
           </div>
 
           {/* ── Submit ── */}
