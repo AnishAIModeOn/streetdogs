@@ -163,6 +163,9 @@ function useAreaDetection() {
   // The neighbourhood to pass to SocietyPicker for filtering
   const effectiveNeighbourhood = manual ? selectedNeighbourhood : detectedNeighbourhood
 
+  // The human-readable label the user sees — used for saving to profile
+  const areaLabel = manual ? areaInput.trim() : detectedLabel
+
   return {
     pincode,
     detectedLabel,
@@ -179,6 +182,7 @@ function useAreaDetection() {
     selectedNeighbourhood,
     effectiveNeighbourhood,
     detectedNeighbourhood,
+    areaLabel,
   }
 }
 
@@ -203,6 +207,7 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
     setShowSuggestions,
     selectSuggestion,
     effectiveNeighbourhood,
+    areaLabel,
   } = useAreaDetection()
 
   const signInMutation = useSignIn()
@@ -248,7 +253,7 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
 
       if (result?.user?.id) {
         const profileUpdate = {}
-        if (effectiveNeighbourhood) profileUpdate.neighbourhood = effectiveNeighbourhood
+        if (areaLabel) profileUpdate.neighbourhood = areaLabel
         if (pincode) profileUpdate.pincode = pincode
         if (selectedSociety) {
           const societyId = await resolveSociety(selectedSociety)
@@ -276,7 +281,7 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
 
       if (result?.user?.id) {
         const profileUpdate = {}
-        if (effectiveNeighbourhood) profileUpdate.neighbourhood = effectiveNeighbourhood
+        if (areaLabel) profileUpdate.neighbourhood = areaLabel
         if (pincode) profileUpdate.pincode = pincode
         if (selectedSociety) {
           const societyId = await resolveSociety(selectedSociety)
