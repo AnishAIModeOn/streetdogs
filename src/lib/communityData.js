@@ -35,8 +35,17 @@ function unwrap(result) {
 // ── Societies ────────────────────────────────────────────────
 
 /**
- * Search societies by pincode and an optional name fragment.
- * Returns up to 10 results ordered alphabetically.
+ * Search societies by pincode and/or a name/neighbourhood fragment.
+ *
+ * When a pincode is supplied, results are restricted to that pincode first,
+ * then filtered by the search term.
+ *
+ * When only a search term is supplied (manual area-name entry), results match
+ * any society whose name OR neighbourhood contains the term — so typing
+ * "Bellandur" surfaces every society tagged to that neighbourhood regardless
+ * of its display name.
+ *
+ * Returns up to 15 results ordered alphabetically.
  */
 export async function searchSocieties(pincode, searchTerm = '') {
   const client = ensureSupabase()
@@ -46,11 +55,14 @@ export async function searchSocieties(pincode, searchTerm = '') {
     query = query.eq('pincode', pincode)
   }
 
-  if (searchTerm.trim()) {
-    query = query.ilike('name', `%${searchTerm.trim()}%`)
+  const term = searchTerm.trim()
+  if (term) {
+    // Match the term against EITHER society name OR the tagged neighbourhood,
+    // so area-name searches ("Bellandur") surface all societies in that area.
+    query = query.or(`name.ilike.%${term}%,neighbourhood.ilike.%${term}%`)
   }
 
-  return unwrap(await query.order('name', { ascending: true }).limit(10))
+  return unwrap(await query.order('name', { ascending: true }).limit(15))
 }
 
 /**

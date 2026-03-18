@@ -355,7 +355,12 @@ function buildOptions(societies, searchTerm, pincode) {
     (s) => s.name.toLowerCase() === trimmed.toLowerCase(),
   )
 
-  if (trimmed.length >= 2 && !hasExactMatch && pincode) {
+  // Show "Add as new society" when:
+  // - user has typed at least 2 chars
+  // - no existing society has that exact name
+  // - either a pincode is known (auto-detected) OR we're in manual area-name
+  //   mode (no pincode) — so users can always add their society
+  if (trimmed.length >= 2 && !hasExactMatch) {
     societyOptions.push({
       key: `create-${trimmed}`,
       type: 'create',
