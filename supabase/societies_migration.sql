@@ -48,10 +48,15 @@ create index if not exists dogs_tagged_by_user_id_idx    on public.dogs (tagged_
 -- ────────────────────────────────────────────────────────────
 alter table public.societies enable row level security;
 
--- Anyone authenticated can read societies (needed for the picker search)
+-- Anyone (including unauthenticated users on sign-in/sign-up pages) can read societies
 create policy "societies_select_authenticated"
   on public.societies for select
   to authenticated
+  using (true);
+
+create policy "societies_select_anon"
+  on public.societies for select
+  to anon
   using (true);
 
 -- Any authenticated user can insert (app-level dedup prevents noise)
