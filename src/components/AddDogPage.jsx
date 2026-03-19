@@ -1,13 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
-import { Sparkles, UploadCloud } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Loader2, UploadCloud } from 'lucide-react'
 import { emptyDogForm } from '../data/seedData'
+import { useAreaSocietyFlow, findMatchingAreaId } from '../hooks/use-area-society-flow'
+import { useDogAiAnalysis } from '../hooks/use-dog-ai'
 import { createDog, listActiveAreas } from '../lib/communityData'
 import { navigateTo } from '../lib/navigation'
+import { AreaSocietyFields } from './AreaSocietyFields'
+import { DogAiSuggestionEditor } from './DogAiSuggestionEditor'
 import { StatusBanner } from './StatusBanner'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
-import { FormDescription, FormField, FormLabel } from './ui/form'
+import { FormDescription, FormField, FormLabel, FormMessage } from './ui/form'
 import { Input } from './ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Textarea } from './ui/textarea'
@@ -16,99 +20,35 @@ const genderOptions = ['unknown', 'male', 'female']
 const vaccinationOptions = ['unknown', 'not_vaccinated', 'partially_vaccinated', 'vaccinated']
 const sterilizationOptions = ['unknown', 'not_sterilized', 'scheduled', 'sterilized']
 const visibilityOptions = ['normal_area_visible', 'uploader_and_area_visible']
-const autoFillableFields = [
-  'dog_name_or_temp_name',
-  'approx_age',
-  'gender',
-  'health_notes',
-  'temperament',
-]
 
 function formatLabel(value) {
   return value.replaceAll('_', ' ')
 }
 
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-
-    reader.onload = () => {
-      resolve(typeof reader.result === 'string' ? reader.result : '')
-    }
-
-    reader.onerror = () => reject(new Error('Unable to read the selected image.'))
-    reader.readAsDataURL(file)
-  })
-}
-
-function loadImage(dataUrl) {
-  return new Promise((resolve, reject) => {
-    const image = new Image()
-    image.onload = () => resolve(image)
-    image.onerror = () =>
-      reject(new Error('This photo format could not be prepared for AI analysis.'))
-    image.src = dataUrl
-  })
-}
-
-async function prepareImageForAnalysis(file) {
-  const originalDataUrl = await fileToDataUrl(file)
-  const image = await loadImage(originalDataUrl)
-  const maxDimension = 1600
-  const scale = Math.min(1, maxDimension / Math.max(image.width, image.height))
-  const width = Math.max(1, Math.round(image.width * scale))
-  const height = Math.max(1, Math.round(image.height * scale))
-
-  const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-
-  const context = canvas.getContext('2d')
-
-  if (!context) {
-    throw new Error('Unable to prepare the selected image for AI analysis.')
-  }
-
-  context.drawImage(image, 0, 0, width, height)
-
-  const normalizedDataUrl = canvas.toDataURL('image/jpeg', 0.82)
-  const [, imageBase64 = ''] = normalizedDataUrl.split(',')
-
-  return {
-    imageBase64,
-    mimeType: 'image/jpeg',
-  }
-}
-
-function parseApiJsonSafely(rawText) {
-  if (!rawText) {
-    return {}
-  }
-
-  try {
-    return JSON.parse(rawText)
-  } catch {
-    throw new Error(
-      `AI analysis returned an unexpected response. ${rawText.slice(0, 140)}`.trim(),
-    )
-  }
+function buildHealthNotesFromAi(suggestions) {
+  return [suggestions.ai_condition, suggestions.ai_injuries].filter(Boolean).join('. ').trim()
 }
 
 export function AddDogPage({ user, profile }) {
-  const analysisRequestIdRef = useRef(0)
   const [areas, setAreas] = useState([])
   const [form, setForm] = useState({
     ...emptyDogForm,
     area_id: profile?.primary_area_id || '',
   })
+  const [fieldErrors, setFieldErrors] = useState({})
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
-  const [isAnalyzingImage, setIsAnalyzingImage] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [selectedImageFile, setSelectedImageFile] = useState(null)
   const [selectedImagePreview, setSelectedImagePreview] = useState('')
-  const [aiSuggestions, setAiSuggestions] = useState(null)
   const [aiStatusMessage, setAiStatusMessage] = useState('')
+  const areaSocietyFlow = useAreaSocietyFlow({
+    autoDetect: true,
+    initialAreaLabel: profile?.societies?.neighbourhood || '',
+    initialPincode: profile?.societies?.pincode || '',
+    initialSociety: profile?.societies || null,
+  })
+  const dogAiMutation = useDogAiAnalysis()
 
   useEffect(() => {
     let isMounted = true
@@ -152,97 +92,121 @@ export function AddDogPage({ user, profile }) {
     }
   }, [selectedImageFile])
 
-  const handleAnalyzeImage = async () => {
-    if (isAnalyzingImage) {
+  useEffect(() => {
+    if (!areas.length || form.area_id) {
       return
     }
 
+    const matchedAreaId = findMatchingAreaId(areas, areaSocietyFlow.areaContext.neighbourhood || areaSocietyFlow.areaLabel)
+    if (matchedAreaId) {
+      setForm((current) => ({ ...current, area_id: matchedAreaId }))
+    }
+  }, [areaSocietyFlow.areaContext.neighbourhood, areaSocietyFlow.areaLabel, areas, form.area_id])
+
+  useEffect(() => {
     if (!selectedImageFile) {
-      setErrorMessage('Please choose a dog photo before running AI analysis.')
-      return
+      return undefined
     }
 
-    const fileToAnalyze = selectedImageFile
-    const requestId = analysisRequestIdRef.current + 1
-    analysisRequestIdRef.current = requestId
+    let isCancelled = false
 
-    try {
-      setIsAnalyzingImage(true)
-      setErrorMessage('')
-      setAiStatusMessage('')
+    const analyzePhoto = async () => {
+      try {
+        setErrorMessage('')
+        setAiStatusMessage('Analyzing photo with AI…')
+        const payload = await dogAiMutation.mutateAsync(selectedImageFile)
 
-      const { imageBase64, mimeType } = await prepareImageForAnalysis(fileToAnalyze)
-      const response = await fetch('/api/ai/analyze-dog', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          imageBase64,
-          mimeType,
-        }),
-      })
-
-      const rawText = await response.text()
-      const payload = parseApiJsonSafely(rawText)
-
-      if (!response.ok) {
-        throw new Error(
-          payload?.error ||
-            'AI analysis is temporarily unavailable. You can still fill the dog profile manually.',
-        )
-      }
-
-      const nextSuggestions = payload?.suggestions
-
-      if (!nextSuggestions) {
-        throw new Error('AI analysis returned no suggestions.')
-      }
-
-      if (analysisRequestIdRef.current !== requestId) {
-        return
-      }
-
-      setAiSuggestions(nextSuggestions)
-      setAiStatusMessage(
-        payload?.cached
-          ? 'We found an existing AI analysis for this same image and reused it.'
-          : 'AI analysis completed. Please review the suggestions before saving.',
-      )
-      setForm((current) => {
-        const nextForm = { ...current }
-
-        for (const field of autoFillableFields) {
-          const nextValue = nextSuggestions[field]
-          if (nextValue) {
-            nextForm[field] = nextValue
-          }
+        if (isCancelled) {
+          return
         }
 
-        return nextForm
-      })
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error && error.name === 'AbortError'
-          ? 'Image analysis was interrupted. Please try again once the image finishes loading.'
-          : 'AI analysis is temporarily unavailable. You can still fill the dog profile manually.',
-      )
-    } finally {
-      if (analysisRequestIdRef.current === requestId) {
-        setIsAnalyzingImage(false)
+        const suggestions = payload.suggestions
+
+        setForm((current) => ({
+          ...current,
+          ai_summary: suggestions.ai_summary || current.ai_summary,
+          ai_condition: suggestions.ai_condition || current.ai_condition,
+          ai_urgency: suggestions.ai_urgency || current.ai_urgency,
+          ai_breed_guess: suggestions.ai_breed_guess || current.ai_breed_guess,
+          ai_color: suggestions.ai_color || current.ai_color,
+          ai_age_band: suggestions.ai_age_band || current.ai_age_band,
+          ai_injuries: suggestions.ai_injuries || current.ai_injuries,
+          ai_raw_json: suggestions,
+          ai_processed_at: new Date().toISOString(),
+          approx_age: current.approx_age || (suggestions.ai_age_band !== 'unknown' ? suggestions.ai_age_band : ''),
+          gender: current.gender === 'unknown' ? suggestions.gender || current.gender : current.gender,
+          temperament: current.temperament || suggestions.temperament || '',
+          health_notes: current.health_notes || buildHealthNotesFromAi(suggestions),
+        }))
+        setAiStatusMessage(
+          payload.cached
+            ? 'Review AI suggestions we found for this photo.'
+            : 'Review AI suggestions before you save the dog record.',
+        )
+      } catch (error) {
+        if (!isCancelled) {
+          setAiStatusMessage('')
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : 'AI analysis is temporarily unavailable. You can still fill the dog profile manually.',
+          )
+        }
       }
     }
+
+    analyzePhoto()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [dogAiMutation, selectedImageFile])
+
+  function setFormValue(field, value) {
+    setForm((current) => ({ ...current, [field]: value }))
+    setFieldErrors((current) => {
+      if (!current[field]) {
+        return current
+      }
+
+      const nextErrors = { ...current }
+      delete nextErrors[field]
+      return nextErrors
+    })
   }
+
+  function validateForm() {
+    const nextErrors = {}
+
+    if (!form.area_id) {
+      nextErrors.area_id = 'Choose the StreetDog App area for visibility and routing.'
+    }
+
+    if (!form.location_description.trim()) {
+      nextErrors.location_description = 'Please add a location description for this dog.'
+    }
+
+    setFieldErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0
+  }
+
+  const canSubmit = !isSaving && !dogAiMutation.isPending
+  const matchedAreaName = useMemo(
+    () => areas.find((area) => area.id === form.area_id),
+    [areas, form.area_id],
+  )
 
   const handleSubmit = async (event) => {
     event.preventDefault()
 
+    if (!validateForm()) {
+      return
+    }
+
     try {
       setIsSaving(true)
       setErrorMessage('')
-      // Derive the tagger's area from their linked society (joined in profile).
-      // Falls back to null so legacy dogs without a society stay visible to all.
-      const society = profile?.societies ?? null
+      const resolvedSociety = await areaSocietyFlow.resolveSelectedSociety()
       const createdDog = await createDog({
         ...form,
         added_by_user_id: user.id,
@@ -251,8 +215,19 @@ export function AddDogPage({ user, profile }) {
         latitude: form.latitude ? Number(form.latitude) : null,
         longitude: form.longitude ? Number(form.longitude) : null,
         tagged_by_user_id: user.id,
-        tagged_area_pincode: society?.pincode ?? null,
-        tagged_area_neighbourhood: society?.neighbourhood ?? null,
+        tagged_society_id: resolvedSociety?._pending ? null : resolvedSociety?.id ?? null,
+        tagged_society_name: resolvedSociety?.name ?? null,
+        tagged_area_pincode: areaSocietyFlow.areaContext.pincode || null,
+        tagged_area_neighbourhood: areaSocietyFlow.areaContext.neighbourhood || null,
+        ai_summary: form.ai_summary.trim() || null,
+        ai_condition: form.ai_condition.trim() || null,
+        ai_urgency: form.ai_urgency.trim() || null,
+        ai_breed_guess: form.ai_breed_guess.trim() || null,
+        ai_color: form.ai_color.trim() || null,
+        ai_age_band: form.ai_age_band.trim() || null,
+        ai_injuries: form.ai_injuries.trim() || null,
+        ai_raw_json: form.ai_raw_json || null,
+        ai_processed_at: form.ai_processed_at || null,
       })
       navigateTo(`/dogs/${createdDog.id}`)
     } catch (error) {
@@ -274,8 +249,8 @@ export function AddDogPage({ user, profile }) {
               Create a new dog record
             </h1>
             <p className="max-w-lg text-sm leading-7 text-muted-foreground sm:text-[0.95rem]">
-              Add a dog profile with clear location and care notes so volunteers can track support
-              with confidence.
+              Add a dog profile with clear location, AI-assisted visual notes, and area context so
+              volunteers can coordinate confidently.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -289,18 +264,19 @@ export function AddDogPage({ user, profile }) {
           <CardHeader className="pb-3">
             <CardTitle>Before you save</CardTitle>
             <CardDescription>
-              One clear photo and a short location description usually create the most useful first record.
+              One clear photo and a short location description usually create the most useful first
+              record.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2.5 text-sm leading-6 text-muted-foreground">
             {[
-              'Pick the correct area so the dog is visible to the right local volunteers.',
-              'AI analysis can suggest age, gender, temperament, and care notes from the photo.',
-              'You can review all AI suggestions before saving anything.',
-            ].map((tip, i) => (
-              <div key={i} className="flex items-start gap-3 rounded-xl bg-secondary/35 px-4 py-3">
+              'Upload a photo and StreetDog App will suggest a careful AI summary for review.',
+              'Use neighbourhood and society details to preserve the same warm area flow used during account setup.',
+              'A matched StreetDog App area still controls visibility and routing for the record.',
+            ].map((tip, index) => (
+              <div key={index} className="flex items-start gap-3 rounded-xl bg-secondary/35 px-4 py-3">
                 <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[0.65rem] font-bold text-primary">
-                  {i + 1}
+                  {index + 1}
                 </span>
                 <span>{tip}</span>
               </div>
@@ -310,7 +286,6 @@ export function AddDogPage({ user, profile }) {
       </div>
 
       {errorMessage ? <StatusBanner variant="error">{errorMessage}</StatusBanner> : null}
-      {aiStatusMessage ? <StatusBanner variant="success">{aiStatusMessage}</StatusBanner> : null}
 
       {isLoading ? (
         <div className="grid gap-4">
@@ -328,7 +303,7 @@ export function AddDogPage({ user, profile }) {
               <CardHeader>
                 <CardTitle>Dog photo</CardTitle>
                 <CardDescription>
-                  Upload a dog photo to get AI-generated suggestions before saving.
+                  Upload a dog photo and StreetDog App will automatically review it with AI.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-4">
@@ -341,82 +316,54 @@ export function AddDogPage({ user, profile }) {
                       {selectedImageFile ? selectedImageFile.name : 'Choose a dog photo'}
                     </p>
                     <p className="text-xs leading-5 text-muted-foreground">
-                      Mobile camera photos work well for AI analysis.
+                      AI will review the photo automatically after upload.
                     </p>
                   </div>
                   <input
                     className="sr-only"
                     type="file"
                     accept="image/*"
-                    disabled={isAnalyzingImage}
+                    disabled={dogAiMutation.isPending}
                     onChange={(event) => {
-                      const nextFile = event.target.files?.[0] ?? null
-                      analysisRequestIdRef.current += 1
-                      setSelectedImageFile(nextFile)
-                      setAiSuggestions(null)
+                      setSelectedImageFile(event.target.files?.[0] ?? null)
                       setAiStatusMessage('')
                     }}
                   />
                 </label>
 
-                {selectedImagePreview ? (
-                  <img
-                    src={selectedImagePreview}
-                    alt="Selected dog preview"
-                    className="h-64 w-full rounded-[1.5rem] border border-border/70 object-cover"
-                  />
-                ) : (
-                  <div className="flex h-64 items-center justify-center rounded-[1.5rem] border border-dashed border-border bg-white/70 text-sm text-muted-foreground">
-                    Photo preview will appear here.
-                  </div>
-                )}
+                <div className="relative overflow-hidden rounded-[1.5rem] border border-border/70 bg-white/70">
+                  {selectedImagePreview ? (
+                    <img
+                      src={selectedImagePreview}
+                      alt="Selected dog preview"
+                      className="h-64 w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
+                      Photo preview will appear here.
+                    </div>
+                  )}
 
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={!selectedImageFile || isAnalyzingImage}
-                    onClick={handleAnalyzeImage}
-                  >
-                    <Sparkles className="h-4 w-4" />
-                    {isAnalyzingImage ? 'Analyzing dog image...' : 'Analyze with AI'}
-                  </Button>
+                  {dogAiMutation.isPending ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/72 backdrop-blur-sm">
+                      <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm text-foreground shadow-soft">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Reviewing AI suggestions…
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </CardContent>
             </Card>
 
-            {aiSuggestions ? (
-              <Card className="rounded-[2rem] border-white/70 bg-white/90 shadow-soft">
-                <CardHeader>
-                  <CardTitle>AI Suggestions</CardTitle>
-                  <CardDescription>
-                    Review the suggestions before saving the dog record.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="grid gap-3 md:grid-cols-2">
-                  <SuggestionTile
-                    label="Name suggestion"
-                    value={aiSuggestions.dog_name_or_temp_name || 'Not detected'}
-                  />
-                  <SuggestionTile label="Approx age" value={aiSuggestions.approx_age || 'Not detected'} />
-                  <SuggestionTile label="Gender" value={aiSuggestions.gender || 'Not detected'} />
-                  <SuggestionTile label="Dog color" value={aiSuggestions.dog_color || 'Not detected'} />
-                  <SuggestionTile label="Dog size" value={aiSuggestions.dog_size || 'Not detected'} />
-                  <SuggestionTile label="Likely breed" value={aiSuggestions.likely_breed || 'Not detected'} />
-                  <SuggestionTile label="Temperament" value={aiSuggestions.temperament || 'Not detected'} />
-                  <SuggestionTile
-                    label="Distinctive features"
-                    value={aiSuggestions.distinctive_features || 'Not detected'}
-                  />
-                  <div className="rounded-2xl bg-secondary/30 p-4 md:col-span-2">
-                    <p className="text-sm font-medium text-muted-foreground">Health notes suggestion</p>
-                    <p className="mt-2 text-sm leading-6 text-foreground">
-                      {aiSuggestions.health_notes || 'Not detected'}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : null}
+            <DogAiSuggestionEditor
+              suggestions={form}
+              statusMessage={aiStatusMessage}
+              onChange={setFormValue}
+              title="Review AI suggestions"
+            />
+
+            <AreaSocietyFields flow={areaSocietyFlow} cardCopy="Use location or type your neighbourhood to mirror the same area and society flow used during account setup." />
           </div>
 
           <div className="grid gap-5">
@@ -424,34 +371,15 @@ export function AddDogPage({ user, profile }) {
               <CardHeader>
                 <CardTitle>Dog details</CardTitle>
                 <CardDescription>
-                  Add the core profile details and review them before saving.
+                  Review the AI suggestions, then keep the final profile accurate and human-checked.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-5">
                 <FormField>
-                  <FormLabel>Dog name or temporary name</FormLabel>
-                  <Input
-                    placeholder="Dog name or temporary name"
-                    value={form.dog_name_or_temp_name}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        dog_name_or_temp_name: event.target.value,
-                      }))
-                    }
-                  />
-                </FormField>
-
-                <FormField>
-                  <FormLabel>Area</FormLabel>
-                  <Select
-                    value={form.area_id}
-                    onValueChange={(value) =>
-                      setForm((current) => ({ ...current, area_id: value }))
-                    }
-                  >
+                  <FormLabel>StreetDog App area</FormLabel>
+                  <Select value={form.area_id} onValueChange={(value) => setFormValue('area_id', value)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select an area" />
+                      <SelectValue placeholder="Select an area for visibility" />
                     </SelectTrigger>
                     <SelectContent>
                       {areas.map((area) => (
@@ -461,20 +389,33 @@ export function AddDogPage({ user, profile }) {
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormDescription>
+                    {matchedAreaName
+                      ? `Matched area: ${matchedAreaName.city} - ${matchedAreaName.name}`
+                      : 'This controls which volunteers can see and manage the record.'}
+                  </FormDescription>
+                  {fieldErrors.area_id ? <FormMessage>{fieldErrors.area_id}</FormMessage> : null}
+                </FormField>
+
+                <FormField>
+                  <FormLabel>Dog name or temporary name</FormLabel>
+                  <Input
+                    placeholder="Dog name or temporary name"
+                    value={form.dog_name_or_temp_name}
+                    onChange={(event) => setFormValue('dog_name_or_temp_name', event.target.value)}
+                  />
                 </FormField>
 
                 <FormField>
                   <FormLabel>Location description</FormLabel>
                   <Textarea
-                    placeholder="Location description"
+                    placeholder="Street, gate, shop, or landmark where the dog is usually seen"
                     value={form.location_description}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        location_description: event.target.value,
-                      }))
-                    }
+                    onChange={(event) => setFormValue('location_description', event.target.value)}
                   />
+                  {fieldErrors.location_description ? (
+                    <FormMessage>{fieldErrors.location_description}</FormMessage>
+                  ) : null}
                 </FormField>
 
                 <div className="grid gap-5 md:grid-cols-2">
@@ -485,9 +426,7 @@ export function AddDogPage({ user, profile }) {
                       step="any"
                       placeholder="Latitude"
                       value={form.latitude}
-                      onChange={(event) =>
-                        setForm((current) => ({ ...current, latitude: event.target.value }))
-                      }
+                      onChange={(event) => setFormValue('latitude', event.target.value)}
                     />
                   </FormField>
                   <FormField>
@@ -497,9 +436,7 @@ export function AddDogPage({ user, profile }) {
                       step="any"
                       placeholder="Longitude"
                       value={form.longitude}
-                      onChange={(event) =>
-                        setForm((current) => ({ ...current, longitude: event.target.value }))
-                      }
+                      onChange={(event) => setFormValue('longitude', event.target.value)}
                     />
                   </FormField>
                 </div>
@@ -507,12 +444,7 @@ export function AddDogPage({ user, profile }) {
                 <div className="grid gap-5 md:grid-cols-2">
                   <FormField>
                     <FormLabel>Gender</FormLabel>
-                    <Select
-                      value={form.gender}
-                      onValueChange={(value) =>
-                        setForm((current) => ({ ...current, gender: value }))
-                      }
-                    >
+                    <Select value={form.gender} onValueChange={(value) => setFormValue('gender', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select gender" />
                       </SelectTrigger>
@@ -531,9 +463,7 @@ export function AddDogPage({ user, profile }) {
                     <Input
                       placeholder="Approx age"
                       value={form.approx_age}
-                      onChange={(event) =>
-                        setForm((current) => ({ ...current, approx_age: event.target.value }))
-                      }
+                      onChange={(event) => setFormValue('approx_age', event.target.value)}
                     />
                   </FormField>
                 </div>
@@ -543,9 +473,7 @@ export function AddDogPage({ user, profile }) {
                     <FormLabel>Vaccination status</FormLabel>
                     <Select
                       value={form.vaccination_status}
-                      onValueChange={(value) =>
-                        setForm((current) => ({ ...current, vaccination_status: value }))
-                      }
+                      onValueChange={(value) => setFormValue('vaccination_status', value)}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Vaccination status" />
@@ -564,9 +492,7 @@ export function AddDogPage({ user, profile }) {
                     <FormLabel>Sterilization status</FormLabel>
                     <Select
                       value={form.sterilization_status}
-                      onValueChange={(value) =>
-                        setForm((current) => ({ ...current, sterilization_status: value }))
-                      }
+                      onValueChange={(value) => setFormValue('sterilization_status', value)}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Sterilization status" />
@@ -587,9 +513,7 @@ export function AddDogPage({ user, profile }) {
                   <Input
                     placeholder="Temperament"
                     value={form.temperament}
-                    onChange={(event) =>
-                      setForm((current) => ({ ...current, temperament: event.target.value }))
-                    }
+                    onChange={(event) => setFormValue('temperament', event.target.value)}
                   />
                 </FormField>
 
@@ -598,9 +522,7 @@ export function AddDogPage({ user, profile }) {
                   <Textarea
                     placeholder="Health notes"
                     value={form.health_notes}
-                    onChange={(event) =>
-                      setForm((current) => ({ ...current, health_notes: event.target.value }))
-                    }
+                    onChange={(event) => setFormValue('health_notes', event.target.value)}
                   />
                 </FormField>
 
@@ -608,9 +530,7 @@ export function AddDogPage({ user, profile }) {
                   <FormLabel>Visibility</FormLabel>
                   <Select
                     value={form.visibility_type}
-                    onValueChange={(value) =>
-                      setForm((current) => ({ ...current, visibility_type: value }))
-                    }
+                    onValueChange={(value) => setFormValue('visibility_type', value)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Visibility" />
@@ -632,7 +552,7 @@ export function AddDogPage({ user, profile }) {
                   <Button type="button" variant="outline" onClick={() => navigateTo('/dogs')}>
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={isSaving}>
+                  <Button type="submit" disabled={!canSubmit}>
                     {isSaving ? 'Saving dog...' : 'Save dog'}
                   </Button>
                 </div>
@@ -642,14 +562,5 @@ export function AddDogPage({ user, profile }) {
         </form>
       )}
     </section>
-  )
-}
-
-function SuggestionTile({ label, value }) {
-  return (
-    <div className="rounded-2xl bg-secondary/30 p-4">
-      <p className="text-sm font-medium text-muted-foreground">{label}</p>
-      <p className="mt-2 text-sm leading-6 text-foreground">{value}</p>
-    </div>
   )
 }

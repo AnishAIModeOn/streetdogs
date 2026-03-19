@@ -6,29 +6,32 @@ const GEMINI_PROMPT = `You are an AI assistant helping manage a street dog datab
 Analyze the uploaded dog photo and return ONLY valid JSON with these fields:
 
 {
-  "dog_name_or_temp_name": "",
-  "dog_color": "",
-  "dog_size": "",
-  "likely_breed": "",
-  "approx_age": "",
+  "ai_summary": "",
+  "ai_condition": "",
+  "ai_urgency": "",
+  "ai_injuries": "",
+  "ai_breed_guess": "",
+  "ai_color": "",
+  "ai_age_band": "",
   "gender": "",
-  "health_notes": "",
-  "temperament": "",
-  "distinctive_features": ""
+  "temperament": ""
 }
 
 Rules:
-- Make reasonable visual estimates only from the image
-- If uncertain, use short cautious guesses
-- dog_size must be one of: small, medium, large
-- approx_age should be one of: puppy, young, adult, senior
+- Make reasonable visual estimates only from the image.
+- If uncertain, use short cautious guesses.
+- ai_summary should be 1-2 short sentences.
+- ai_condition should be a short description such as "appears stable", "thin and cautious", or "possible medical concern".
+- ai_urgency must be one of: low, medium, high, critical.
+- ai_age_band should be one of: puppy, young, adult, senior, unknown.
 - gender should be one of: male, female, unknown
-- Return JSON only, no markdown, no explanation`
+- temperament should be brief and cautious.
+- Return JSON only, no markdown, no explanation.`
 const GEMINI_MODEL = 'gemini-2.5-flash'
 const ANALYSIS_TYPE = 'dog_profile'
 
-const ALLOWED_DOG_SIZES = new Set(['small', 'medium', 'large'])
-const ALLOWED_APPROX_AGES = new Set(['puppy', 'young', 'adult', 'senior'])
+const ALLOWED_AI_URGENCY = new Set(['low', 'medium', 'high', 'critical'])
+const ALLOWED_APPROX_AGES = new Set(['puppy', 'young', 'adult', 'senior', 'unknown'])
 const ALLOWED_GENDERS = new Set(['male', 'female', 'unknown'])
 
 function normalizeText(value) {
@@ -42,15 +45,15 @@ function normalizeEnum(value, allowedValues) {
 
 function sanitizeSuggestionPayload(payload) {
   return {
-    dog_name_or_temp_name: normalizeText(payload?.dog_name_or_temp_name),
-    dog_color: normalizeText(payload?.dog_color),
-    dog_size: normalizeEnum(payload?.dog_size, ALLOWED_DOG_SIZES),
-    likely_breed: normalizeText(payload?.likely_breed),
-    approx_age: normalizeEnum(payload?.approx_age, ALLOWED_APPROX_AGES),
+    ai_summary: normalizeText(payload?.ai_summary),
+    ai_condition: normalizeText(payload?.ai_condition),
+    ai_urgency: normalizeEnum(payload?.ai_urgency, ALLOWED_AI_URGENCY),
+    ai_injuries: normalizeText(payload?.ai_injuries),
+    ai_breed_guess: normalizeText(payload?.ai_breed_guess),
+    ai_color: normalizeText(payload?.ai_color),
+    ai_age_band: normalizeEnum(payload?.ai_age_band, ALLOWED_APPROX_AGES) || 'unknown',
     gender: normalizeEnum(payload?.gender, ALLOWED_GENDERS) || 'unknown',
-    health_notes: normalizeText(payload?.health_notes),
     temperament: normalizeText(payload?.temperament),
-    distinctive_features: normalizeText(payload?.distinctive_features),
   }
 }
 

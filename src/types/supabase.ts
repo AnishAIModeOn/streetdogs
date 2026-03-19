@@ -42,6 +42,11 @@ export interface Dog {
   updated_by: string | null
   area_id?: string | null
   added_by_user_id?: string | null
+  tagged_by_user_id?: string | null
+  tagged_society_id?: string | null
+  tagged_society_name?: string | null
+  tagged_area_pincode?: string | null
+  tagged_area_neighbourhood?: string | null
   added_by_guest?: boolean
   guest_contact?: string | null
   dog_name_or_temp_name: string | null
@@ -60,6 +65,15 @@ export interface Dog {
   health_status: HealthStatus
   health_notes?: string | null
   temperament?: string | null
+  ai_summary?: string | null
+  ai_condition?: string | null
+  ai_urgency?: string | null
+  ai_breed_guess?: string | null
+  ai_color?: string | null
+  ai_age_band?: string | null
+  ai_injuries?: string | null
+  ai_raw_json?: Record<string, unknown> | null
+  ai_processed_at?: string | null
   visibility_type?: string | null
   notes: string | null
   photo_path: string | null

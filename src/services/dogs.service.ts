@@ -12,6 +12,10 @@ export interface UpsertDogInput {
   area_id?: string | null
   added_by_user_id?: string | null
   tagged_by_user_id?: string | null
+  tagged_society_id?: string | null
+  tagged_society_name?: string | null
+  tagged_area_pincode?: string | null
+  tagged_area_neighbourhood?: string | null
   added_by_guest?: boolean
   guest_contact?: string | null
   city?: string | null
@@ -27,6 +31,15 @@ export interface UpsertDogInput {
   health_status?: Dog['health_status']
   health_notes?: string | null
   temperament?: string | null
+  ai_summary?: string | null
+  ai_condition?: string | null
+  ai_urgency?: string | null
+  ai_breed_guess?: string | null
+  ai_color?: string | null
+  ai_age_band?: string | null
+  ai_injuries?: string | null
+  ai_raw_json?: Record<string, unknown> | null
+  ai_processed_at?: string | null
   visibility_type?: string | null
   status?: string | null
   notes?: string | null
@@ -91,6 +104,10 @@ export async function createDog(input: UpsertDogInput) {
       area_id: input.area_id ?? null,
       added_by_user_id: input.added_by_user_id ?? user?.id ?? null,
       tagged_by_user_id: input.tagged_by_user_id ?? user?.id ?? null,
+      tagged_society_id: input.tagged_society_id ?? null,
+      tagged_society_name: input.tagged_society_name ?? null,
+      tagged_area_pincode: input.tagged_area_pincode ?? null,
+      tagged_area_neighbourhood: input.tagged_area_neighbourhood ?? null,
       added_by_guest: input.added_by_guest ?? !user,
       guest_contact: input.guest_contact ?? null,
       photo_url: input.photo_url ?? null,
@@ -103,6 +120,15 @@ export async function createDog(input: UpsertDogInput) {
       sterilization_status: input.sterilization_status ?? 'unknown',
       health_notes: input.health_notes ?? input.notes ?? null,
       temperament: input.temperament ?? null,
+      ai_summary: input.ai_summary ?? null,
+      ai_condition: input.ai_condition ?? null,
+      ai_urgency: input.ai_urgency ?? null,
+      ai_breed_guess: input.ai_breed_guess ?? null,
+      ai_color: input.ai_color ?? null,
+      ai_age_band: input.ai_age_band ?? null,
+      ai_injuries: input.ai_injuries ?? null,
+      ai_raw_json: input.ai_raw_json ?? null,
+      ai_processed_at: input.ai_processed_at ?? null,
       visibility_type: input.visibility_type ?? 'normal_area_visible',
       status: input.status ?? 'active',
     }

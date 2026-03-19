@@ -367,8 +367,19 @@ export async function createDog(payload) {
     // Area-tagging: written at create time so RLS pincode scoping works correctly.
     // tagged_by_user_id lets the user always see their own dogs regardless of area.
     tagged_by_user_id: payload.tagged_by_user_id ?? null,
+    tagged_society_id: payload.tagged_society_id ?? null,
+    tagged_society_name: payload.tagged_society_name ?? null,
     tagged_area_pincode: payload.tagged_area_pincode ?? null,
     tagged_area_neighbourhood: payload.tagged_area_neighbourhood ?? null,
+    ai_summary: payload.ai_summary ?? null,
+    ai_condition: payload.ai_condition ?? null,
+    ai_urgency: payload.ai_urgency ?? null,
+    ai_breed_guess: payload.ai_breed_guess ?? null,
+    ai_color: payload.ai_color ?? null,
+    ai_age_band: payload.ai_age_band ?? null,
+    ai_injuries: payload.ai_injuries ?? null,
+    ai_raw_json: payload.ai_raw_json ?? null,
+    ai_processed_at: payload.ai_processed_at ?? null,
   }
 
   return unwrap(await client.from('dogs').insert(safePayload).select().single())

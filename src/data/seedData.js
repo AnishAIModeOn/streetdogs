@@ -20,6 +20,7 @@ export const emptyDogForm = {
   area_id: '',
   added_by_guest: false,
   guest_contact: '',
+  tagged_society_name: '',
   photo_url: '',
   location_description: '',
   latitude: '',
@@ -32,6 +33,15 @@ export const emptyDogForm = {
   temperament: '',
   visibility_type: 'normal_area_visible',
   status: 'active',
+  ai_summary: '',
+  ai_condition: '',
+  ai_urgency: '',
+  ai_breed_guess: '',
+  ai_color: '',
+  ai_age_band: '',
+  ai_injuries: '',
+  ai_raw_json: null,
+  ai_processed_at: '',
 }
 
 export const emptyGuestReportForm = {
@@ -39,10 +49,20 @@ export const emptyGuestReportForm = {
   area_id: '',
   guest_name: '',
   guest_contact: '',
+  tagged_society_name: '',
   location_description: '',
   photo_url: '',
   approx_age: '',
   health_notes: '',
+  ai_summary: '',
+  ai_condition: '',
+  ai_urgency: '',
+  ai_breed_guess: '',
+  ai_color: '',
+  ai_age_band: '',
+  ai_injuries: '',
+  ai_raw_json: null,
+  ai_processed_at: '',
 }
 
 export const emptyExpenseForm = {
