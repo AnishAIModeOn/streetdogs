@@ -44,17 +44,31 @@ function normalizeEnum(value, allowedValues) {
 }
 
 function sanitizeSuggestionPayload(payload) {
+  const source =
+    payload?.suggestions && typeof payload.suggestions === 'object' ? payload.suggestions : payload
+
   return {
-    ai_summary: normalizeText(payload?.ai_summary),
-    ai_condition: normalizeText(payload?.ai_condition),
-    ai_urgency: normalizeEnum(payload?.ai_urgency, ALLOWED_AI_URGENCY),
-    ai_injuries: normalizeText(payload?.ai_injuries),
-    ai_breed_guess: normalizeText(payload?.ai_breed_guess),
-    ai_color: normalizeText(payload?.ai_color),
-    ai_age_band: normalizeEnum(payload?.ai_age_band, ALLOWED_APPROX_AGES) || 'unknown',
-    gender: normalizeEnum(payload?.gender, ALLOWED_GENDERS) || 'unknown',
-    temperament: normalizeText(payload?.temperament),
+    ai_summary: normalizeText(source?.ai_summary || source?.summary || source?.description),
+    ai_condition: normalizeText(source?.ai_condition || source?.condition || source?.status),
+    ai_urgency: normalizeEnum(source?.ai_urgency || source?.urgency, ALLOWED_AI_URGENCY),
+    ai_injuries: normalizeText(source?.ai_injuries || source?.injuries || source?.health_notes),
+    ai_breed_guess: normalizeText(source?.ai_breed_guess || source?.breed_guess || source?.breed),
+    ai_color: normalizeText(source?.ai_color || source?.color || source?.coat_color),
+    ai_age_band: normalizeEnum(source?.ai_age_band || source?.age_band, ALLOWED_APPROX_AGES) || 'unknown',
+    gender: normalizeEnum(source?.gender || source?.sex, ALLOWED_GENDERS) || 'unknown',
+    temperament: normalizeText(source?.temperament || source?.behavior),
   }
+}
+
+function hasMeaningfulSuggestions(suggestions) {
+  return Boolean(
+    suggestions.ai_summary ||
+      suggestions.ai_condition ||
+      suggestions.ai_injuries ||
+      suggestions.ai_breed_guess ||
+      suggestions.ai_color ||
+      suggestions.temperament,
+  )
 }
 
 function extractJsonFromText(text) {
@@ -168,6 +182,9 @@ export default async function handler(req, res) {
 
       if (!cacheReadError && cachedRow?.result_json) {
         const suggestions = sanitizeSuggestionPayload(cachedRow.result_json)
+        if (!hasMeaningfulSuggestions(suggestions)) {
+          throw new Error('AI analysis returned no usable suggestions for this photo.')
+        }
         return res.status(200).json({ ok: true, suggestions, cached: true })
       }
     }
@@ -222,6 +239,10 @@ export default async function handler(req, res) {
     const rawText = collectGeminiText(payload)
     const parsedJson = extractJsonFromText(rawText)
     const suggestions = sanitizeSuggestionPayload(parsedJson)
+
+    if (!hasMeaningfulSuggestions(suggestions)) {
+      throw new Error('AI analysis returned no usable suggestions for this photo.')
+    }
 
     if (serverSupabase) {
       await serverSupabase.from('ai_dog_analysis_cache').insert({
