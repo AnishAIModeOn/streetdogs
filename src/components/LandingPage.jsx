@@ -8,7 +8,7 @@ import { HeroImageCarousel } from './HeroImageCarousel'
 
 const heroImages = [
   {
-    src: '/landing/dog1.jpg',
+    src: '/landing/landing-dog-1.jpg',
     alt: 'Street dog resting calmly in warm afternoon light',
     name: 'Milo',
     location: 'Bandra West, Mumbai',
@@ -16,7 +16,7 @@ const heroImages = [
     badges: ['Vaccinated', 'Friendly'],
   },
   {
-    src: '/landing/dog2.jpg',
+    src: '/landing/landing-dog-2.jpg',
     alt: 'Puppy portrait with soft premium background',
     name: 'Luna',
     location: 'Koramangala, Bengaluru',
@@ -24,7 +24,7 @@ const heroImages = [
     badges: ['Needs Food'],
   },
   {
-    src: '/landing/dog3.AVIF',
+    src: '/landing/landing-dog-3.jpg',
     alt: 'Street dog looking toward nearby volunteers',
     name: 'Rocky',
     location: 'Adyar, Chennai',
