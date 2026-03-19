@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { HeartHandshake, Loader2, MapPin, UploadCloud } from 'lucide-react'
+import { HeartHandshake, Loader2, MapPin, Sparkles, UploadCloud } from 'lucide-react'
 import { toast } from 'sonner'
 import { emptyGuestReportForm } from '../data/seedData'
 import { useAreaSocietyFlow, findMatchingAreaId } from '../hooks/use-area-society-flow'
@@ -8,7 +8,6 @@ import { useDogAiAnalysis } from '../hooks/use-dog-ai'
 import { useCreateDog, useUploadDogPhoto } from '../hooks/use-dogs'
 import { listActiveAreas } from '../lib/communityData'
 import { AreaSocietyFields } from './AreaSocietyFields'
-import { DogAiSuggestionEditor } from './DogAiSuggestionEditor'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
@@ -94,12 +93,11 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
   const uploadDogPhotoMutation = useUploadDogPhoto()
   const dogAiMutation = useDogAiAnalysis()
   const activeUser = authState?.user ?? currentUser
+  const isUploadingPhoto = uploadDogPhotoMutation.isPending
   const areaSocietyFlow = useAreaSocietyFlow({
     autoDetect: true,
     deferSocietyCreate: !activeUser?.id,
   })
-  const isUploadingPhoto = uploadDogPhotoMutation.isPending
-  const isSubmitDisabled = isSaving || isUploadingPhoto || dogAiMutation.isPending
 
   useEffect(() => {
     let isMounted = true
@@ -170,73 +168,58 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
     }
   }, [areaSocietyFlow.areaContext.neighbourhood, areaSocietyFlow.areaLabel, areas, form.area_id])
 
-  useEffect(() => {
-    if (!selectedImageFile) {
-      return undefined
-    }
-
-    let isCancelled = false
-
-    const analyzePhoto = async () => {
-      try {
-        setErrorMessage('')
-        setAiStatusMessage('Analyzing photo with AI…')
-        const payload = await dogAiMutation.mutateAsync(selectedImageFile)
-
-        if (isCancelled) {
-          return
-        }
-
-        const suggestions = payload.suggestions
-        setForm((current) => ({
-          ...current,
-          ai_summary: suggestions.ai_summary || current.ai_summary,
-          ai_condition: suggestions.ai_condition || current.ai_condition,
-          ai_urgency: suggestions.ai_urgency || current.ai_urgency,
-          ai_breed_guess: suggestions.ai_breed_guess || current.ai_breed_guess,
-          ai_color: suggestions.ai_color || current.ai_color,
-          ai_age_band: suggestions.ai_age_band || current.ai_age_band,
-          ai_injuries: suggestions.ai_injuries || current.ai_injuries,
-          ai_raw_json: suggestions,
-          ai_processed_at: new Date().toISOString(),
-          approx_age: current.approx_age || (suggestions.ai_age_band !== 'unknown' ? suggestions.ai_age_band : ''),
-          health_notes: current.health_notes || buildHealthNotesFromAi(suggestions),
-        }))
-        setAiStatusMessage(
-          payload.cached
-            ? 'Review AI suggestions we found for this photo.'
-            : 'Review AI suggestions before you submit the report.',
-        )
-      } catch (error) {
-        if (!isCancelled) {
-          setAiStatusMessage('')
-          setErrorMessage(
-            error instanceof Error
-              ? error.message
-              : 'AI analysis is temporarily unavailable. You can still submit the report manually.',
-          )
-        }
-      }
-    }
-
-    analyzePhoto()
-
-    return () => {
-      isCancelled = true
-    }
-  }, [dogAiMutation, selectedImageFile])
-
   function setFormValue(field, value) {
     setForm((current) => ({ ...current, [field]: value }))
     setFieldErrors((current) => {
       if (!current[field]) {
         return current
       }
-
       const nextErrors = { ...current }
       delete nextErrors[field]
       return nextErrors
     })
+  }
+
+  async function handleAnalyzePhoto() {
+    if (!selectedImageFile || dogAiMutation.isPending) {
+      return
+    }
+
+    try {
+      setErrorMessage('')
+      setAiStatusMessage('Analyzing photo with AI…')
+      const payload = await dogAiMutation.mutateAsync(selectedImageFile)
+      const suggestions = payload.suggestions
+
+      setForm((current) => ({
+        ...current,
+        ai_summary: suggestions.ai_summary || current.ai_summary,
+        ai_condition: suggestions.ai_condition || current.ai_condition,
+        ai_urgency: suggestions.ai_urgency || current.ai_urgency,
+        ai_breed_guess: suggestions.ai_breed_guess || current.ai_breed_guess,
+        ai_color: suggestions.ai_color || current.ai_color,
+        ai_age_band: suggestions.ai_age_band || current.ai_age_band,
+        ai_injuries: suggestions.ai_injuries || current.ai_injuries,
+        ai_raw_json: suggestions,
+        ai_processed_at: new Date().toISOString(),
+        ai_summary_user: suggestions.ai_summary || current.ai_summary,
+        ai_condition_user: suggestions.ai_condition || current.ai_condition,
+        approx_age: current.approx_age || (suggestions.ai_age_band !== 'unknown' ? suggestions.ai_age_band : ''),
+        health_notes: current.health_notes || buildHealthNotesFromAi(suggestions),
+      }))
+      setAiStatusMessage(
+        payload.cached
+          ? 'AI suggestions are ready to review from a previous matching photo.'
+          : 'AI suggestions are ready. You can edit anything before you submit.',
+      )
+    } catch (error) {
+      setAiStatusMessage('')
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : 'AI analysis is temporarily unavailable. You can still submit manually.',
+      )
+    }
   }
 
   function resetFormState() {
@@ -256,9 +239,14 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
     if (!form.location_description.trim()) {
       nextErrors.location_description = 'Please share where you saw this dog.'
     }
-
     if (!form.area_id) {
       nextErrors.area_id = 'Please choose the StreetDog App area so volunteers know where to look.'
+    }
+    if (!form.ai_condition.trim()) {
+      nextErrors.ai_condition = 'Add a short condition or status note.'
+    }
+    if (!form.ai_summary.trim()) {
+      nextErrors.ai_summary = 'Add a short description so volunteers know what to expect.'
     }
 
     setFieldErrors(nextErrors)
@@ -272,19 +260,13 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-
-    if (!validateForm()) {
-      return
-    }
+    if (!validateForm()) return
 
     try {
       setIsSaving(true)
       setErrorMessage('')
-      let uploadedPhoto = {
-        photo_path: null,
-        photo_url: form.photo_url.trim() || null,
-      }
 
+      let uploadedPhoto = { photo_path: null, photo_url: null }
       if (selectedImageFile && activeUser?.id) {
         uploadedPhoto = await uploadDogPhotoMutation.mutateAsync({
           file: selectedImageFile,
@@ -292,7 +274,10 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
         })
       }
 
-      const resolvedSociety = activeUser?.id ? await areaSocietyFlow.resolveSelectedSociety() : areaSocietyFlow.selectedSociety
+      const resolvedSociety = activeUser?.id
+        ? await areaSocietyFlow.resolveSelectedSociety()
+        : areaSocietyFlow.selectedSociety
+
       const guestContact = formatGuestContact(form.guest_name, form.guest_contact)
       const payload = {
         dog_name_or_temp_name: form.dog_name_or_temp_name.trim() || null,
@@ -324,7 +309,6 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
       }
 
       const createdDog = await createDogMutation.mutateAsync(payload)
-
       setSubmittedDogPreview({
         id: createdDog.id,
         image: uploadedPhoto.photo_url || selectedImagePreview || '',
@@ -349,16 +333,13 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
       <section className="grid gap-5 rounded-[2rem] border border-white/65 bg-hero-wash p-6 shadow-float lg:grid-cols-[1.05fr_0.95fr]">
         <div className="space-y-5">
-          <Badge className="w-fit" variant="secondary">
-            Public sighting report
-          </Badge>
+          <Badge className="w-fit" variant="secondary">Public sighting report</Badge>
           <div className="space-y-2">
             <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
               Spotted a dog that needs help?
             </h1>
             <p className="max-w-lg text-sm leading-7 text-muted-foreground sm:text-[0.95rem]">
-              Share a quick report and local volunteers will pick it up from here. No account
-              required.
+              Share a quick report and local volunteers will pick it up from here. No account required.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -381,7 +362,7 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
                 Guests welcome
               </div>
               <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                AI suggestions are assistive only. You stay in control of the final report.
+                AI is optional. You can always fill the report yourself and submit manually.
               </p>
             </div>
           </div>
@@ -390,15 +371,13 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
         <Card className="overflow-hidden rounded-[1.75rem] border-white/65 bg-white/92">
           <CardHeader className="pb-3">
             <CardTitle>What to include</CardTitle>
-            <CardDescription>
-              Short, clear details are enough for a useful first report.
-            </CardDescription>
+            <CardDescription>Short, clear details are enough for a useful first report.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2.5 text-sm leading-6 text-muted-foreground">
             {[
-              'A photo helps AI and volunteers understand what they are seeing, even if you stay a guest.',
-              'The same warm area and society flow from account setup is available here too.',
-              'You can review every AI suggestion before the report is saved.',
+              'Upload a photo safely and review it before you do anything else.',
+              'Use the same area and society flow used elsewhere in StreetDog App.',
+              'If AI helps, it fills the same form you will submit.',
             ].map((tip, index) => (
               <div key={index} className="flex items-start gap-3 rounded-xl bg-secondary/40 px-4 py-3">
                 <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[0.65rem] font-bold text-primary">
@@ -423,17 +402,14 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
           <CardDescription>
             {hasSubmitted
               ? 'Thank you for taking a moment to help this dog get seen by the community.'
-              : 'Keep it simple. You can share only the details you know and volunteers can add more later.'}
+              : 'A shorter, simpler report helps volunteers act faster on mobile.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="grid gap-4">
               {Array.from({ length: 5 }).map((_, index) => (
-                <div
-                  key={index}
-                  className="h-11 animate-pulse rounded-2xl border border-border/70 bg-secondary/40"
-                />
+                <div key={index} className="h-11 animate-pulse rounded-2xl border border-border/70 bg-secondary/40" />
               ))}
             </div>
           ) : hasSubmitted ? (
@@ -445,8 +421,7 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
                       Thank you for looking out for them.
                     </h3>
                     <p className="text-sm leading-7 text-muted-foreground">
-                      Your report has been submitted to volunteers in this area. Someone will check
-                      on this dog soon.
+                      Your report has been submitted to volunteers in this area. Someone will check on this dog soon.
                     </p>
                     <p className="text-sm leading-7 text-muted-foreground">
                       Because of you, this dog is now visible to the community.
@@ -457,27 +432,15 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
                     <div className="grid gap-4 rounded-[1.5rem] border border-white/60 bg-white/85 p-4 shadow-soft sm:grid-cols-[0.8fr_1.2fr]">
                       <div className="overflow-hidden rounded-[1.35rem] bg-secondary/30">
                         {submittedDogPreview.image ? (
-                          <img
-                            src={submittedDogPreview.image}
-                            alt={submittedDogPreview.name}
-                            className="h-44 w-full object-cover"
-                          />
+                          <img src={submittedDogPreview.image} alt={submittedDogPreview.name} className="h-44 w-full object-cover" />
                         ) : (
-                          <div className="flex h-44 items-center justify-center text-sm text-muted-foreground">
-                            No image shared
-                          </div>
+                          <div className="flex h-44 items-center justify-center text-sm text-muted-foreground">No image shared</div>
                         )}
                       </div>
                       <div className="space-y-2">
-                        <p className="text-lg font-semibold text-foreground">
-                          {submittedDogPreview.name}
-                        </p>
-                        <p className="text-sm font-medium text-muted-foreground">
-                          {submittedDogPreview.areaLabel}
-                        </p>
-                        <p className="text-sm leading-6 text-muted-foreground">
-                          {submittedDogPreview.location}
-                        </p>
+                        <p className="text-lg font-semibold text-foreground">{submittedDogPreview.name}</p>
+                        <p className="text-sm font-medium text-muted-foreground">{submittedDogPreview.areaLabel}</p>
+                        <p className="text-sm leading-6 text-muted-foreground">{submittedDogPreview.location}</p>
                       </div>
                     </div>
                   ) : null}
@@ -512,10 +475,9 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
               <Card className="overflow-hidden rounded-2xl border-dashed border-border bg-secondary/20">
                 <CardContent className="space-y-4 p-5">
                   <div className="space-y-1">
-                    <p className="text-sm font-semibold text-foreground">Photo upload</p>
+                    <p className="text-sm font-semibold text-foreground">Photo</p>
                     <p className="text-sm leading-6 text-muted-foreground">
-                      Add a photo from your phone if you have one. StreetDog App will review it with
-                      AI automatically, and guests can still submit even if they do not sign in.
+                      Choose a photo if you have one, then optionally ask AI to suggest details.
                     </p>
                   </div>
                   <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-[1.5rem] border border-dashed border-border bg-white/80 px-5 py-8 text-center transition hover:bg-white">
@@ -527,7 +489,7 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
                         {selectedImageFile ? selectedImageFile.name : 'Choose a dog photo'}
                       </p>
                       <p className="text-xs leading-5 text-muted-foreground">
-                        AI will review the photo automatically after upload.
+                        The photo stays optional for manual reporting.
                       </p>
                     </div>
                     <input
@@ -542,38 +504,37 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
                   </label>
                   <div className="relative overflow-hidden rounded-[1.5rem] border border-border/70 bg-white/70">
                     {selectedImagePreview ? (
-                      <img
-                        src={selectedImagePreview}
-                        alt="Selected dog preview"
-                        className="h-56 w-full object-cover"
-                      />
+                      <img src={selectedImagePreview} alt="Selected dog preview" className="h-56 w-full object-cover" />
                     ) : (
                       <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">
                         Photo preview will appear here.
                       </div>
                     )}
-                    {dogAiMutation.isPending ? (
+                    {isUploadingPhoto ? (
                       <div className="absolute inset-0 flex items-center justify-center bg-white/70 backdrop-blur-sm">
                         <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm text-foreground shadow-soft">
                           <Loader2 className="h-4 w-4 animate-spin" />
-                          Reviewing AI suggestions…
+                          Uploading photo…
                         </div>
                       </div>
                     ) : null}
                   </div>
-                  <FormDescription>
-                    Signed-in users can upload directly to StreetDog App storage. Guests can also add
-                    a public photo link below if they want the image saved with the report.
-                  </FormDescription>
+                  <div className="flex flex-wrap gap-3">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={!selectedImageFile || dogAiMutation.isPending}
+                      onClick={handleAnalyzePhoto}
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      {dogAiMutation.isPending ? 'Analyzing photo…' : 'Analyze photo with AI'}
+                    </Button>
+                  </div>
+                  {aiStatusMessage ? (
+                    <FormDescription>{aiStatusMessage}</FormDescription>
+                  ) : null}
                 </CardContent>
               </Card>
-
-              <DogAiSuggestionEditor
-                suggestions={form}
-                statusMessage={aiStatusMessage}
-                onChange={setFormValue}
-                title="Review AI suggestions"
-              />
 
               <Card className="rounded-2xl border-white/70 bg-white/95">
                 <CardContent className="grid gap-5 p-5">
@@ -585,9 +546,7 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
                       value={form.location_description}
                       onChange={(event) => setFormValue('location_description', event.target.value)}
                     />
-                    {fieldErrors.location_description ? (
-                      <FormMessage>{fieldErrors.location_description}</FormMessage>
-                    ) : null}
+                    {fieldErrors.location_description ? <FormMessage>{fieldErrors.location_description}</FormMessage> : null}
                   </FormField>
 
                   <AreaSocietyFields
@@ -598,7 +557,7 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
                   />
 
                   <FormField>
-                    <FormLabel>StreetDog App area</FormLabel>
+                    <FormLabel>Detected / editable found area</FormLabel>
                     <Select value={form.area_id} onValueChange={(value) => setFormValue('area_id', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select the area" />
@@ -612,77 +571,56 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      {matchedAreaName
-                        ? `Matched area: ${matchedAreaName.city} - ${matchedAreaName.name}`
-                        : 'This routes the report to the right volunteer group.'}
+                      {matchedAreaName ? `Matched area: ${matchedAreaName.city} - ${matchedAreaName.name}` : 'This routes the report to the right volunteer group.'}
                     </FormDescription>
                     {fieldErrors.area_id ? <FormMessage>{fieldErrors.area_id}</FormMessage> : null}
                   </FormField>
 
                   <FormField>
-                    <FormLabel>Dog description</FormLabel>
+                    <FormLabel>Condition / status</FormLabel>
                     <Input
-                      placeholder="Puppy, brown coat, collar visible, playful, shy..."
-                      value={form.approx_age}
-                      onChange={(event) => setFormValue('approx_age', event.target.value)}
+                      placeholder="Stable, thin, cautious, limping, needs review…"
+                      value={form.ai_condition}
+                      onChange={(event) => setFormValue('ai_condition', event.target.value)}
                     />
+                    {fieldErrors.ai_condition ? <FormMessage>{fieldErrors.ai_condition}</FormMessage> : null}
                   </FormField>
 
                   <FormField>
-                    <FormLabel>Anything that needs attention? Injuries, limping, visible illness</FormLabel>
+                    <FormLabel>Short description</FormLabel>
+                    <Textarea
+                      className="min-h-[88px]"
+                      placeholder="A short summary volunteers should know before they arrive"
+                      value={form.ai_summary}
+                      onChange={(event) => setFormValue('ai_summary', event.target.value)}
+                    />
+                    {fieldErrors.ai_summary ? <FormMessage>{fieldErrors.ai_summary}</FormMessage> : null}
+                  </FormField>
+
+                  <FormField>
+                    <FormLabel>Health / injuries notes</FormLabel>
                     <Textarea
                       className="min-h-[96px]"
-                      placeholder="Share anything that may help volunteers respond with care."
+                      placeholder="Share any injuries, limping, visible illness, or care concerns"
                       value={form.health_notes}
                       onChange={(event) => setFormValue('health_notes', event.target.value)}
                     />
                   </FormField>
 
                   <FormField>
-                    <FormLabel>Your name (optional — helps us follow up)</FormLabel>
+                    <FormLabel>Optional contact details</FormLabel>
                     <Input
-                      placeholder="Your name"
-                      value={form.guest_name}
-                      onChange={(event) => setFormValue('guest_name', event.target.value)}
-                    />
-                  </FormField>
-
-                  <FormField>
-                    <FormLabel>Phone or email (optional — only used if we need to reach you)</FormLabel>
-                    <Input
-                      placeholder="Phone number or email"
+                      placeholder="Your name, phone, or email if follow-up is needed"
                       value={form.guest_contact}
                       onChange={(event) => setFormValue('guest_contact', event.target.value)}
                     />
-                  </FormField>
-
-                  <FormField>
-                    <FormLabel>Name for this dog (optional)</FormLabel>
-                    <Input
-                      placeholder="Brownie, White Puppy, Near Temple Dog..."
-                      value={form.dog_name_or_temp_name}
-                      onChange={(event) => setFormValue('dog_name_or_temp_name', event.target.value)}
-                    />
-                  </FormField>
-
-                  <FormField>
-                    <FormLabel>Photo link (optional)</FormLabel>
-                    <div className="relative">
-                      <UploadCloud className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        className="pl-11"
-                        placeholder="Paste a public photo URL if available"
-                        value={form.photo_url}
-                        onChange={(event) => setFormValue('photo_url', event.target.value)}
-                      />
-                    </div>
                   </FormField>
 
                   <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
                     <Button type="button" variant="outline" onClick={() => onNavigate('/')}>
                       Back to Home
                     </Button>
-                    <Button type="submit" disabled={isSubmitDisabled}>
+                    <Button type="submit" disabled={isSaving || isUploadingPhoto}>
                       {isSaving ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -716,10 +654,7 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
 
       {!activeUser && !isDesktopPrompt ? (
         <Sheet open={isSignInPromptOpen} onOpenChange={setIsSignInPromptOpen}>
-          <SheetContent
-            side="bottom"
-            className="top-auto h-auto max-h-[82vh] w-full max-w-none rounded-t-[2rem] border-x-0 border-b-0"
-          >
+          <SheetContent side="bottom" className="top-auto h-auto max-h-[82vh] w-full max-w-none rounded-t-[2rem] border-x-0 border-b-0">
             <AuthPromptContent onNavigate={onNavigate} />
           </SheetContent>
         </Sheet>
