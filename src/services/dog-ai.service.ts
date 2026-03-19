@@ -26,7 +26,25 @@ function fileToDataUrl(file: File) {
       resolve(typeof reader.result === 'string' ? reader.result : '')
     }
 
-    reader.onerror = () => reject(new Error('Unable to read the selected image.'))
+    reader.onerror = async () => {
+      try {
+        const buffer = await file.arrayBuffer()
+        const bytes = new Uint8Array(buffer)
+        const chunkSize = 0x8000
+        let binary = ''
+
+        for (let index = 0; index < bytes.length; index += chunkSize) {
+          const chunk = bytes.subarray(index, index + chunkSize)
+          binary += String.fromCharCode(...chunk)
+        }
+
+        const normalizedMimeType = (file.type || 'image/jpeg').toLowerCase() || 'image/jpeg'
+        const base64 = btoa(binary)
+        resolve(`data:${normalizedMimeType};base64,${base64}`)
+      } catch {
+        reject(new Error('Unable to read the selected image. Please try a different photo or continue without AI.'))
+      }
+    }
     reader.readAsDataURL(file)
   })
 }
