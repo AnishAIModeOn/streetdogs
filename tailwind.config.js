@@ -40,15 +40,15 @@ export default {
         '3xl': '1.875rem',
       },
       boxShadow: {
-        soft: '0 18px 45px rgba(70, 55, 39, 0.10)',
-        float: '0 28px 60px rgba(70, 55, 39, 0.14)',
+        soft: '0 18px 45px rgba(85, 98, 77, 0.10)',
+        float: '0 28px 60px rgba(85, 98, 77, 0.15)',
       },
       fontFamily: {
         sans: ['"Plus Jakarta Sans"', '"Inter"', '"Segoe UI"', 'sans-serif'],
       },
       backgroundImage: {
         'hero-wash':
-          'radial-gradient(circle at top left, rgba(240, 150, 82, 0.28), transparent 28%), radial-gradient(circle at right 20%, rgba(74, 122, 94, 0.18), transparent 28%), linear-gradient(145deg, rgba(252,248,240,0.98), rgba(244,235,221,0.95))',
+          'radial-gradient(circle at top left, rgba(245,157,82,0.26), transparent 28%), radial-gradient(circle at right 18%, rgba(110,162,128,0.18), transparent 26%), linear-gradient(148deg, rgba(253,251,245,0.99), rgba(245,248,240,0.98) 48%, rgba(240,247,243,0.97))',
       },
     },
   },
