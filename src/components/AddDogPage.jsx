@@ -15,8 +15,39 @@ import { Input } from './ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Textarea } from './ui/textarea'
 
+const AGE_BAND_OPTIONS = ['puppy', 'young', 'adult', 'senior', 'unknown']
+
 function buildHealthNotesFromAi(suggestions) {
   return [suggestions.ai_condition, suggestions.ai_injuries].filter(Boolean).join('. ').trim()
+}
+
+function buildShortDescriptionFromAi(suggestions, currentSummary) {
+  if (currentSummary) {
+    return currentSummary
+  }
+
+  const summary = (suggestions.ai_summary || '').trim()
+  const color = (suggestions.ai_color || '').trim()
+  if (!summary) {
+    return color ? `${color} street dog` : ''
+  }
+
+  if (!color || summary.toLowerCase().includes(color.toLowerCase())) {
+    return summary
+  }
+
+  return `${color}. ${summary}`
+}
+
+function buildLocationDescriptionFromArea(flow) {
+  return [
+    flow.selectedSociety?.name || '',
+    flow.areaContext.neighbourhood || flow.areaLabel || '',
+    flow.areaContext.pincode || '',
+  ]
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .join(', ')
 }
 
 export function AddDogPage({ user, profile }) {
@@ -82,19 +113,21 @@ export function AddDogPage({ user, profile }) {
     }
   }, [selectedImageFile])
 
-  useEffect(() => {
-    if (!areas.length || form.area_id) {
-      return
-    }
+  const matchedAreaId = useMemo(
+    () =>
+      findMatchingAreaId(
+        areas,
+        areaSocietyFlow.areaContext.neighbourhood || areaSocietyFlow.areaLabel,
+      ),
+    [areaSocietyFlow.areaContext.neighbourhood, areaSocietyFlow.areaLabel, areas],
+  )
 
-    const matchedAreaId = findMatchingAreaId(
-      areas,
-      areaSocietyFlow.areaContext.neighbourhood || areaSocietyFlow.areaLabel,
-    )
-    if (matchedAreaId) {
-      setForm((current) => ({ ...current, area_id: matchedAreaId }))
-    }
-  }, [areaSocietyFlow.areaContext.neighbourhood, areaSocietyFlow.areaLabel, areas, form.area_id])
+  useEffect(() => {
+    setForm((current) => {
+      const nextAreaId = matchedAreaId || ''
+      return current.area_id === nextAreaId ? current : { ...current, area_id: nextAreaId }
+    })
+  }, [matchedAreaId])
 
   function setFormValue(field, value) {
     setForm((current) => ({ ...current, [field]: value }))
@@ -122,7 +155,6 @@ export function AddDogPage({ user, profile }) {
 
       setForm((current) => ({
         ...current,
-        ai_summary: suggestions.ai_summary || current.ai_summary,
         ai_condition: suggestions.ai_condition || current.ai_condition,
         ai_urgency: suggestions.ai_urgency || current.ai_urgency,
         ai_breed_guess: suggestions.ai_breed_guess || current.ai_breed_guess,
@@ -135,6 +167,7 @@ export function AddDogPage({ user, profile }) {
           current.approx_age || (suggestions.ai_age_band !== 'unknown' ? suggestions.ai_age_band : ''),
         gender: current.gender === 'unknown' ? suggestions.gender || current.gender : current.gender,
         temperament: current.temperament || suggestions.temperament || '',
+        ai_summary: buildShortDescriptionFromAi(suggestions, current.ai_summary),
         health_notes: current.health_notes || buildHealthNotesFromAi(suggestions),
       }))
       setAiStatusMessage(
@@ -159,8 +192,8 @@ export function AddDogPage({ user, profile }) {
       nextErrors.area_id = 'Choose the StreetDog App area for visibility and routing.'
     }
 
-    if (!form.location_description.trim()) {
-      nextErrors.location_description = 'Please add a location description for this dog.'
+    if (!areaSocietyFlow.areaContext.neighbourhood && !areaSocietyFlow.areaLabel) {
+      nextErrors.area = 'Please choose or type the area where this dog belongs.'
     }
 
     if (!form.ai_condition.trim()) {
@@ -175,10 +208,7 @@ export function AddDogPage({ user, profile }) {
     return Object.keys(nextErrors).length === 0
   }
 
-  const matchedAreaName = useMemo(
-    () => areas.find((area) => area.id === form.area_id),
-    [areas, form.area_id],
-  )
+  const matchedAreaName = useMemo(() => areas.find((area) => area.id === form.area_id), [areas, form.area_id])
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -191,6 +221,7 @@ export function AddDogPage({ user, profile }) {
       setIsSaving(true)
       setErrorMessage('')
       const resolvedSociety = await areaSocietyFlow.resolveSelectedSociety()
+      const locationDescription = buildLocationDescriptionFromArea(areaSocietyFlow)
       const createdDog = await createDog({
         ...form,
         added_by_user_id: user.id,
@@ -203,6 +234,7 @@ export function AddDogPage({ user, profile }) {
         tagged_society_name: resolvedSociety?.name ?? null,
         tagged_area_pincode: areaSocietyFlow.areaContext.pincode || null,
         tagged_area_neighbourhood: areaSocietyFlow.areaContext.neighbourhood || null,
+        location_description: locationDescription || null,
         ai_summary: form.ai_summary.trim() || null,
         ai_condition: form.ai_condition.trim() || null,
         ai_urgency: form.ai_urgency.trim() || null,
@@ -357,6 +389,13 @@ export function AddDogPage({ user, profile }) {
               flow={areaSocietyFlow}
               cardCopy="Use location or type your neighbourhood to mirror the same area and society flow used during account setup."
             />
+            {fieldErrors.area ? <FormMessage>{fieldErrors.area}</FormMessage> : null}
+            <FormDescription>
+              {matchedAreaName
+                ? `Matched StreetDog App area: ${matchedAreaName.city} - ${matchedAreaName.name}`
+                : 'Choose a recognised area suggestion so the record can be routed correctly.'}
+            </FormDescription>
+            {fieldErrors.area_id ? <FormMessage>{fieldErrors.area_id}</FormMessage> : null}
           </div>
 
           <div className="grid gap-5">
@@ -369,43 +408,6 @@ export function AddDogPage({ user, profile }) {
               </CardHeader>
               <CardContent className="grid gap-5">
                 <FormField>
-                  <FormLabel className="flex items-center gap-1.5">
-                    <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                    Detected / editable found area
-                  </FormLabel>
-                  <Select value={form.area_id} onValueChange={(value) => setFormValue('area_id', value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select an area for visibility" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {areas.map((area) => (
-                        <SelectItem key={area.id} value={area.id}>
-                          {area.city} - {area.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    {matchedAreaName
-                      ? `Matched area: ${matchedAreaName.city} - ${matchedAreaName.name}`
-                      : 'This controls which volunteers can see and manage the record.'}
-                  </FormDescription>
-                  {fieldErrors.area_id ? <FormMessage>{fieldErrors.area_id}</FormMessage> : null}
-                </FormField>
-
-                <FormField>
-                  <FormLabel>Where did you see this dog?</FormLabel>
-                  <Textarea
-                    placeholder="Street, gate, shop, feeding spot, or landmark where the dog is usually seen"
-                    value={form.location_description}
-                    onChange={(event) => setFormValue('location_description', event.target.value)}
-                  />
-                  {fieldErrors.location_description ? (
-                    <FormMessage>{fieldErrors.location_description}</FormMessage>
-                  ) : null}
-                </FormField>
-
-                <FormField>
                   <FormLabel>Condition / status</FormLabel>
                   <Input
                     placeholder="Stable, thin, timid, limping, needs review..."
@@ -414,6 +416,33 @@ export function AddDogPage({ user, profile }) {
                   />
                   {fieldErrors.ai_condition ? <FormMessage>{fieldErrors.ai_condition}</FormMessage> : null}
                 </FormField>
+
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <FormField>
+                    <FormLabel>Breed / type</FormLabel>
+                    <Input
+                      placeholder="Indie, mixed breed, shepherd-like..."
+                      value={form.ai_breed_guess}
+                      onChange={(event) => setFormValue('ai_breed_guess', event.target.value)}
+                    />
+                  </FormField>
+
+                  <FormField>
+                    <FormLabel>Age band</FormLabel>
+                    <Select value={form.ai_age_band || 'unknown'} onValueChange={(value) => setFormValue('ai_age_band', value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select age band" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {AGE_BAND_OPTIONS.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option.charAt(0).toUpperCase() + option.slice(1)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormField>
+                </div>
 
                 <FormField>
                   <FormLabel>Short description</FormLabel>
@@ -437,11 +466,11 @@ export function AddDogPage({ user, profile }) {
                 </FormField>
 
                 <FormField>
-                  <FormLabel>Dog name (optional)</FormLabel>
+                  <FormLabel>Contact details (optional)</FormLabel>
                   <Input
-                    placeholder="Give a temporary name if it helps identify them"
-                    value={form.dog_name_or_temp_name}
-                    onChange={(event) => setFormValue('dog_name_or_temp_name', event.target.value)}
+                    placeholder="Phone or email if someone may need to follow up"
+                    value={form.guest_contact}
+                    onChange={(event) => setFormValue('guest_contact', event.target.value)}
                   />
                 </FormField>
 

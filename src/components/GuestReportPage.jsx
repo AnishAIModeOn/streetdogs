@@ -24,8 +24,39 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Sheet, SheetContent } from './ui/sheet'
 import { Textarea } from './ui/textarea'
 
+const AGE_BAND_OPTIONS = ['puppy', 'young', 'adult', 'senior', 'unknown']
+
 function buildHealthNotesFromAi(suggestions) {
   return [suggestions.ai_condition, suggestions.ai_injuries].filter(Boolean).join('. ').trim()
+}
+
+function buildShortDescriptionFromAi(suggestions, currentSummary) {
+  if (currentSummary) {
+    return currentSummary
+  }
+
+  const summary = (suggestions.ai_summary || '').trim()
+  const color = (suggestions.ai_color || '').trim()
+  if (!summary) {
+    return color ? `${color} street dog` : ''
+  }
+
+  if (!color || summary.toLowerCase().includes(color.toLowerCase())) {
+    return summary
+  }
+
+  return `${color}. ${summary}`
+}
+
+function buildLocationDescriptionFromArea(flow) {
+  return [
+    flow.selectedSociety?.name || '',
+    flow.areaContext.neighbourhood || flow.areaLabel || '',
+    flow.areaContext.pincode || '',
+  ]
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .join(', ')
 }
 
 function formatGuestContact(name, contact) {
@@ -154,19 +185,21 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
     return () => media.removeEventListener('change', sync)
   }, [])
 
-  useEffect(() => {
-    if (!areas.length || form.area_id) {
-      return
-    }
+  const matchedAreaId = useMemo(
+    () =>
+      findMatchingAreaId(
+        areas,
+        areaSocietyFlow.areaContext.neighbourhood || areaSocietyFlow.areaLabel,
+      ),
+    [areaSocietyFlow.areaContext.neighbourhood, areaSocietyFlow.areaLabel, areas],
+  )
 
-    const matchedAreaId = findMatchingAreaId(
-      areas,
-      areaSocietyFlow.areaContext.neighbourhood || areaSocietyFlow.areaLabel,
-    )
-    if (matchedAreaId) {
-      setForm((current) => ({ ...current, area_id: matchedAreaId }))
-    }
-  }, [areaSocietyFlow.areaContext.neighbourhood, areaSocietyFlow.areaLabel, areas, form.area_id])
+  useEffect(() => {
+    setForm((current) => {
+      const nextAreaId = matchedAreaId || ''
+      return current.area_id === nextAreaId ? current : { ...current, area_id: nextAreaId }
+    })
+  }, [matchedAreaId])
 
   function setFormValue(field, value) {
     setForm((current) => ({ ...current, [field]: value }))
@@ -193,7 +226,6 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
 
       setForm((current) => ({
         ...current,
-        ai_summary: suggestions.ai_summary || current.ai_summary,
         ai_condition: suggestions.ai_condition || current.ai_condition,
         ai_urgency: suggestions.ai_urgency || current.ai_urgency,
         ai_breed_guess: suggestions.ai_breed_guess || current.ai_breed_guess,
@@ -202,9 +234,9 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
         ai_injuries: suggestions.ai_injuries || current.ai_injuries,
         ai_raw_json: suggestions,
         ai_processed_at: new Date().toISOString(),
-        ai_summary_user: suggestions.ai_summary || current.ai_summary,
-        ai_condition_user: suggestions.ai_condition || current.ai_condition,
-        approx_age: current.approx_age || (suggestions.ai_age_band !== 'unknown' ? suggestions.ai_age_band : ''),
+        approx_age:
+          current.approx_age || (suggestions.ai_age_band !== 'unknown' ? suggestions.ai_age_band : ''),
+        ai_summary: buildShortDescriptionFromAi(suggestions, current.ai_summary),
         health_notes: current.health_notes || buildHealthNotesFromAi(suggestions),
       }))
       setAiStatusMessage(
@@ -236,11 +268,11 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
   function validateForm() {
     const nextErrors = {}
 
-    if (!form.location_description.trim()) {
-      nextErrors.location_description = 'Please share where you saw this dog.'
+    if (!areaSocietyFlow.areaContext.neighbourhood && !areaSocietyFlow.areaLabel) {
+      nextErrors.area = 'Please choose or type the area where this dog belongs.'
     }
     if (!form.area_id) {
-      nextErrors.area_id = 'Please choose the StreetDog App area so volunteers know where to look.'
+      nextErrors.area_id = 'Please choose a recognised area suggestion so volunteers know where to look.'
     }
     if (!form.ai_condition.trim()) {
       nextErrors.ai_condition = 'Add a short condition or status note.'
@@ -253,10 +285,7 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
     return Object.keys(nextErrors).length === 0
   }
 
-  const matchedAreaName = useMemo(
-    () => areas.find((area) => area.id === form.area_id),
-    [areas, form.area_id],
-  )
+  const matchedAreaName = useMemo(() => areas.find((area) => area.id === form.area_id), [areas, form.area_id])
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -279,6 +308,7 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
         : areaSocietyFlow.selectedSociety
 
       const guestContact = formatGuestContact(form.guest_name, form.guest_contact)
+      const locationDescription = buildLocationDescriptionFromArea(areaSocietyFlow)
       const payload = {
         dog_name_or_temp_name: form.dog_name_or_temp_name.trim() || null,
         area_id: form.area_id,
@@ -290,7 +320,7 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
         tagged_area_pincode: areaSocietyFlow.areaContext.pincode || null,
         tagged_area_neighbourhood: areaSocietyFlow.areaContext.neighbourhood || null,
         guest_contact: guestContact,
-        location_description: form.location_description.trim(),
+        location_description: locationDescription || null,
         photo_path: uploadedPhoto.photo_path,
         photo_url: uploadedPhoto.photo_url,
         approx_age: form.approx_age.trim() || null,
@@ -313,7 +343,7 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
         id: createdDog.id,
         image: uploadedPhoto.photo_url || selectedImagePreview || '',
         areaLabel: findAreaLabel(areas, form.area_id),
-        location: form.location_description.trim(),
+        location: locationDescription || areaSocietyFlow.areaContext.neighbourhood || 'Area shared',
         name: form.dog_name_or_temp_name.trim() || 'Community dog report',
       })
       setForm(emptyGuestReportForm)
@@ -538,43 +568,19 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
 
               <Card className="rounded-2xl border-white/70 bg-white/95">
                 <CardContent className="grid gap-5 p-5">
-                  <FormField>
-                    <FormLabel>Where did you see them? Street, landmark, or building name</FormLabel>
-                    <Textarea
-                      required
-                      placeholder="Street name, nearby shop, apartment gate, feeding spot, or landmark"
-                      value={form.location_description}
-                      onChange={(event) => setFormValue('location_description', event.target.value)}
-                    />
-                    {fieldErrors.location_description ? <FormMessage>{fieldErrors.location_description}</FormMessage> : null}
-                  </FormField>
-
                   <AreaSocietyFields
                     flow={areaSocietyFlow}
                     deferSocietyCreate={!activeUser?.id}
                     cardTitle="Area and society"
                     cardCopy="Use your location or type your neighbourhood to mirror the same warm area flow available during account setup."
                   />
-
-                  <FormField>
-                    <FormLabel>Detected / editable found area</FormLabel>
-                    <Select value={form.area_id} onValueChange={(value) => setFormValue('area_id', value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select the area" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {areas.map((area) => (
-                          <SelectItem key={area.id} value={area.id}>
-                            {area.city} - {area.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      {matchedAreaName ? `Matched area: ${matchedAreaName.city} - ${matchedAreaName.name}` : 'This routes the report to the right volunteer group.'}
-                    </FormDescription>
-                    {fieldErrors.area_id ? <FormMessage>{fieldErrors.area_id}</FormMessage> : null}
-                  </FormField>
+                  {fieldErrors.area ? <FormMessage>{fieldErrors.area}</FormMessage> : null}
+                  <FormDescription>
+                    {matchedAreaName
+                      ? `Matched StreetDog App area: ${matchedAreaName.city} - ${matchedAreaName.name}`
+                      : 'Choose a recognised area suggestion so the report can be routed correctly.'}
+                  </FormDescription>
+                  {fieldErrors.area_id ? <FormMessage>{fieldErrors.area_id}</FormMessage> : null}
 
                   <FormField>
                     <FormLabel>Condition / status</FormLabel>
@@ -585,6 +591,33 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
                     />
                     {fieldErrors.ai_condition ? <FormMessage>{fieldErrors.ai_condition}</FormMessage> : null}
                   </FormField>
+
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <FormField>
+                      <FormLabel>Breed / type</FormLabel>
+                      <Input
+                        placeholder="Indie, mixed breed, shepherd-like..."
+                        value={form.ai_breed_guess}
+                        onChange={(event) => setFormValue('ai_breed_guess', event.target.value)}
+                      />
+                    </FormField>
+
+                    <FormField>
+                      <FormLabel>Age band</FormLabel>
+                      <Select value={form.ai_age_band || 'unknown'} onValueChange={(value) => setFormValue('ai_age_band', value)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select age band" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {AGE_BAND_OPTIONS.map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option.charAt(0).toUpperCase() + option.slice(1)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormField>
+                  </div>
 
                   <FormField>
                     <FormLabel>Short description</FormLabel>
