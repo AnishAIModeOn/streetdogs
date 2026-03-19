@@ -99,6 +99,54 @@ export async function createDog(input: UpsertDogInput) {
     input.status !== undefined
 
   if (shouldUseLegacyPayload) {
+    if ((input.added_by_guest ?? !user) && !user) {
+      const guestPayload = {
+        dog_name_or_temp_name: input.dog_name_or_temp_name ?? null,
+        area_id: input.area_id ?? null,
+        tagged_society_id: input.tagged_society_id ?? null,
+        tagged_society_name: input.tagged_society_name ?? null,
+        tagged_area_pincode: input.tagged_area_pincode ?? null,
+        tagged_area_neighbourhood: input.tagged_area_neighbourhood ?? null,
+        guest_contact: input.guest_contact ?? null,
+        location_description: input.location_description,
+        latitude: input.latitude ?? null,
+        longitude: input.longitude ?? null,
+        gender: input.gender ?? 'unknown',
+        approx_age: input.approx_age ?? null,
+        vaccination_status: input.vaccination_status ?? 'unknown',
+        sterilization_status: input.sterilization_status ?? 'unknown',
+        health_notes: input.health_notes ?? input.notes ?? null,
+        temperament: input.temperament ?? null,
+        ai_summary: input.ai_summary ?? null,
+        ai_condition: input.ai_condition ?? null,
+        ai_urgency: input.ai_urgency ?? null,
+        ai_breed_guess: input.ai_breed_guess ?? null,
+        ai_color: input.ai_color ?? null,
+        ai_age_band: input.ai_age_band ?? null,
+        ai_injuries: input.ai_injuries ?? null,
+        ai_raw_json: input.ai_raw_json ?? null,
+        ai_processed_at: input.ai_processed_at ?? null,
+        visibility_type: input.visibility_type ?? 'normal_area_visible',
+        status: input.status ?? 'active',
+        photo_url: input.photo_url ?? null,
+      }
+
+      const response = await fetch('/api/dog-reports', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(guestPayload),
+      })
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || !payload?.ok || !payload?.dog) {
+        throw new Error(payload?.error || 'Unable to submit the dog report right now.')
+      }
+
+      return payload.dog as Dog
+    }
+
     const legacyPayload = {
       dog_name_or_temp_name: input.dog_name_or_temp_name ?? null,
       area_id: input.area_id ?? null,
@@ -136,7 +184,7 @@ export async function createDog(input: UpsertDogInput) {
     const { data, error } = await supabase.from('dogs').insert(legacyPayload).select('*').single()
 
     if (error) {
-      throw error
+      throw new Error(error.message)
     }
 
     return data as Dog
