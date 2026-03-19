@@ -6,6 +6,7 @@ const GEMINI_PROMPT = `You are an AI assistant helping manage a street dog datab
 Analyze the uploaded dog photo and return ONLY valid JSON with these fields:
 
 {
+  "ai_dog_name": "",
   "ai_summary": "",
   "ai_condition": "",
   "ai_urgency": "",
@@ -20,6 +21,7 @@ Analyze the uploaded dog photo and return ONLY valid JSON with these fields:
 Rules:
 - Make reasonable visual estimates only from the image.
 - If uncertain, use short cautious guesses.
+- ai_dog_name should be a short, friendly temporary name suggestion, not a claim of a real known name.
 - ai_summary should be 1-2 short sentences.
 - ai_condition should be a short description such as "appears stable", "thin and cautious", or "possible medical concern".
 - ai_urgency must be one of: low, medium, high, critical.
@@ -48,6 +50,7 @@ function sanitizeSuggestionPayload(payload) {
     payload?.suggestions && typeof payload.suggestions === 'object' ? payload.suggestions : payload
 
   return {
+    ai_dog_name: normalizeText(source?.ai_dog_name || source?.dog_name || source?.name_suggestion),
     ai_summary: normalizeText(source?.ai_summary || source?.summary || source?.description),
     ai_condition: normalizeText(source?.ai_condition || source?.condition || source?.status),
     ai_urgency: normalizeEnum(source?.ai_urgency || source?.urgency, ALLOWED_AI_URGENCY),
@@ -62,7 +65,8 @@ function sanitizeSuggestionPayload(payload) {
 
 function hasMeaningfulSuggestions(suggestions) {
   return Boolean(
-    suggestions.ai_summary ||
+    suggestions.ai_dog_name ||
+      suggestions.ai_summary ||
       suggestions.ai_condition ||
       suggestions.ai_injuries ||
       suggestions.ai_breed_guess ||

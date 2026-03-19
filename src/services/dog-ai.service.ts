@@ -1,4 +1,5 @@
 export interface DogAiSuggestions {
+  ai_dog_name: string
   ai_summary: string
   ai_condition: string
   ai_urgency: string

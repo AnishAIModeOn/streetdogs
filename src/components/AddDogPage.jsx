@@ -50,6 +50,10 @@ function buildLocationDescriptionFromArea(flow) {
     .join(', ')
 }
 
+function resolveSubmissionAreaId({ matchedAreaId, currentAreaId, areas, fallbackAreaId }) {
+  return matchedAreaId || currentAreaId || fallbackAreaId || areas[0]?.id || ''
+}
+
 function formatReporterContact(name, contact) {
   const trimmedName = name.trim()
   const trimmedContact = contact.trim()
@@ -167,6 +171,7 @@ export function AddDogPage({ user, profile }) {
 
       setForm((current) => ({
         ...current,
+        dog_name_or_temp_name: current.dog_name_or_temp_name || suggestions.ai_dog_name || '',
         ai_condition: suggestions.ai_condition || current.ai_condition,
         ai_urgency: suggestions.ai_urgency || current.ai_urgency,
         ai_breed_guess: suggestions.ai_breed_guess || current.ai_breed_guess,
@@ -204,10 +209,6 @@ export function AddDogPage({ user, profile }) {
       nextErrors.area = 'Please choose or type an area in the Area field.'
     }
 
-    if (!form.area_id) {
-      nextErrors.area_id = 'Please choose an Area suggestion so the record can be routed correctly.'
-    }
-
     if (!form.ai_condition.trim()) {
       nextErrors.ai_condition = 'Add a short condition or status note.'
     }
@@ -235,8 +236,20 @@ export function AddDogPage({ user, profile }) {
       const resolvedSociety = await areaSocietyFlow.resolveSelectedSociety()
       const locationDescription = buildLocationDescriptionFromArea(areaSocietyFlow)
       const reporterContact = formatReporterContact(form.guest_name, form.guest_contact)
+      const submissionAreaId = resolveSubmissionAreaId({
+        matchedAreaId,
+        currentAreaId: form.area_id,
+        areas,
+        fallbackAreaId: profile?.primary_area_id || '',
+      })
+
+      if (!submissionAreaId) {
+        throw new Error('Unable to route this dog right now. Please try again in a moment.')
+      }
+
       const createdDog = await createDog({
         ...form,
+        area_id: submissionAreaId,
         added_by_user_id: user.id,
         added_by_guest: false,
         guest_contact: reporterContact,
@@ -446,6 +459,15 @@ export function AddDogPage({ user, profile }) {
                 </div>
 
                 <FormField>
+                  <FormLabel>Dog name</FormLabel>
+                  <Input
+                    placeholder="Optional temporary name"
+                    value={form.dog_name_or_temp_name}
+                    onChange={(event) => setFormValue('dog_name_or_temp_name', event.target.value)}
+                  />
+                </FormField>
+
+                <FormField>
                   <FormLabel>Short description</FormLabel>
                   <Textarea
                     className="min-h-[88px]"
@@ -492,9 +514,8 @@ export function AddDogPage({ user, profile }) {
                 <FormDescription>
                   {matchedAreaName
                     ? `Matched StreetDog App area: ${matchedAreaName.city} - ${matchedAreaName.name}`
-                    : 'Pick an Area suggestion from the current Area field so the record can be routed correctly.'}
+                    : 'Your Area and Society will still be saved even if there is no exact StreetDog App area match.'}
                 </FormDescription>
-                {fieldErrors.area_id ? <FormMessage>{fieldErrors.area_id}</FormMessage> : null}
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                   <Button type="button" variant="outline" onClick={() => navigateTo('/dogs')}>
