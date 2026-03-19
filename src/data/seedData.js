@@ -19,6 +19,7 @@ export const emptyDogForm = {
   dog_name_or_temp_name: '',
   area_id: '',
   added_by_guest: false,
+  guest_name: '',
   guest_contact: '',
   tagged_society_name: '',
   photo_url: '',

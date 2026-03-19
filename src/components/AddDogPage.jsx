@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Loader2, MapPin, Sparkles, UploadCloud } from 'lucide-react'
+import { Loader2, Sparkles, UploadCloud } from 'lucide-react'
 import { emptyDogForm } from '../data/seedData'
 import { useAreaSocietyFlow, findMatchingAreaId } from '../hooks/use-area-society-flow'
 import { useDogAiAnalysis } from '../hooks/use-dog-ai'
@@ -50,11 +50,23 @@ function buildLocationDescriptionFromArea(flow) {
     .join(', ')
 }
 
+function formatReporterContact(name, contact) {
+  const trimmedName = name.trim()
+  const trimmedContact = contact.trim()
+
+  if (trimmedName && trimmedContact) {
+    return `${trimmedName} | ${trimmedContact}`
+  }
+
+  return trimmedName || trimmedContact || null
+}
+
 export function AddDogPage({ user, profile }) {
   const [areas, setAreas] = useState([])
   const [form, setForm] = useState({
     ...emptyDogForm,
     area_id: profile?.primary_area_id || '',
+    guest_name: profile?.full_name || '',
   })
   const [fieldErrors, setFieldErrors] = useState({})
   const [isLoading, setIsLoading] = useState(true)
@@ -188,12 +200,12 @@ export function AddDogPage({ user, profile }) {
   function validateForm() {
     const nextErrors = {}
 
-    if (!form.area_id) {
-      nextErrors.area_id = 'Choose the StreetDog App area for visibility and routing.'
+    if (!areaSocietyFlow.areaContext.neighbourhood && !areaSocietyFlow.areaLabel) {
+      nextErrors.area = 'Please choose or type an area in the Area field.'
     }
 
-    if (!areaSocietyFlow.areaContext.neighbourhood && !areaSocietyFlow.areaLabel) {
-      nextErrors.area = 'Please choose or type the area where this dog belongs.'
+    if (!form.area_id) {
+      nextErrors.area_id = 'Please choose an Area suggestion so the record can be routed correctly.'
     }
 
     if (!form.ai_condition.trim()) {
@@ -222,11 +234,12 @@ export function AddDogPage({ user, profile }) {
       setErrorMessage('')
       const resolvedSociety = await areaSocietyFlow.resolveSelectedSociety()
       const locationDescription = buildLocationDescriptionFromArea(areaSocietyFlow)
+      const reporterContact = formatReporterContact(form.guest_name, form.guest_contact)
       const createdDog = await createDog({
         ...form,
         added_by_user_id: user.id,
         added_by_guest: false,
-        guest_contact: form.guest_contact.trim() || null,
+        guest_contact: reporterContact,
         latitude: form.latitude ? Number(form.latitude) : null,
         longitude: form.longitude ? Number(form.longitude) : null,
         tagged_by_user_id: user.id,
@@ -384,18 +397,6 @@ export function AddDogPage({ user, profile }) {
                 {aiStatusMessage ? <FormDescription>{aiStatusMessage}</FormDescription> : null}
               </CardContent>
             </Card>
-
-            <AreaSocietyFields
-              flow={areaSocietyFlow}
-              cardCopy="Use location or type your neighbourhood to mirror the same area and society flow used during account setup."
-            />
-            {fieldErrors.area ? <FormMessage>{fieldErrors.area}</FormMessage> : null}
-            <FormDescription>
-              {matchedAreaName
-                ? `Matched StreetDog App area: ${matchedAreaName.city} - ${matchedAreaName.name}`
-                : 'Choose a recognised area suggestion so the record can be routed correctly.'}
-            </FormDescription>
-            {fieldErrors.area_id ? <FormMessage>{fieldErrors.area_id}</FormMessage> : null}
           </div>
 
           <div className="grid gap-5">
@@ -466,6 +467,15 @@ export function AddDogPage({ user, profile }) {
                 </FormField>
 
                 <FormField>
+                  <FormLabel>Reporter name</FormLabel>
+                  <Input
+                    placeholder="Your name"
+                    value={form.guest_name}
+                    onChange={(event) => setFormValue('guest_name', event.target.value)}
+                  />
+                </FormField>
+
+                <FormField>
                   <FormLabel>Contact details (optional)</FormLabel>
                   <Input
                     placeholder="Phone or email if someone may need to follow up"
@@ -473,6 +483,18 @@ export function AddDogPage({ user, profile }) {
                     onChange={(event) => setFormValue('guest_contact', event.target.value)}
                   />
                 </FormField>
+
+                <AreaSocietyFields
+                  flow={areaSocietyFlow}
+                  cardCopy="Choose the area last so StreetDog App can route this record to the right volunteer group."
+                />
+                {fieldErrors.area ? <FormMessage>{fieldErrors.area}</FormMessage> : null}
+                <FormDescription>
+                  {matchedAreaName
+                    ? `Matched StreetDog App area: ${matchedAreaName.city} - ${matchedAreaName.name}`
+                    : 'Pick an Area suggestion from the current Area field so the record can be routed correctly.'}
+                </FormDescription>
+                {fieldErrors.area_id ? <FormMessage>{fieldErrors.area_id}</FormMessage> : null}
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                   <Button type="button" variant="outline" onClick={() => navigateTo('/dogs')}>

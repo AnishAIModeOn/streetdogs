@@ -269,10 +269,10 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
     const nextErrors = {}
 
     if (!areaSocietyFlow.areaContext.neighbourhood && !areaSocietyFlow.areaLabel) {
-      nextErrors.area = 'Please choose or type the area where this dog belongs.'
+      nextErrors.area = 'Please choose or type an area in the Area field.'
     }
     if (!form.area_id) {
-      nextErrors.area_id = 'Please choose a recognised area suggestion so volunteers know where to look.'
+      nextErrors.area_id = 'Please choose an Area suggestion so volunteers know where to look.'
     }
     if (!form.ai_condition.trim()) {
       nextErrors.ai_condition = 'Add a short condition or status note.'
@@ -568,20 +568,6 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
 
               <Card className="rounded-2xl border-white/70 bg-white/95">
                 <CardContent className="grid gap-5 p-5">
-                  <AreaSocietyFields
-                    flow={areaSocietyFlow}
-                    deferSocietyCreate={!activeUser?.id}
-                    cardTitle="Area and society"
-                    cardCopy="Use your location or type your neighbourhood to mirror the same warm area flow available during account setup."
-                  />
-                  {fieldErrors.area ? <FormMessage>{fieldErrors.area}</FormMessage> : null}
-                  <FormDescription>
-                    {matchedAreaName
-                      ? `Matched StreetDog App area: ${matchedAreaName.city} - ${matchedAreaName.name}`
-                      : 'Choose a recognised area suggestion so the report can be routed correctly.'}
-                  </FormDescription>
-                  {fieldErrors.area_id ? <FormMessage>{fieldErrors.area_id}</FormMessage> : null}
-
                   <FormField>
                     <FormLabel>Condition / status</FormLabel>
                     <Input
@@ -641,6 +627,15 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
                   </FormField>
 
                   <FormField>
+                    <FormLabel>Reporter name</FormLabel>
+                    <Input
+                      placeholder="Your name"
+                      value={form.guest_name}
+                      onChange={(event) => setFormValue('guest_name', event.target.value)}
+                    />
+                  </FormField>
+
+                  <FormField>
                     <FormLabel>Optional contact details</FormLabel>
                     <Input
                       placeholder="Your name, phone, or email if follow-up is needed"
@@ -648,6 +643,20 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
                       onChange={(event) => setFormValue('guest_contact', event.target.value)}
                     />
                   </FormField>
+
+                  <AreaSocietyFields
+                    flow={areaSocietyFlow}
+                    deferSocietyCreate={!activeUser?.id}
+                    cardTitle="Area and society"
+                    cardCopy="Choose the area last so StreetDog App can route this report to the right volunteer group."
+                  />
+                  {fieldErrors.area ? <FormMessage>{fieldErrors.area}</FormMessage> : null}
+                  <FormDescription>
+                    {matchedAreaName
+                      ? `Matched StreetDog App area: ${matchedAreaName.city} - ${matchedAreaName.name}`
+                      : 'Pick an Area suggestion from the current Area field so the report can be routed correctly.'}
+                  </FormDescription>
+                  {fieldErrors.area_id ? <FormMessage>{fieldErrors.area_id}</FormMessage> : null}
 
                   <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
                     <Button type="button" variant="outline" onClick={() => onNavigate('/')}>
