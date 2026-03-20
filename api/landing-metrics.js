@@ -159,7 +159,7 @@ export default async function handler(req, res) {
       inventoryItemsResult,
       featuredDogsResult,
       areasResult,
-    ] = await Promise.all([
+    ] = await Promise.allSettled([
       supabase.from('dogs').select('id', { count: 'exact', head: true }),
       supabase
         .from('dogs')
@@ -171,28 +171,39 @@ export default async function handler(req, res) {
       supabase.from('areas').select('id, name, city'),
     ])
 
-    if (
-      totalDogsResult.error ||
-      vaccinatedDogsResult.error ||
-      expensesResult.error ||
-      inventoryItemsResult.error ||
-      featuredDogsResult.error ||
-      areasResult.error
-    ) {
-      throw new Error('Unable to load landing metrics.')
+    const dogsResponse =
+      featuredDogsResult.status === 'fulfilled' ? featuredDogsResult.value : null
+    const areasResponse = areasResult.status === 'fulfilled' ? areasResult.value : null
+
+    if (dogsResponse?.error || areasResponse?.error || !dogsResponse || !areasResponse) {
+      throw new Error('Unable to load homepage dogs.')
     }
 
-    const expensesRaised = (expensesResult.data ?? []).reduce(
+    const totalDogsCount =
+      totalDogsResult.status === 'fulfilled' && !totalDogsResult.value.error
+        ? totalDogsResult.value.count ?? 0
+        : 0
+    const vaccinatedDogsCount =
+      vaccinatedDogsResult.status === 'fulfilled' && !vaccinatedDogsResult.value.error
+        ? vaccinatedDogsResult.value.count ?? 0
+        : 0
+    const expensesRaised =
+      expensesResult.status === 'fulfilled' && !expensesResult.value.error
+        ? (expensesResult.value.data ?? []).reduce(
       (sum, expense) => sum + Number(expense.total_amount ?? 0),
       0,
     )
-    const inventoryFulfilled = (inventoryItemsResult.data ?? []).filter(
-      (item) =>
-        Number(item.quantity_required ?? 0) > 0 &&
-        Number(item.quantity_committed ?? 0) >= Number(item.quantity_required ?? 0),
-    ).length
-    const areaMap = Object.fromEntries((areasResult.data ?? []).map((area) => [area.id, area]))
-    const dogsWithArea = (featuredDogsResult.data ?? []).map((dog) => ({
+        : 0
+    const inventoryFulfilled =
+      inventoryItemsResult.status === 'fulfilled' && !inventoryItemsResult.value.error
+        ? (inventoryItemsResult.value.data ?? []).filter(
+            (item) =>
+              Number(item.quantity_required ?? 0) > 0 &&
+              Number(item.quantity_committed ?? 0) >= Number(item.quantity_required ?? 0),
+          ).length
+        : 0
+    const areaMap = Object.fromEntries((areasResponse.data ?? []).map((area) => [area.id, area]))
+    const dogsWithArea = (dogsResponse.data ?? []).map((dog) => ({
       ...dog,
       area: dog.area_id ? areaMap[dog.area_id] ?? null : null,
     }))
@@ -207,8 +218,8 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       metrics: {
-        totalDogs: totalDogsResult.count ?? 0,
-        vaccinatedDogs: vaccinatedDogsResult.count ?? 0,
+        totalDogs: totalDogsCount,
+        vaccinatedDogs: vaccinatedDogsCount,
         expensesRaised,
         inventoryFulfilled,
       },
