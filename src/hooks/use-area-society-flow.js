@@ -3,7 +3,15 @@ import { createSociety, searchNeighbourhoods } from '../lib/communityData'
 
 const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? ''
 
-function extractComponents(addressComponents) {
+function normalizeText(value) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function normalizeComparable(value) {
+  return normalizeText(value).toLowerCase().replace(/\s+/g, ' ')
+}
+
+function extractFromGoogle(addressComponents) {
   const get = (...types) => {
     const match = addressComponents.find((component) =>
       types.some((type) => component.types.includes(type)),
@@ -26,24 +34,94 @@ function extractComponents(addressComponents) {
   }
 }
 
-async function reverseGeocode(lat, lng) {
+function extractFromBigDataCloud(payload) {
+  return {
+    pincode: payload?.postcode ?? '',
+    neighbourhood:
+      payload?.locality ||
+      payload?.principalSubdivision ||
+      payload?.cityDistrict ||
+      payload?.neighbourhood ||
+      '',
+    city: payload?.city || payload?.principalSubdivision || payload?.localityInfo?.administrative?.[1]?.name || '',
+  }
+}
+
+function extractFromNominatim(payload) {
+  const address = payload?.address ?? {}
+
+  return {
+    pincode: address.postcode ?? '',
+    neighbourhood:
+      address.suburb ||
+      address.neighbourhood ||
+      address.quarter ||
+      address.city_district ||
+      address.town ||
+      '',
+    city: address.city || address.town || address.state_district || address.state || '',
+  }
+}
+
+async function reverseGeocodeWithGoogle(lat, lng) {
   if (!GOOGLE_MAPS_KEY) {
-    return { pincode: '', neighbourhood: '', city: '' }
+    throw new Error('Google Maps key missing')
   }
 
   const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_KEY}`
   const response = await fetch(url)
   const payload = await response.json()
 
-  return extractComponents(payload?.results?.[0]?.address_components ?? [])
+  if (!response.ok || payload?.status !== 'OK') {
+    throw new Error('Google reverse geocode failed')
+  }
+
+  return extractFromGoogle(payload?.results?.[0]?.address_components ?? [])
 }
 
-function normalizeText(value) {
-  return typeof value === 'string' ? value.trim() : ''
+async function reverseGeocodeWithBigDataCloud(lat, lng) {
+  const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`
+  const response = await fetch(url)
+  const payload = await response.json()
+
+  if (!response.ok) {
+    throw new Error('BigDataCloud reverse geocode failed')
+  }
+
+  return extractFromBigDataCloud(payload)
 }
 
-function normalizeComparable(value) {
-  return normalizeText(value).toLowerCase().replace(/\s+/g, ' ')
+async function reverseGeocodeWithNominatim(lat, lng) {
+  const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=jsonv2`
+  const response = await fetch(url, {
+    headers: {
+      Accept: 'application/json',
+    },
+  })
+  const payload = await response.json()
+
+  if (!response.ok) {
+    throw new Error('Nominatim reverse geocode failed')
+  }
+
+  return extractFromNominatim(payload)
+}
+
+async function reverseGeocode(lat, lng) {
+  const resolvers = [reverseGeocodeWithGoogle, reverseGeocodeWithBigDataCloud, reverseGeocodeWithNominatim]
+
+  for (const resolver of resolvers) {
+    try {
+      const result = await resolver(lat, lng)
+      if (result?.pincode || result?.neighbourhood || result?.city) {
+        return result
+      }
+    } catch {
+      // Try the next resolver.
+    }
+  }
+
+  return { pincode: '', neighbourhood: '', city: '' }
 }
 
 async function detectCurrentLocation({
@@ -58,7 +136,7 @@ async function detectCurrentLocation({
   if (!navigator.geolocation) {
     setDetecting(false)
     setManual(true)
-    return
+    return { ok: false, reason: 'unsupported' }
   }
 
   setDetecting(true)
@@ -72,30 +150,35 @@ async function detectCurrentLocation({
             position.coords.longitude,
           )
 
-          if (nextPincode || neighbourhood) {
+          if (nextPincode || neighbourhood || city) {
+            const nextNeighbourhood = neighbourhood || city || ''
+            const parts = [nextNeighbourhood, city && city !== nextNeighbourhood ? city : ''].filter(Boolean)
+
             setPincode(nextPincode)
-            setDetectedNeighbourhood(neighbourhood)
-            const parts = [neighbourhood, city].filter(Boolean)
-            setDetectedLabel(parts.length ? parts.join(', ') : nextPincode)
-            setAreaInputState(neighbourhood || '')
+            setDetectedNeighbourhood(nextNeighbourhood)
+            setDetectedLabel(parts.join(', ') || nextPincode)
+            setAreaInputState(nextNeighbourhood)
             setSelectedSociety(null)
             setManual(false)
-          } else {
-            setManual(true)
+            resolve({ ok: true })
+            return
           }
+
+          setManual(true)
+          resolve({ ok: false, reason: 'no-match' })
         } catch {
           setManual(true)
+          resolve({ ok: false, reason: 'reverse-geocode-failed' })
         } finally {
           setDetecting(false)
-          resolve()
         }
       },
       () => {
         setDetecting(false)
         setManual(true)
-        resolve()
+        resolve({ ok: false, reason: 'permission-denied' })
       },
-      { timeout: 9000, maximumAge: 60_000 },
+      { enableHighAccuracy: false, timeout: 9000, maximumAge: 300_000 },
     )
   })
 }
@@ -174,7 +257,7 @@ export function useAreaSocietyFlow(options = {}) {
   }, [autoDetect])
 
   useEffect(() => {
-    if (!manual || normalizeText(areaInput).length < 2) {
+    if (normalizeText(areaInput).length < 2) {
       setAreaSuggestions([])
       return undefined
     }
@@ -189,13 +272,16 @@ export function useAreaSocietyFlow(options = {}) {
       } finally {
         setIsFetchingSuggestions(false)
       }
-    }, 300)
+    }, 250)
 
     return () => window.clearTimeout(timer)
-  }, [areaInput, manual])
+  }, [areaInput])
 
   function setAreaInput(value) {
+    setManual(true)
     setAreaInputState(value)
+    setDetectedLabel('')
+    setDetectedNeighbourhood('')
     setPincode('')
     setShowSuggestions(true)
     setSelectedSociety(null)
@@ -203,7 +289,10 @@ export function useAreaSocietyFlow(options = {}) {
 
   function selectSuggestion(suggestion) {
     const label = suggestion.neighbourhood || ''
+    setManual(true)
     setAreaInputState(label)
+    setDetectedLabel('')
+    setDetectedNeighbourhood('')
     if (suggestion.pincode) {
       setPincode(suggestion.pincode)
     }
@@ -253,13 +342,15 @@ export function useAreaSocietyFlow(options = {}) {
     return createdSociety
   }
 
-  const effectiveNeighbourhood = manual ? normalizeText(areaInput) : normalizeText(detectedNeighbourhood)
-  const areaLabel = manual ? normalizeText(areaInput) : normalizeText(detectedLabel)
+  const effectiveNeighbourhood = selectedSociety?.neighbourhood || normalizeText(areaInput) || normalizeText(detectedNeighbourhood)
+  const areaLabel =
+    selectedSociety?.neighbourhood ||
+    (manual ? normalizeText(areaInput) : normalizeText(detectedLabel) || normalizeText(detectedNeighbourhood))
 
   const areaContext = useMemo(
     () => ({
       pincode: selectedSociety?.pincode || pincode || '',
-      neighbourhood: selectedSociety?.neighbourhood || effectiveNeighbourhood || '',
+      neighbourhood: effectiveNeighbourhood || '',
       societyId: selectedSociety?._pending ? null : selectedSociety?.id ?? null,
       societyName: selectedSociety?.name ?? null,
       areaLabel,

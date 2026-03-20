@@ -4,6 +4,7 @@ import { useAreaSocietyFlow } from '../hooks/use-area-society-flow'
 import { useDogs } from '../hooks/use-dogs'
 import { navigateTo } from '../lib/navigation'
 import { DogCard } from './DogCard'
+import { HeroImageCarousel } from './HeroImageCarousel'
 import { SocietyPicker } from './SocietyPicker'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
@@ -12,6 +13,33 @@ import { Input } from './ui/input'
 import { Skeleton } from './ui/skeleton'
 
 const LANDING_LOCATION_KEY = 'streetdog-landing-location'
+
+const heroImages = [
+  {
+    src: '/landing/landing-dog-1.jpg',
+    alt: 'Street dog resting calmly in warm afternoon light',
+    name: 'Milo',
+    location: 'Bandra West, Mumbai',
+    summary: 'Local sightings and care updates help neighbours respond faster.',
+    badges: ['Vaccinated', 'Friendly'],
+  },
+  {
+    src: '/landing/landing-dog-2.jpg',
+    alt: 'Puppy portrait with a warm, soft background',
+    name: 'Luna',
+    location: 'Koramangala, Bengaluru',
+    summary: 'A clear local feed makes it easier to spot dogs that need food or follow-up.',
+    badges: ['Needs Food'],
+  },
+  {
+    src: '/landing/landing-dog-3.jpg',
+    alt: 'Street dog looking toward nearby volunteers',
+    name: 'Rocky',
+    location: 'Adyar, Chennai',
+    summary: 'Shared neighbourhood context keeps reports useful and actionable.',
+    badges: ['Medical Attention'],
+  },
+]
 
 function readStoredLocation() {
   if (typeof window === 'undefined') {
@@ -45,8 +73,10 @@ export function LandingPage({ onNavigate }) {
     autoDetect: !persistedLocation?.areaLabel,
   })
 
-  const selectedArea = flow.effectiveNeighbourhood || flow.areaLabel
-  const dogsQuery = useDogs(selectedArea ? { areaName: selectedArea } : {})
+  const { data: allDogs = [], isLoading: isDogsLoading } = useDogs()
+  const selectedArea = flow.areaContext.neighbourhood || flow.areaContext.areaLabel
+  const selectedSociety = flow.selectedSociety
+  const showingLabel = selectedArea || 'your community'
 
   useEffect(() => {
     let isMounted = true
@@ -82,13 +112,18 @@ export function LandingPage({ onNavigate }) {
       return
     }
 
+    if (selectedSociety?.name) {
+      setLocationStatus('society')
+      return
+    }
+
     if (selectedArea) {
       setLocationStatus('manual')
       return
     }
 
     setLocationStatus('idle')
-  }, [flow.detectedLabel, flow.detecting, flow.manual, selectedArea])
+  }, [flow.detectedLabel, flow.detecting, flow.manual, selectedArea, selectedSociety])
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -110,40 +145,43 @@ export function LandingPage({ onNavigate }) {
     )
   }, [flow.areaContext.pincode, flow.selectedSociety, selectedArea])
 
-  const nearbyDogs = dogsQuery.data ?? []
-  const attentionDogs = nearbyDogs.filter(isNeedsAttentionDog).slice(0, 6)
-  const visibleNearbyDogs = nearbyDogs.slice(0, 12)
-  const showingLabel = selectedArea || 'your community'
+  const filteredDogs = useMemo(
+    () => filterDogsForLocation(allDogs, flow.areaContext),
+    [allDogs, flow.areaContext],
+  )
+
+  const visibleNearbyDogs = filteredDogs.slice(0, 12)
+  const attentionDogs = filteredDogs.filter(isNeedsAttentionDog).slice(0, 6)
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-4 px-4 py-4 sm:gap-5 sm:px-6 sm:py-5 lg:px-8">
-      <section className="rounded-[1.75rem] border border-white/70 bg-white/92 p-4 shadow-soft sm:p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-2">
-            <Badge className="w-fit bg-secondary/60 text-primary" variant="secondary">
+      <section className="rounded-[1.6rem] border border-white/70 bg-white/90 px-3 py-3 shadow-soft sm:px-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+            <Badge className="bg-secondary/60 text-primary" variant="secondary">
               Your area
             </Badge>
-            <div>
-              <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-foreground">
-                <MapPin className="h-5 w-5 text-primary" />
-                <span>Your area</span>
-              </h2>
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-                Choose a neighbourhood first so the homepage can show nearby dogs and the right local context.
-              </p>
+            <div className="min-w-0 rounded-full bg-secondary/35 px-3 py-1.5 text-sm text-foreground">
+              <span className="font-medium">Area:</span> {showingLabel}
             </div>
+            {selectedSociety?.name ? (
+              <div className="min-w-0 rounded-full bg-white px-3 py-1.5 text-sm text-muted-foreground shadow-sm">
+                <span className="font-medium text-foreground">Society:</span> {selectedSociety.name}
+              </div>
+            ) : null}
           </div>
 
-          <div className="rounded-full bg-secondary/45 px-3 py-1.5 text-sm font-medium text-muted-foreground">
-            Showing dogs in <span className="text-foreground">{showingLabel}</span>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            {flow.detecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MapPin className="h-3.5 w-3.5 text-primary" />}
+            <span>{getLocationMessage(locationStatus, flow.detectedLabel, showingLabel, selectedSociety?.name)}</span>
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)_minmax(0,320px)]">
+        <div className="mt-3 grid gap-2.5 lg:grid-cols-[180px_minmax(0,1fr)_minmax(0,300px)]">
           <Button
             type="button"
-            size="lg"
-            className="h-12 justify-center rounded-2xl shadow-soft"
+            variant="secondary"
+            className="h-11 rounded-2xl bg-secondary/45 shadow-sm"
             onClick={() => {
               setLocationStatus('detecting')
               flow.detectLocation()
@@ -152,12 +190,12 @@ export function LandingPage({ onNavigate }) {
             {flow.detecting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Detecting area
+                Detecting
               </>
             ) : (
               <>
                 <Crosshair className="h-4 w-4" />
-                Detect location
+                Detect or change
               </>
             )}
           </Button>
@@ -165,12 +203,12 @@ export function LandingPage({ onNavigate }) {
           <div className="relative min-w-0">
             <Input
               value={flow.areaInput}
-              placeholder="Type your area"
+              placeholder="Type area"
               onChange={(event) => flow.setAreaInput(event.target.value)}
               onFocus={() => flow.setShowSuggestions(true)}
               onBlur={() => window.setTimeout(() => flow.setShowSuggestions(false), 150)}
               autoComplete="off"
-              className="h-12 rounded-2xl border-white/70 bg-secondary/15 pr-10 shadow-sm"
+              className="h-11 rounded-2xl border-white/70 bg-secondary/15 pr-10 shadow-sm"
             />
             {flow.isFetchingSuggestions ? (
               <Loader2 className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
@@ -195,7 +233,7 @@ export function LandingPage({ onNavigate }) {
             ) : null}
           </div>
 
-          <div className="min-w-0 rounded-[1.25rem] border border-white/70 bg-secondary/20 p-3 shadow-sm">
+          <div className="min-w-0 rounded-[1.1rem] border border-white/70 bg-secondary/18 p-2.5 shadow-sm">
             <SocietyPicker
               pincode={flow.areaContext.pincode}
               neighbourhood={flow.areaContext.neighbourhood}
@@ -204,40 +242,21 @@ export function LandingPage({ onNavigate }) {
             />
           </div>
         </div>
-
-        <div className="mt-3 min-h-6 text-sm text-muted-foreground">
-          {flow.detecting ? (
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-4 w-28 rounded-full" />
-              <Skeleton className="h-4 w-40 rounded-full" />
-            </div>
-          ) : null}
-          {!flow.detecting && locationStatus === 'detected' ? (
-            <p>Detected area: {flow.detectedLabel}</p>
-          ) : null}
-          {!flow.detecting && locationStatus === 'manual' ? (
-            <p>Showing dogs in {showingLabel}</p>
-          ) : null}
-          {!flow.detecting && locationStatus === 'saved' ? (
-            <p>Using your last selected area to keep things fast.</p>
-          ) : null}
-          {!flow.detecting && locationStatus === 'idle' ? (
-            <p>Location access is optional. You can type your neighbourhood anytime.</p>
-          ) : null}
-        </div>
       </section>
 
-      <section className="overflow-hidden rounded-[2rem] border border-white/70 bg-hero-wash px-4 py-5 shadow-float sm:px-6 sm:py-6">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-center">
-          <div className="space-y-4">
-            <Badge className="w-fit bg-white/90 text-primary shadow-soft" variant="secondary">
+      <section className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-hero-wash p-3 shadow-float sm:p-5 lg:p-6">
+        <div className="absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.6),transparent_72%)]" />
+        <div className="absolute -right-10 top-1/3 h-40 w-40 rounded-full bg-primary/8 blur-3xl" />
+        <div className="relative grid gap-3 lg:grid-cols-[minmax(0,0.88fr)_minmax(0,1.12fr)] lg:items-stretch">
+          <div className="order-2 flex flex-col justify-center gap-4 rounded-[1.65rem] border border-white/80 bg-white/88 p-4 shadow-soft backdrop-blur-sm sm:gap-5 sm:rounded-[2rem] sm:p-7 lg:order-1 lg:p-8">
+            <Badge className="w-fit bg-white/85 text-primary shadow-soft" variant="secondary">
               StreetDog App
             </Badge>
-            <div className="space-y-2">
-              <h1 className="max-w-xl text-3xl font-semibold leading-tight tracking-tight text-foreground sm:text-5xl">
+            <div className="space-y-3">
+              <h1 className="max-w-xl text-3xl font-semibold leading-[1.02] tracking-tight text-foreground sm:text-5xl lg:text-6xl">
                 Help street dogs in your area
               </h1>
-              <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+              <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base sm:leading-7">
                 See dogs nearby, report sightings, and support local care.
               </p>
             </div>
@@ -254,38 +273,37 @@ export function LandingPage({ onNavigate }) {
                 Browse dogs
               </Button>
             </div>
+            <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-2">
+              <div className="rounded-[1.25rem] border border-primary/10 bg-secondary/35 px-4 py-3 shadow-soft">
+                Start with your location, then see dogs that matter nearby.
+              </div>
+              <div className="rounded-[1.25rem] border border-primary/10 bg-secondary/35 px-4 py-3 shadow-soft">
+                Reports, sightings, and care notes stay grounded in place.
+              </div>
+            </div>
           </div>
 
-          <Card className="rounded-[1.75rem] border-white/70 bg-white/88 shadow-soft">
-            <CardContent className="space-y-3 p-4">
-              <div className="flex items-center gap-2 text-sm font-medium text-primary">
-                <PawPrint className="h-4 w-4" />
-                Local action
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <SnapshotTile label="Nearby dogs" value={visibleNearbyDogs.length} />
-                <SnapshotTile label="Need attention" value={attentionDogs.length} />
-              </div>
-              <p className="text-sm leading-6 text-muted-foreground">
-                Start with your location, then jump straight into dogs that need visibility nearby.
-              </p>
-            </CardContent>
-          </Card>
+          <HeroImageCarousel slides={heroImages} className="order-1 lg:order-2 lg:self-stretch" />
         </div>
       </section>
 
       <section className="space-y-3">
-        <div className="space-y-1">
-          <Badge variant="outline">Dogs near you</Badge>
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground">Dogs near you</h2>
-          <p className="text-sm leading-6 text-muted-foreground">
-            {selectedArea
-              ? `Showing the latest dogs we have for ${showingLabel}.`
-              : 'Pick an area above or browse recent dogs from the wider community.'}
-          </p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-1">
+            <Badge variant="outline">Dogs near you</Badge>
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground">Dogs near you</h2>
+            <p className="text-sm leading-6 text-muted-foreground">
+              {selectedArea
+                ? `Showing dogs that match ${selectedSociety?.name ? `${selectedSociety.name} and ` : ''}${showingLabel}.`
+                : 'Pick an area above to load the most relevant dogs first.'}
+            </p>
+          </div>
+          <div className="rounded-full bg-secondary/35 px-3 py-1.5 text-sm font-medium text-muted-foreground">
+            {filteredDogs.length} match{filteredDogs.length === 1 ? '' : 'es'}
+          </div>
         </div>
 
-        {dogsQuery.isLoading ? (
+        {isDogsLoading ? (
           <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
             {Array.from({ length: 3 }).map((_, index) => (
               <Card key={index} className="min-w-[280px] rounded-[1.75rem] border-white/70 bg-white/90 shadow-soft">
@@ -300,13 +318,13 @@ export function LandingPage({ onNavigate }) {
           </div>
         ) : null}
 
-        {!dogsQuery.isLoading && visibleNearbyDogs.length ? (
+        {!isDogsLoading && visibleNearbyDogs.length ? (
           <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
             {visibleNearbyDogs.map((dog) => (
               <div key={dog.id} className="min-w-[280px] max-w-[320px] flex-1">
                 <DogCard
                   dog={dog}
-                  area={{ city: dog.city || 'Unknown city', name: dog.area_name || 'Unknown area' }}
+                  area={buildDogArea(dog)}
                   onViewDetails={() => navigateTo(`/dogs/${dog.id}`)}
                 />
               </div>
@@ -314,16 +332,16 @@ export function LandingPage({ onNavigate }) {
           </div>
         ) : null}
 
-        {!dogsQuery.isLoading && !visibleNearbyDogs.length ? (
+        {!isDogsLoading && !visibleNearbyDogs.length ? (
           <Card className="rounded-[1.75rem] border-dashed border-border bg-white/80">
             <CardContent className="flex flex-col items-center gap-3 p-8 text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-secondary/60 text-primary shadow-soft">
                 <MapPin className="h-6 w-6" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-lg font-semibold text-foreground">No dogs in this area yet</h3>
+                <h3 className="text-lg font-semibold text-foreground">No dogs matched this location yet</h3>
                 <p className="max-w-xl text-sm leading-6 text-muted-foreground">
-                  Try another neighbourhood or be the first to report a dog here.
+                  Try a nearby area, clear the society, or be the first to report a dog here.
                 </p>
               </div>
             </CardContent>
@@ -337,7 +355,7 @@ export function LandingPage({ onNavigate }) {
             <Badge variant="outline">Needs attention</Badge>
             <h2 className="text-2xl font-semibold tracking-tight text-foreground">Needs attention</h2>
             <p className="text-sm leading-6 text-muted-foreground">
-              Highlighting dogs with urgent food or medical notes in the current area.
+              Dogs with urgent food or medical notes in the current location context.
             </p>
           </div>
 
@@ -346,7 +364,7 @@ export function LandingPage({ onNavigate }) {
               <div key={dog.id} className="min-w-[280px] max-w-[320px] flex-1">
                 <DogCard
                   dog={dog}
-                  area={{ city: dog.city || 'Unknown city', name: dog.area_name || 'Unknown area' }}
+                  area={buildDogArea(dog)}
                   onViewDetails={() => navigateTo(`/dogs/${dog.id}`)}
                 />
               </div>
@@ -375,15 +393,6 @@ export function LandingPage({ onNavigate }) {
   )
 }
 
-function SnapshotTile({ label, value }) {
-  return (
-    <div className="rounded-[1.1rem] border border-primary/10 bg-secondary/35 p-3 shadow-sm">
-      <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tracking-tight text-foreground">{value}</p>
-    </div>
-  )
-}
-
 function CompactMetric({ label, value }) {
   return (
     <Card className="min-w-[180px] rounded-[1.5rem] border-white/70 bg-white/90 shadow-soft sm:min-w-0">
@@ -393,6 +402,86 @@ function CompactMetric({ label, value }) {
       </CardContent>
     </Card>
   )
+}
+
+function buildDogArea(dog) {
+  return {
+    city: dog.city || dog.tagged_area_pincode || 'Unknown city',
+    name: dog.area_name || dog.tagged_area_neighbourhood || dog.tagged_society_name || 'Unknown area',
+  }
+}
+
+function getLocationMessage(status, detectedLabel, showingLabel, societyName) {
+  if (status === 'detecting') {
+    return 'Detecting your location'
+  }
+
+  if (status === 'detected') {
+    return `Detected ${detectedLabel || showingLabel}`
+  }
+
+  if (status === 'society') {
+    return `Focused on ${societyName}`
+  }
+
+  if (status === 'manual') {
+    return `Showing ${showingLabel}`
+  }
+
+  if (status === 'saved') {
+    return 'Using your saved area'
+  }
+
+  return 'Location is optional'
+}
+
+function normalize(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+}
+
+function filterDogsForLocation(dogs, areaContext) {
+  const area = normalize(areaContext.neighbourhood || areaContext.areaLabel)
+  const pincode = normalize(areaContext.pincode)
+  const societyId = normalize(areaContext.societyId)
+  const societyName = normalize(areaContext.societyName)
+
+  if (!area && !pincode && !societyId && !societyName) {
+    return dogs
+  }
+
+  return dogs.filter((dog) => {
+    const dogArea = normalize(dog.area_name)
+    const dogNeighbourhood = normalize(dog.tagged_area_neighbourhood)
+    const dogPincode = normalize(dog.tagged_area_pincode)
+    const dogSocietyId = normalize(dog.tagged_society_id)
+    const dogSocietyName = normalize(dog.tagged_society_name)
+    const matchesArea =
+      !area ||
+      dogArea === area ||
+      dogNeighbourhood === area ||
+      dogArea.includes(area) ||
+      dogNeighbourhood.includes(area) ||
+      area.includes(dogArea) ||
+      area.includes(dogNeighbourhood)
+    const matchesPincode = !pincode || dogPincode === pincode
+    const matchesSociety =
+      !societyId && !societyName
+        ? true
+        : dogSocietyId === societyId || (societyName && dogSocietyName.includes(societyName))
+
+    if (societyId || societyName) {
+      return matchesSociety && (matchesArea || matchesPincode || !area)
+    }
+
+    if (pincode) {
+      return matchesPincode || matchesArea
+    }
+
+    return matchesArea
+  })
 }
 
 function isNeedsAttentionDog(dog) {

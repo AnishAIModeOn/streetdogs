@@ -4,6 +4,9 @@ import type { Dog } from '../types/supabase'
 export interface DogFilters {
   city?: string
   areaName?: string
+  pincode?: string
+  societyId?: string
+  societyName?: string
   search?: string
 }
 
@@ -57,7 +60,21 @@ export async function listDogs(filters: DogFilters = {}) {
   }
 
   if (filters.areaName) {
-    query = query.eq('area_name', filters.areaName)
+    query = query.or(
+      `area_name.ilike.%${filters.areaName}%,tagged_area_neighbourhood.ilike.%${filters.areaName}%`,
+    )
+  }
+
+  if (filters.pincode) {
+    query = query.eq('tagged_area_pincode', filters.pincode)
+  }
+
+  if (filters.societyId) {
+    query = query.eq('tagged_society_id', filters.societyId)
+  }
+
+  if (filters.societyName) {
+    query = query.ilike('tagged_society_name', `%${filters.societyName}%`)
   }
 
   if (filters.search) {
