@@ -1,9 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
 
+function cleanEnv(value) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
 function createServerSupabaseClient() {
-  const supabaseUrl =
-    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || ''
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  const supabaseUrl = cleanEnv(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '',
+  )
+  const serviceRoleKey = cleanEnv(process.env.SUPABASE_SERVICE_ROLE_KEY || '')
 
   if (!supabaseUrl || !serviceRoleKey) {
     return null
@@ -176,7 +181,16 @@ export default async function handler(req, res) {
     const areasResponse = areasResult.status === 'fulfilled' ? areasResult.value : null
 
     if (dogsResponse?.error || areasResponse?.error || !dogsResponse || !areasResponse) {
-      throw new Error('Unable to load homepage dogs.')
+      const dogError =
+        dogsResponse?.error?.message ||
+        (featuredDogsResult.status === 'rejected' ? String(featuredDogsResult.reason) : '')
+      const areaError =
+        areasResponse?.error?.message ||
+        (areasResult.status === 'rejected' ? String(areasResult.reason) : '')
+
+      throw new Error(
+        `Unable to load homepage dogs. Dogs query: ${dogError || 'ok'}. Areas query: ${areaError || 'ok'}.`,
+      )
     }
 
     const totalDogsCount =
