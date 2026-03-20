@@ -119,8 +119,9 @@ export default async function handler(req, res) {
   const supabase = createServerSupabaseClient()
 
   if (!supabase) {
-    return res.status(200).json({
-      ok: true,
+    return res.status(500).json({
+      ok: false,
+      error: 'Landing API is missing SUPABASE_SERVICE_ROLE_KEY.',
       metrics: {
         totalDogs: 0,
         vaccinatedDogs: 0,
@@ -136,6 +137,20 @@ export default async function handler(req, res) {
     const selectedPincode = normalize(req.query?.pincode)
     const selectedSocietyId = normalize(req.query?.societyId)
     const selectedSocietyName = normalize(req.query?.societyName)
+    const hasLocationFilter = Boolean(
+      selectedArea || selectedPincode || selectedSocietyId || selectedSocietyName,
+    )
+
+    let dogsQuery = supabase
+      .from('dogs')
+      .select(
+        'id, dog_name_or_temp_name, photo_url, location_description, area_id, area_name, city, status, vaccination_status, health_notes, notes, health_status, tagged_area_neighbourhood, tagged_area_pincode, tagged_society_id, tagged_society_name, created_at',
+      )
+      .order('created_at', { ascending: false })
+
+    if (!hasLocationFilter) {
+      dogsQuery = dogsQuery.limit(60)
+    }
 
     const [
       totalDogsResult,
@@ -152,13 +167,7 @@ export default async function handler(req, res) {
         .eq('vaccination_status', 'vaccinated'),
       supabase.from('expenses').select('total_amount'),
       supabase.from('inventory_request_items').select('quantity_required, quantity_committed'),
-      supabase
-        .from('dogs')
-        .select(
-          'id, dog_name_or_temp_name, photo_url, location_description, area_id, area_name, city, status, vaccination_status, health_notes, notes, health_status, tagged_area_neighbourhood, tagged_area_pincode, tagged_society_id, tagged_society_name, created_at',
-        )
-        .order('created_at', { ascending: false })
-        .limit(60),
+      dogsQuery,
       supabase.from('areas').select('id, name, city'),
     ])
 
@@ -193,7 +202,7 @@ export default async function handler(req, res) {
       societyId: selectedSocietyId,
       societyName: selectedSocietyName,
     })
-    const featuredDogs = selectedArea || selectedPincode ? matchedDogs.slice(0, 12) : dogsWithArea.slice(0, 3)
+    const featuredDogs = hasLocationFilter ? matchedDogs.slice(0, 12) : dogsWithArea.slice(0, 3)
 
     return res.status(200).json({
       ok: true,
@@ -206,9 +215,10 @@ export default async function handler(req, res) {
       featuredDogs,
       matchedDogs: matchedDogs.slice(0, 18),
     })
-  } catch {
-    return res.status(200).json({
-      ok: true,
+  } catch (error) {
+    return res.status(500).json({
+      ok: false,
+      error: error instanceof Error ? error.message : 'Unable to load landing metrics.',
       metrics: {
         totalDogs: 0,
         vaccinatedDogs: 0,

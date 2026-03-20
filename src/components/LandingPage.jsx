@@ -64,6 +64,7 @@ export function LandingPage({ onNavigate }) {
   const [areasById, setAreasById] = useState({})
   const [landingDogs, setLandingDogs] = useState([])
   const [isDogsLoading, setIsDogsLoading] = useState(true)
+  const [landingDogsError, setLandingDogsError] = useState('')
   const persistedLocation = useMemo(() => readStoredLocation(), [])
   const [locationStatus, setLocationStatus] = useState(
     persistedLocation?.areaLabel ? 'saved' : 'detecting',
@@ -100,16 +101,24 @@ export function LandingPage({ onNavigate }) {
         }
 
         setIsDogsLoading(true)
+        setLandingDogsError('')
         const response = await fetch(`/api/landing-metrics${params.toString() ? `?${params}` : ''}`)
         const payload = await response.json()
 
         if (isMounted && response.ok && payload?.metrics) {
           setMetrics(payload.metrics)
           setLandingDogs(payload.matchedDogs ?? payload.featuredDogs ?? [])
+          return
+        }
+
+        if (isMounted) {
+          setLandingDogs([])
+          setLandingDogsError(payload?.error || 'Unable to load dogs for the homepage right now.')
         }
       } catch {
         if (isMounted) {
           setLandingDogs([])
+          setLandingDogsError('Unable to load dogs for the homepage right now.')
         }
       } finally {
         if (isMounted) {
@@ -362,6 +371,14 @@ export function LandingPage({ onNavigate }) {
             {filteredDogs.length} match{filteredDogs.length === 1 ? '' : 'es'}
           </div>
         </div>
+
+        {landingDogsError ? (
+          <Card className="rounded-[1.25rem] border-amber-200/70 bg-amber-50/80 shadow-soft">
+            <CardContent className="p-4 text-sm text-amber-800">
+              {landingDogsError}
+            </CardContent>
+          </Card>
+        ) : null}
 
         {isDogsLoading ? (
           <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
