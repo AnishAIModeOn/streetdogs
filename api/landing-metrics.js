@@ -149,7 +149,7 @@ export default async function handler(req, res) {
     let dogsQuery = supabase
       .from('dogs')
       .select(
-        'id, dog_name_or_temp_name, photo_url, location_description, area_id, area_name, city, status, vaccination_status, health_notes, notes, health_status, tagged_area_neighbourhood, tagged_area_pincode, tagged_society_id, tagged_society_name, created_at',
+        'id, dog_name_or_temp_name, photo_url, location_description, area_id, status, vaccination_status, health_notes, tagged_area_neighbourhood, tagged_area_pincode, tagged_society_id, tagged_society_name, created_at',
       )
       .order('created_at', { ascending: false })
 
