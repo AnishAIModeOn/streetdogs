@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Crosshair, Loader2, MapPin, PawPrint } from 'lucide-react'
 import { useAreaSocietyFlow } from '../hooks/use-area-society-flow'
 import { useDogs } from '../hooks/use-dogs'
+import { listAreas } from '../lib/communityData'
 import { navigateTo } from '../lib/navigation'
 import { DogCard } from './DogCard'
 import { HeroImageCarousel } from './HeroImageCarousel'
@@ -61,6 +62,7 @@ export function LandingPage({ onNavigate }) {
     expensesRaised: 0,
     inventoryFulfilled: 0,
   })
+  const [areasById, setAreasById] = useState({})
   const persistedLocation = useMemo(() => readStoredLocation(), [])
   const [locationStatus, setLocationStatus] = useState(
     persistedLocation?.areaLabel ? 'saved' : 'detecting',
@@ -95,6 +97,36 @@ export function LandingPage({ onNavigate }) {
     }
 
     loadMetrics()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  useEffect(() => {
+    let isMounted = true
+
+    const loadAreas = async () => {
+      try {
+        const areas = await listAreas()
+        if (!isMounted) {
+          return
+        }
+
+        setAreasById(
+          areas.reduce((accumulator, area) => {
+            accumulator[area.id] = area
+            return accumulator
+          }, {}),
+        )
+      } catch {
+        if (isMounted) {
+          setAreasById({})
+        }
+      }
+    }
+
+    loadAreas()
 
     return () => {
       isMounted = false
@@ -146,8 +178,8 @@ export function LandingPage({ onNavigate }) {
   }, [flow.areaContext.pincode, flow.selectedSociety, selectedArea])
 
   const filteredDogs = useMemo(
-    () => filterDogsForLocation(allDogs, flow.areaContext),
-    [allDogs, flow.areaContext],
+    () => filterDogsForLocation(allDogs, flow.areaContext, areasById),
+    [allDogs, flow.areaContext, areasById],
   )
 
   const visibleNearbyDogs = filteredDogs.slice(0, 12)
@@ -324,7 +356,7 @@ export function LandingPage({ onNavigate }) {
               <div key={dog.id} className="min-w-[280px] max-w-[320px] flex-1">
                 <DogCard
                   dog={dog}
-                  area={buildDogArea(dog)}
+                  area={buildDogArea(dog, areasById)}
                   onViewDetails={() => navigateTo(`/dogs/${dog.id}`)}
                 />
               </div>
@@ -364,7 +396,7 @@ export function LandingPage({ onNavigate }) {
               <div key={dog.id} className="min-w-[280px] max-w-[320px] flex-1">
                 <DogCard
                   dog={dog}
-                  area={buildDogArea(dog)}
+                  area={buildDogArea(dog, areasById)}
                   onViewDetails={() => navigateTo(`/dogs/${dog.id}`)}
                 />
               </div>
@@ -404,10 +436,17 @@ function CompactMetric({ label, value }) {
   )
 }
 
-function buildDogArea(dog) {
+function buildDogArea(dog, areasById) {
+  const legacyArea = dog.area_id ? areasById[dog.area_id] : null
+
   return {
-    city: dog.city || dog.tagged_area_pincode || 'Unknown city',
-    name: dog.area_name || dog.tagged_area_neighbourhood || dog.tagged_society_name || 'Unknown area',
+    city: dog.city || legacyArea?.city || dog.tagged_area_pincode || 'Unknown city',
+    name:
+      dog.area_name ||
+      dog.tagged_area_neighbourhood ||
+      legacyArea?.name ||
+      dog.tagged_society_name ||
+      'Unknown area',
   }
 }
 
@@ -471,7 +510,7 @@ function looselyMatches(primary, target) {
   return leftTokens.every((token) => rightTokens.includes(token)) || rightTokens.every((token) => leftTokens.includes(token))
 }
 
-function filterDogsForLocation(dogs, areaContext) {
+function filterDogsForLocation(dogs, areaContext, areasById) {
   const area = normalize(areaContext.neighbourhood || areaContext.areaLabel)
   const pincode = normalize(areaContext.pincode)
   const societyId = normalize(areaContext.societyId)
@@ -483,14 +522,21 @@ function filterDogsForLocation(dogs, areaContext) {
 
   const withScores = dogs
     .map((dog) => {
+      const legacyArea = dog.area_id ? areasById[dog.area_id] : null
       const dogArea = normalize(dog.area_name)
       const dogNeighbourhood = normalize(dog.tagged_area_neighbourhood)
+      const dogLegacyArea = normalize(legacyArea?.name)
       const dogPincode = normalize(dog.tagged_area_pincode)
       const dogSocietyId = normalize(dog.tagged_society_id)
       const dogSocietyName = normalize(dog.tagged_society_name)
+      const dogLocationDescription = normalize(dog.location_description)
 
       const matchesArea =
-        !area || looselyMatches(area, dogNeighbourhood) || looselyMatches(area, dogArea)
+        !area ||
+        looselyMatches(area, dogNeighbourhood) ||
+        looselyMatches(area, dogArea) ||
+        looselyMatches(area, dogLegacyArea) ||
+        looselyMatches(area, dogLocationDescription)
       const matchesPincode = !pincode || dogPincode === pincode
       const matchesSociety =
         !societyId && !societyName
