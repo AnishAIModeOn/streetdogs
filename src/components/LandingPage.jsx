@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Crosshair, Loader2, MapPin, PawPrint } from 'lucide-react'
 import { useAreaSocietyFlow } from '../hooks/use-area-society-flow'
-import { useDogs } from '../hooks/use-dogs'
 import { listAreas } from '../lib/communityData'
 import { navigateTo } from '../lib/navigation'
 import { DogCard } from './DogCard'
@@ -63,6 +62,8 @@ export function LandingPage({ onNavigate }) {
     inventoryFulfilled: 0,
   })
   const [areasById, setAreasById] = useState({})
+  const [landingDogs, setLandingDogs] = useState([])
+  const [isDogsLoading, setIsDogsLoading] = useState(true)
   const persistedLocation = useMemo(() => readStoredLocation(), [])
   const [locationStatus, setLocationStatus] = useState(
     persistedLocation?.areaLabel ? 'saved' : 'detecting',
@@ -75,7 +76,6 @@ export function LandingPage({ onNavigate }) {
     autoDetect: !persistedLocation?.areaLabel,
   })
 
-  const { data: allDogs = [], isLoading: isDogsLoading } = useDogs()
   const selectedArea = flow.areaContext.neighbourhood || flow.areaContext.areaLabel
   const selectedSociety = flow.selectedSociety
   const showingLabel = selectedArea || 'your community'
@@ -83,25 +83,53 @@ export function LandingPage({ onNavigate }) {
   useEffect(() => {
     let isMounted = true
 
-    const loadMetrics = async () => {
+    const loadLandingData = async () => {
       try {
-        const response = await fetch('/api/landing-metrics')
+        const params = new URLSearchParams()
+        if (flow.areaContext.neighbourhood || flow.areaContext.areaLabel) {
+          params.set('area', flow.areaContext.neighbourhood || flow.areaContext.areaLabel)
+        }
+        if (flow.areaContext.pincode) {
+          params.set('pincode', flow.areaContext.pincode)
+        }
+        if (flow.areaContext.societyId) {
+          params.set('societyId', flow.areaContext.societyId)
+        }
+        if (flow.areaContext.societyName) {
+          params.set('societyName', flow.areaContext.societyName)
+        }
+
+        setIsDogsLoading(true)
+        const response = await fetch(`/api/landing-metrics${params.toString() ? `?${params}` : ''}`)
         const payload = await response.json()
 
         if (isMounted && response.ok && payload?.metrics) {
           setMetrics(payload.metrics)
+          setLandingDogs(payload.matchedDogs ?? payload.featuredDogs ?? [])
         }
       } catch {
-        // Keep the default snapshot if metrics are unavailable.
+        if (isMounted) {
+          setLandingDogs([])
+        }
+      } finally {
+        if (isMounted) {
+          setIsDogsLoading(false)
+        }
       }
     }
 
-    loadMetrics()
+    loadLandingData()
 
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [
+    flow.areaContext.areaLabel,
+    flow.areaContext.neighbourhood,
+    flow.areaContext.pincode,
+    flow.areaContext.societyId,
+    flow.areaContext.societyName,
+  ])
 
   useEffect(() => {
     let isMounted = true
@@ -178,8 +206,8 @@ export function LandingPage({ onNavigate }) {
   }, [flow.areaContext.pincode, flow.selectedSociety, selectedArea])
 
   const filteredDogs = useMemo(
-    () => filterDogsForLocation(allDogs, flow.areaContext, areasById),
-    [allDogs, flow.areaContext, areasById],
+    () => filterDogsForLocation(landingDogs, flow.areaContext, areasById),
+    [areasById, flow.areaContext, landingDogs],
   )
 
   const visibleNearbyDogs = filteredDogs.slice(0, 12)
