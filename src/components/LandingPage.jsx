@@ -214,10 +214,7 @@ export function LandingPage({ onNavigate }) {
     )
   }, [flow.areaContext.pincode, flow.selectedSociety, selectedArea])
 
-  const filteredDogs = useMemo(
-    () => filterDogsForLocation(landingDogs, flow.areaContext, areasById),
-    [areasById, flow.areaContext, landingDogs],
-  )
+  const filteredDogs = landingDogs
 
   const visibleNearbyDogs = filteredDogs.slice(0, 12)
   const attentionDogs = filteredDogs.filter(isNeedsAttentionDog).slice(0, 6)
@@ -517,94 +514,6 @@ function getLocationMessage(status, detectedLabel, showingLabel, societyName) {
   }
 
   return 'Location is optional'
-}
-
-function normalize(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-}
-
-function tokens(value) {
-  return normalize(value)
-    .split(/[\s,/-]+/)
-    .map((token) => token.trim())
-    .filter(Boolean)
-}
-
-function looselyMatches(primary, target) {
-  const left = normalize(primary)
-  const right = normalize(target)
-
-  if (!left || !right) {
-    return false
-  }
-
-  if (left === right || left.includes(right) || right.includes(left)) {
-    return true
-  }
-
-  const leftTokens = tokens(left)
-  const rightTokens = tokens(right)
-
-  if (!leftTokens.length || !rightTokens.length) {
-    return false
-  }
-
-  return leftTokens.every((token) => rightTokens.includes(token)) || rightTokens.every((token) => leftTokens.includes(token))
-}
-
-function filterDogsForLocation(dogs, areaContext, areasById) {
-  const area = normalize(areaContext.neighbourhood || areaContext.areaLabel)
-  const pincode = normalize(areaContext.pincode)
-  const societyId = normalize(areaContext.societyId)
-  const societyName = normalize(areaContext.societyName)
-
-  if (!area && !pincode && !societyId && !societyName) {
-    return dogs
-  }
-
-  const withScores = dogs
-    .map((dog) => {
-      const legacyArea = dog.area_id ? areasById[dog.area_id] : null
-      const dogArea = normalize(dog.area_name)
-      const dogNeighbourhood = normalize(dog.tagged_area_neighbourhood)
-      const dogLegacyArea = normalize(legacyArea?.name)
-      const dogPincode = normalize(dog.tagged_area_pincode)
-      const dogSocietyId = normalize(dog.tagged_society_id)
-      const dogSocietyName = normalize(dog.tagged_society_name)
-      const dogLocationDescription = normalize(dog.location_description)
-
-      const matchesArea =
-        !area ||
-        looselyMatches(area, dogNeighbourhood) ||
-        looselyMatches(area, dogArea) ||
-        looselyMatches(area, dogLegacyArea) ||
-        looselyMatches(area, dogLocationDescription)
-      const matchesPincode = !pincode || dogPincode === pincode
-      const matchesSociety =
-        !societyId && !societyName
-          ? false
-          : dogSocietyId === societyId || looselyMatches(societyName, dogSocietyName)
-
-      const passesPrimaryLocation = area ? matchesArea : pincode ? matchesPincode : true
-      const passesFallbackLocation = !passesPrimaryLocation && area && pincode ? matchesPincode : false
-
-      if (!passesPrimaryLocation && !passesFallbackLocation) {
-        return null
-      }
-
-      return {
-        dog,
-        score: matchesSociety ? 2 : matchesPincode ? 1 : 0,
-      }
-    })
-    .filter(Boolean)
-
-  return withScores
-    .sort((left, right) => right.score - left.score)
-    .map((entry) => entry.dog)
 }
 
 function isNeedsAttentionDog(dog) {
