@@ -26,11 +26,10 @@ export function DogCard({ dog, area, onViewDetails }) {
   }
 
   const dogName = dog.dog_name_or_temp_name || `Dog ${dog.id.slice(0, 6)}`
-  const areaLabel = area ? `${area.city} · ${area.name}` : 'Area unavailable'
+  const areaLabel = area ? `${area.city} - ${area.name}` : 'Area unavailable'
 
   return (
     <div className="group flex flex-col overflow-hidden rounded-[1.75rem] border border-white/55 bg-white/95 shadow-soft transition-all duration-500 hover:-translate-y-1 hover:shadow-float">
-      {/* Photo */}
       <div className="relative aspect-[16/10] shrink-0 overflow-hidden bg-secondary/40">
         {dog.photo_url ? (
           <img
@@ -44,23 +43,20 @@ export function DogCard({ dog, area, onViewDetails }) {
           </div>
         )}
 
-        {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent" />
 
-        {/* Care status badges — top left */}
         <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
           {badges.map((badge) => (
             <Badge
               key={badge.label}
               variant={badge.variant}
-              className="border border-white/30 bg-white/90 shadow-sm backdrop-blur-sm text-[0.7rem]"
+              className="border border-white/30 bg-white/90 text-[0.7rem] shadow-sm backdrop-blur-sm"
             >
               {badge.label}
             </Badge>
           ))}
         </div>
 
-        {/* Name + area pill — bottom of photo */}
         <div className="absolute bottom-3 left-3 right-3">
           <div className="rounded-[1.1rem] border border-white/18 bg-black/30 px-3.5 py-2.5 backdrop-blur-md">
             <p className="text-[0.95rem] font-bold leading-tight text-white">{dogName}</p>
@@ -69,9 +65,7 @@ export function DogCard({ dog, area, onViewDetails }) {
         </div>
       </div>
 
-      {/* Card body */}
       <div className="flex flex-1 flex-col gap-3 p-4">
-        {/* Location */}
         <div className="flex items-start gap-2 text-sm text-muted-foreground">
           <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />
           <p className="line-clamp-2 leading-5">
@@ -79,7 +73,6 @@ export function DogCard({ dog, area, onViewDetails }) {
           </p>
         </div>
 
-        {/* View Details CTA */}
         <Button
           variant="secondary"
           className="mt-auto w-full justify-between rounded-xl font-semibold"

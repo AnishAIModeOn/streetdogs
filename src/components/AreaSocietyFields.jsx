@@ -12,11 +12,11 @@ export function AreaSocietyFields({
 }) {
   return (
     <Card className="rounded-[2rem] border-white/70 bg-white/90 shadow-soft">
-      <CardHeader>
+      <CardHeader className="pb-3">
         <CardTitle>{cardTitle}</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-5">
-        <p className="text-sm leading-6 text-muted-foreground">{cardCopy}</p>
+        <p className="text-sm leading-5 text-muted-foreground sm:leading-6">{cardCopy}</p>
 
         <FormField>
           <FormLabel className="flex items-center gap-1.5">
@@ -51,7 +51,7 @@ export function AreaSocietyFields({
           ) : null}
 
           {!flow.detecting && (flow.manual || !flow.detectedLabel) ? (
-            <div className="relative">
+            <div className="relative min-w-0">
               <Input
                 placeholder="e.g. Bellandur, Koramangala, Baner…"
                 value={flow.areaInput}
@@ -88,7 +88,7 @@ export function AreaSocietyFields({
           ) : null}
         </FormField>
 
-        <div className="rounded-[1.5rem] border border-border/60 bg-secondary/20 p-4">
+        <div className="min-w-0 overflow-hidden rounded-[1.5rem] border border-border/60 bg-secondary/20 p-3 sm:p-4">
           <SocietyPicker
             pincode={flow.areaContext.pincode}
             neighbourhood={flow.areaContext.neighbourhood}

@@ -23,11 +23,11 @@ export function HeroImageCarousel({ slides, intervalMs = 5000, className }) {
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-[2rem] border border-white/25 bg-secondary/30 shadow-float',
+        'relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/72 shadow-float backdrop-blur-sm',
         className,
       )}
     >
-      <div className="relative aspect-[0.88] min-h-[420px] w-full sm:aspect-[1.05] lg:min-h-[560px]">
+      <div className="relative aspect-[4/5] min-h-[320px] w-full sm:aspect-[5/4] sm:min-h-[420px] lg:min-h-[540px]">
         {slides.map((slide, index) => {
           const isActive = index === activeIndex
 
@@ -47,41 +47,54 @@ export function HeroImageCarousel({ slides, intervalMs = 5000, className }) {
                   isActive ? 'scale-[1.06]' : 'scale-100',
                 )}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-white/10" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/12 via-transparent to-white/12" />
             </div>
           )
         })}
 
-        <div className="absolute bottom-5 left-5 right-5 flex items-end justify-between gap-4">
-          <div className="max-w-sm rounded-[1.6rem] border border-white/20 bg-black/20 p-4 backdrop-blur-md shadow-float">
+        <div className="pointer-events-none absolute inset-x-4 top-4 flex justify-end sm:inset-x-5 sm:top-5">
+          <div className="rounded-full border border-white/60 bg-white/55 px-3 py-2 backdrop-blur-md shadow-soft">
+            <div className="pointer-events-auto flex items-center gap-2">
+              {slides.map((slide, index) => (
+                <button
+                  key={slide.src}
+                  type="button"
+                  aria-label={`Show slide ${index + 1}`}
+                  className={cn(
+                    'h-2.5 rounded-full transition-all duration-500',
+                    index === activeIndex ? 'w-8 bg-primary' : 'w-2.5 bg-primary/35',
+                  )}
+                  onClick={() => setActiveIndex(index)}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t border-white/65 bg-[linear-gradient(180deg,rgba(255,252,245,0.94),rgba(248,241,229,0.88))] p-5 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-3">
             <div className="flex flex-wrap gap-2">
               {getSlideBadges(slides[activeIndex]).map((badge) => (
                 <span
                   key={badge}
-                  className="rounded-full border border-white/20 bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white"
+                  className="rounded-full border border-primary/10 bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary"
                 >
                   {badge}
                 </span>
               ))}
             </div>
-            <p className="mt-3 text-2xl font-semibold text-white">{slides[activeIndex].name}</p>
-            <p className="mt-1 text-sm text-white/80">{slides[activeIndex].location}</p>
-            <p className="mt-3 text-sm leading-6 text-white/88">{slides[activeIndex].summary}</p>
+            <div className="space-y-1">
+              <p className="text-2xl font-semibold tracking-tight text-foreground">
+                {slides[activeIndex].name}
+              </p>
+              <p className="text-sm text-muted-foreground">{slides[activeIndex].location}</p>
+            </div>
           </div>
-          <div className="flex items-center gap-2 rounded-full border border-white/20 bg-black/20 px-3 py-2 backdrop-blur-md">
-            {slides.map((slide, index) => (
-              <button
-                key={slide.src}
-                type="button"
-                aria-label={`Show slide ${index + 1}`}
-                className={cn(
-                  'h-2.5 rounded-full transition-all duration-500',
-                  index === activeIndex ? 'w-8 bg-white' : 'w-2.5 bg-white/45',
-                )}
-                onClick={() => setActiveIndex(index)}
-              />
-            ))}
-          </div>
+          <p className="max-w-md text-sm leading-6 text-muted-foreground">
+            {slides[activeIndex].summary}
+          </p>
         </div>
       </div>
     </div>

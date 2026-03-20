@@ -47,21 +47,20 @@ export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, defe
   const debouncedPincode = useDebouncedValue(pincode, 400)
   const debouncedNeighbourhood = useDebouncedValue(neighbourhood, 400)
 
-  // Reset selection and societies when the area changes
   useEffect(() => {
     setSelected(null)
     onSelect(null)
     setSocieties([])
     setSearchTerm('')
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedPincode, debouncedNeighbourhood])
 
-  // Fetch societies whenever pincode, neighbourhood, or search term changes
   const fetchSocieties = useCallback(async (pc, nb, term) => {
     if (!pc && !nb && !term) {
       setSocieties([])
       return
     }
+
     try {
       setIsFetching(true)
       setFetchError('')
@@ -83,13 +82,13 @@ export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, defe
     }
   }, [debouncedPincode, debouncedNeighbourhood, debouncedSearch, fetchSocieties])
 
-  // Close on outside click/touch
   useEffect(() => {
     function onOutside(e) {
       if (containerRef.current && !containerRef.current.contains(e.target)) {
         setIsOpen(false)
       }
     }
+
     document.addEventListener('mousedown', onOutside)
     document.addEventListener('touchstart', onOutside)
     return () => {
@@ -108,6 +107,7 @@ export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, defe
       }
       return
     }
+
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault()
@@ -150,10 +150,16 @@ export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, defe
       })
       return
     }
+
     try {
       setIsCreating(true)
       setFetchError('')
-      const newSociety = await createSociety({ name, pincode, neighbourhood: neighbourhood || null, coordinates: null })
+      const newSociety = await createSociety({
+        name,
+        pincode,
+        neighbourhood: neighbourhood || null,
+        coordinates: null,
+      })
       commitSelection(newSociety)
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'Unable to create society.')
@@ -182,8 +188,7 @@ export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, defe
   }, [activeIndex])
 
   return (
-    <div className="space-y-3">
-      {/* Label */}
+    <div className="min-w-0 space-y-3">
       <div className="flex items-center gap-2">
         <Building2 className="h-4 w-4 text-primary/70" />
         <p className="text-sm font-semibold text-foreground">Society</p>
@@ -192,21 +197,27 @@ export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, defe
         </span>
       </div>
 
-      {/* Combobox */}
-      <div ref={containerRef} className="relative">
+      <div ref={containerRef} className="relative min-w-0">
         {selected ? (
-          <div className="flex h-11 w-full items-center justify-between rounded-2xl border border-input bg-white/90 px-4 shadow-sm">
-            <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Building2 className="h-3.5 w-3.5 text-primary/70" />
-              {selected.name}
-              {selected.pincode && (
-                <span className="font-normal text-muted-foreground">· {selected.pincode}</span>
-              )}
+          <div className="flex min-h-12 w-full items-start justify-between gap-3 rounded-2xl border border-input bg-white/90 px-4 py-3 shadow-sm">
+            <span className="min-w-0 flex-1 text-sm font-semibold text-foreground">
+              <span className="flex min-w-0 items-start gap-2">
+                <Building2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/70" />
+                <span className="min-w-0 break-words">{selected.name}</span>
+              </span>
+              {selected.pincode ? (
+                <span className="mt-1 block break-words text-xs font-normal text-muted-foreground">
+                  {selected.pincode}
+                </span>
+              ) : null}
             </span>
             <button
               type="button"
-              onMouseDown={(e) => { e.preventDefault(); clearSelection() }}
-              className="rounded-full p-1 text-muted-foreground hover:text-foreground transition-colors"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                clearSelection()
+              }}
+              className="shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:text-foreground"
               aria-label="Clear selection"
             >
               <X className="h-4 w-4" />
@@ -215,7 +226,7 @@ export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, defe
         ) : (
           <button
             type="button"
-            className="flex h-11 w-full items-center justify-between rounded-2xl border border-input bg-white/90 px-4 text-sm shadow-sm transition-all hover:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
+            className="flex min-h-12 w-full items-center justify-between gap-3 rounded-2xl border border-input bg-white/90 px-4 py-3 text-left text-sm shadow-sm transition-all hover:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
             onMouseDown={(e) => {
               e.preventDefault()
               setIsOpen((o) => !o)
@@ -227,115 +238,144 @@ export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, defe
               setTimeout(() => inputRef.current?.focus(), 10)
             }}
           >
-            <span className="text-muted-foreground">
+            <span className="min-w-0 flex-1 break-words text-muted-foreground">
               {societies.length > 0
-                ? `${societies.length} societ${societies.length === 1 ? 'y' : 'ies'} found — tap to select`
+                ? `${societies.length} societ${societies.length === 1 ? 'y' : 'ies'} found - tap to select`
                 : neighbourhood || pincode
-                  ? `Search societies in ${neighbourhood || pincode}…`
-                  : 'Search for your society…'}
+                  ? `Search societies in ${neighbourhood || pincode}...`
+                  : 'Search for your society...'}
             </span>
-            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown
+              className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
+                isOpen ? 'rotate-180' : ''
+              }`}
+            />
           </button>
         )}
 
-        {/* Dropdown */}
-        {isOpen && !selected && (
+        {isOpen && !selected ? (
           <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-2xl border border-white/70 bg-white shadow-float">
             <div className="flex items-center gap-2 border-b border-border/50 px-3 py-2.5">
               <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
               <input
                 ref={inputRef}
-                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                placeholder={neighbourhood || pincode ? `Search in ${neighbourhood || pincode}…` : 'Type society name…'}
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                placeholder={
+                  neighbourhood || pincode
+                    ? `Search in ${neighbourhood || pincode}...`
+                    : 'Type society name...'
+                }
                 value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); setActiveIndex(-1) }}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value)
+                  setActiveIndex(-1)
+                }}
                 onKeyDown={handleKeyDown}
                 autoComplete="off"
               />
-              {searchTerm && (
+              {searchTerm ? (
                 <button
                   type="button"
-                  onMouseDown={(e) => { e.preventDefault(); setSearchTerm('') }}
-                  className="text-muted-foreground hover:text-foreground"
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    setSearchTerm('')
+                  }}
+                  className="shrink-0 text-muted-foreground hover:text-foreground"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
-              )}
+              ) : null}
             </div>
 
             <div ref={listRef} className="max-h-[240px] overflow-y-auto overflow-x-hidden p-2" role="listbox">
-              {isFetching && (
+              {isFetching ? (
                 <div className="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Searching…
+                  Searching...
                 </div>
-              )}
+              ) : null}
 
-              {fetchError && !isFetching && (
+              {fetchError && !isFetching ? (
                 <p className="px-3 py-3 text-xs text-red-600">{fetchError}</p>
-              )}
+              ) : null}
 
-              {!isFetching && !fetchError && allOptions.length === 0 && (pincode || neighbourhood) && !searchTerm && (
+              {!isFetching && !fetchError && allOptions.length === 0 && (pincode || neighbourhood) && !searchTerm ? (
                 <p className="px-3 py-3 text-xs text-muted-foreground">
                   No societies found for this area yet. Type a name to add one.
                 </p>
-              )}
+              ) : null}
 
-              {!isFetching && !fetchError && !pincode && !neighbourhood && !searchTerm && (
+              {!isFetching && !fetchError && !pincode && !neighbourhood && !searchTerm ? (
                 <p className="px-3 py-4 text-center text-xs text-muted-foreground">
-                  Type a society name to search…
+                  Type a society name to search...
                 </p>
-              )}
+              ) : null}
 
-              {!isFetching &&
-                allOptions.map((option, i) => (
-                  <button
-                    key={option.key}
-                    type="button"
-                    role="option"
-                    aria-selected={i === activeIndex}
-                    className={[
-                      'flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm transition-colors',
-                      i === activeIndex
-                        ? 'bg-secondary/60 text-foreground'
-                        : 'text-foreground/80 hover:bg-secondary/40',
-                    ].join(' ')}
-                    onMouseEnter={() => setActiveIndex(i)}
-                    onMouseDown={(e) => { e.preventDefault(); handleOptionClick(option) }}
-                    onTouchEnd={(e) => { e.preventDefault(); handleOptionClick(option) }}
-                    disabled={isCreating && option.type === 'create'}
-                  >
-                    {option.type === 'create' ? (
-                      <>
-                        {isCreating ? (
-                          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
-                        ) : (
-                          <Plus className="h-4 w-4 shrink-0 text-primary" />
-                        )}
-                        <span>
-                          Add <strong className="font-semibold">&ldquo;{option.label}&rdquo;</strong> as a new society
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        <span className="flex-1 font-medium">{option.society.name}</span>
-                        <span className="text-xs text-muted-foreground">{option.society.pincode}</span>
-                        {selected?.id === option.society.id && <Check className="h-4 w-4 text-primary" />}
-                      </>
-                    )}
-                  </button>
-                ))}
+              {!isFetching
+                ? allOptions.map((option, i) => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      role="option"
+                      aria-selected={i === activeIndex}
+                      className={[
+                        'flex w-full items-start gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm transition-colors',
+                        i === activeIndex
+                          ? 'bg-secondary/60 text-foreground'
+                          : 'text-foreground/80 hover:bg-secondary/40',
+                      ].join(' ')}
+                      onMouseEnter={() => setActiveIndex(i)}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        handleOptionClick(option)
+                      }}
+                      onTouchEnd={(e) => {
+                        e.preventDefault()
+                        handleOptionClick(option)
+                      }}
+                      disabled={isCreating && option.type === 'create'}
+                    >
+                      {option.type === 'create' ? (
+                        <>
+                          {isCreating ? (
+                            <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-primary" />
+                          ) : (
+                            <Plus className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                          )}
+                          <span className="min-w-0 break-words">
+                            Add <strong className="font-semibold">&ldquo;{option.label}&rdquo;</strong> as a new
+                            society
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                          <span className="min-w-0 flex-1">
+                            <span className="block break-words font-medium">{option.society.name}</span>
+                            {option.society.pincode ? (
+                              <span className="mt-0.5 block text-xs text-muted-foreground">
+                                {option.society.pincode}
+                              </span>
+                            ) : null}
+                          </span>
+                          {selected?.id === option.society.id ? (
+                            <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                          ) : null}
+                        </>
+                      )}
+                    </button>
+                  ))
+                : null}
             </div>
           </div>
-        )}
+        ) : null}
       </div>
 
-      {!selected && (
+      {!selected ? (
         <p className="text-[0.72rem] leading-4 text-muted-foreground">
           You can skip this and add your society from your profile later.
         </p>
-      )}
+      ) : null}
     </div>
   )
 }
@@ -348,15 +388,8 @@ function buildOptions(societies, searchTerm) {
   }))
 
   const trimmed = searchTerm.trim()
-  const hasExactMatch = societies.some(
-    (s) => s.name.toLowerCase() === trimmed.toLowerCase(),
-  )
+  const hasExactMatch = societies.some((s) => s.name.toLowerCase() === trimmed.toLowerCase())
 
-  // Show "Add as new society" when:
-  // - user has typed at least 2 chars
-  // - no existing society has that exact name
-  // - either a pincode is known (auto-detected) OR we're in manual area-name
-  //   mode (no pincode) — so users can always add their society
   if (trimmed.length >= 2 && !hasExactMatch) {
     societyOptions.push({
       key: `create-${trimmed}`,

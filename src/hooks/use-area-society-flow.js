@@ -46,6 +46,60 @@ function normalizeComparable(value) {
   return normalizeText(value).toLowerCase().replace(/\s+/g, ' ')
 }
 
+async function detectCurrentLocation({
+  setPincode,
+  setDetectedNeighbourhood,
+  setDetectedLabel,
+  setManual,
+  setAreaInputState,
+  setSelectedSociety,
+  setDetecting,
+}) {
+  if (!navigator.geolocation) {
+    setDetecting(false)
+    setManual(true)
+    return
+  }
+
+  setDetecting(true)
+
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { pincode: nextPincode, neighbourhood, city } = await reverseGeocode(
+            position.coords.latitude,
+            position.coords.longitude,
+          )
+
+          if (nextPincode || neighbourhood) {
+            setPincode(nextPincode)
+            setDetectedNeighbourhood(neighbourhood)
+            const parts = [neighbourhood, city].filter(Boolean)
+            setDetectedLabel(parts.length ? parts.join(', ') : nextPincode)
+            setAreaInputState(neighbourhood || '')
+            setSelectedSociety(null)
+            setManual(false)
+          } else {
+            setManual(true)
+          }
+        } catch {
+          setManual(true)
+        } finally {
+          setDetecting(false)
+          resolve()
+        }
+      },
+      () => {
+        setDetecting(false)
+        setManual(true)
+        resolve()
+      },
+      { timeout: 9000, maximumAge: 60_000 },
+    )
+  })
+}
+
 export function findMatchingAreaId(areas, areaLabel) {
   const normalizedLabel = normalizeComparable(areaLabel)
 
@@ -102,51 +156,17 @@ export function useAreaSocietyFlow(options = {}) {
       return undefined
     }
 
-    if (!navigator.geolocation) {
-      setDetecting(false)
-      setManual(true)
-      return undefined
-    }
-
     let isMounted = true
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          const { pincode: nextPincode, neighbourhood, city } = await reverseGeocode(
-            position.coords.latitude,
-            position.coords.longitude,
-          )
 
-          if (!isMounted) {
-            return
-          }
-
-          if (nextPincode || neighbourhood) {
-            setPincode(nextPincode)
-            setDetectedNeighbourhood(neighbourhood)
-            const parts = [neighbourhood, city].filter(Boolean)
-            setDetectedLabel(parts.length ? parts.join(', ') : nextPincode)
-          } else {
-            setManual(true)
-          }
-        } catch {
-          if (isMounted) {
-            setManual(true)
-          }
-        } finally {
-          if (isMounted) {
-            setDetecting(false)
-          }
-        }
-      },
-      () => {
-        if (isMounted) {
-          setDetecting(false)
-          setManual(true)
-        }
-      },
-      { timeout: 9000, maximumAge: 60_000 },
-    )
+    detectCurrentLocation({
+      setPincode: (value) => isMounted && setPincode(value),
+      setDetectedNeighbourhood: (value) => isMounted && setDetectedNeighbourhood(value),
+      setDetectedLabel: (value) => isMounted && setDetectedLabel(value),
+      setManual: (value) => isMounted && setManual(value),
+      setAreaInputState: (value) => isMounted && setAreaInputState(value),
+      setSelectedSociety: (value) => isMounted && setSelectedSociety(value),
+      setDetecting: (value) => isMounted && setDetecting(value),
+    })
 
     return () => {
       isMounted = false
@@ -201,6 +221,18 @@ export function useAreaSocietyFlow(options = {}) {
     setSelectedSociety(null)
   }
 
+  function detectLocation() {
+    return detectCurrentLocation({
+      setPincode,
+      setDetectedNeighbourhood,
+      setDetectedLabel,
+      setManual,
+      setAreaInputState,
+      setSelectedSociety,
+      setDetecting,
+    })
+  }
+
   async function resolveSelectedSociety() {
     if (!selectedSociety) {
       return null
@@ -253,6 +285,7 @@ export function useAreaSocietyFlow(options = {}) {
     setShowSuggestions,
     selectSuggestion,
     setSelectedSociety,
+    detectLocation,
     resolveSelectedSociety,
   }
 }
