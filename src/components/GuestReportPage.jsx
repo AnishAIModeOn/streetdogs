@@ -88,6 +88,15 @@ function findAreaLabel(areas, areaId) {
   return area ? `${area.city} - ${area.name}` : 'Area unavailable'
 }
 
+function buildSubmittedDogLocation(dog) {
+  return (
+    dog?.tagged_area_neighbourhood ||
+    dog?.tagged_society_name ||
+    dog?.location_description ||
+    'Location shared'
+  )
+}
+
 function AuthPromptContent({ onNavigate }) {
   return (
     <div className="space-y-4">
@@ -386,7 +395,7 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
         id: createdDog.id,
         image: uploadedPhoto.photo_url || selectedImagePreview || '',
         areaLabel: findAreaLabel(areas, submissionAreaId),
-        location: locationDescription || areaSocietyFlow.areaContext.neighbourhood || 'Area shared',
+        location: buildSubmittedDogLocation(createdDog),
         name: form.dog_name_or_temp_name.trim() || 'Community dog report',
       })
       setForm(emptyGuestReportForm)
