@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Crosshair, Loader2, MapPin, PawPrint } from 'lucide-react'
-import { findMatchingAreaId, useAreaSocietyFlow } from '../hooks/use-area-society-flow'
+import { findMatchingAreaId, normalizeAreaLabel, useAreaSocietyFlow } from '../hooks/use-area-society-flow'
 import { listAreas } from '../lib/communityData'
 import { navigateTo } from '../lib/navigation'
 import { DogCard } from './DogCard'
@@ -48,7 +48,15 @@ function readStoredLocation() {
 
   try {
     const raw = window.localStorage.getItem(LANDING_LOCATION_KEY)
-    return raw ? JSON.parse(raw) : null
+    if (!raw) {
+      return null
+    }
+
+    const parsed = JSON.parse(raw)
+    return {
+      ...parsed,
+      areaLabel: normalizeAreaLabel(parsed?.areaLabel),
+    }
   } catch {
     return null
   }
@@ -80,11 +88,13 @@ export function LandingPage({ onNavigate }) {
 
   const selectedArea = flow.areaContext.neighbourhood || flow.areaContext.areaLabel
   const selectedSociety = flow.selectedSociety
-  const showingLabel = selectedArea || 'your community'
   const matchedAreaId = useMemo(
     () => findMatchingAreaId(areas, flow.areaContext.neighbourhood || flow.areaContext.areaLabel),
     [areas, flow.areaContext.areaLabel, flow.areaContext.neighbourhood],
   )
+  const canonicalAreaLabel =
+    (matchedAreaId ? areasById[matchedAreaId]?.name : '') || normalizeAreaLabel(selectedArea)
+  const showingLabel = canonicalAreaLabel || 'your community'
 
   useEffect(() => {
     let isMounted = true
@@ -95,8 +105,8 @@ export function LandingPage({ onNavigate }) {
         if (matchedAreaId) {
           params.set('areaId', matchedAreaId)
         }
-        if (flow.areaContext.neighbourhood || flow.areaContext.areaLabel) {
-          params.set('area', flow.areaContext.neighbourhood || flow.areaContext.areaLabel)
+        if (canonicalAreaLabel) {
+          params.set('area', canonicalAreaLabel)
         }
         if (flow.areaContext.pincode) {
           params.set('pincode', flow.areaContext.pincode)
@@ -142,11 +152,11 @@ export function LandingPage({ onNavigate }) {
     }
   }, [
     matchedAreaId,
-    flow.areaContext.areaLabel,
     flow.areaContext.neighbourhood,
     flow.areaContext.pincode,
     flow.areaContext.societyId,
     flow.areaContext.societyName,
+    canonicalAreaLabel,
   ])
 
   useEffect(() => {
@@ -218,12 +228,12 @@ export function LandingPage({ onNavigate }) {
     window.localStorage.setItem(
       LANDING_LOCATION_KEY,
       JSON.stringify({
-        areaLabel: selectedArea,
+        areaLabel: canonicalAreaLabel,
         pincode: flow.areaContext.pincode,
         selectedSociety: flow.selectedSociety,
       }),
     )
-  }, [flow.areaContext.pincode, flow.selectedSociety, selectedArea])
+  }, [canonicalAreaLabel, flow.areaContext.pincode, flow.selectedSociety, selectedArea])
 
   const filteredDogs = landingDogs
 

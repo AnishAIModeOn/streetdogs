@@ -518,7 +518,7 @@ export function AddDogPage({ user, profile }) {
                 {fieldErrors.area ? <FormMessage>{fieldErrors.area}</FormMessage> : null}
                 <FormDescription>
                   {matchedAreaName
-                    ? `Matched StreetDog App area: ${matchedAreaName.city} - ${matchedAreaName.name}`
+                    ? `Matched StreetDog App area: ${matchedAreaName.name}`
                     : 'Your Area and Society will still be saved even if there is no exact StreetDog App area match.'}
                 </FormDescription>
 

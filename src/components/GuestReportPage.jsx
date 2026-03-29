@@ -694,7 +694,7 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
                   {fieldErrors.area ? <FormMessage>{fieldErrors.area}</FormMessage> : null}
                   {matchedAreaName ? (
                     <FormDescription>
-                      Matched StreetDog App area: {matchedAreaName.city} - {matchedAreaName.name}
+                      Matched StreetDog App area: {matchedAreaName.name}
                     </FormDescription>
                   ) : null}
 

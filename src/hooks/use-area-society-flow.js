@@ -11,6 +11,21 @@ function normalizeComparable(value) {
   return normalizeText(value).toLowerCase().replace(/\s+/g, ' ')
 }
 
+export function normalizeAreaLabel(value) {
+  const normalizedValue = normalizeText(value).replace(/\s+/g, ' ')
+  if (!normalizedValue) {
+    return ''
+  }
+
+  const legacyCityPrefixMatch = normalizedValue.match(/^([^,\d-][^,-]{1,40})\s*-\s*(.+)$/)
+  if (!legacyCityPrefixMatch) {
+    return normalizedValue
+  }
+
+  const possibleArea = normalizeText(legacyCityPrefixMatch[2])
+  return possibleArea || normalizedValue
+}
+
 function extractFromGoogle(addressComponents) {
   const get = (...types) => {
     const match = addressComponents.find((component) =>
@@ -221,12 +236,14 @@ export function useAreaSocietyFlow(options = {}) {
     autoDetect = true,
   } = options
 
+  const normalizedInitialAreaLabel = normalizeAreaLabel(initialAreaLabel)
+
   const [pincode, setPincode] = useState(initialPincode)
   const [detectedLabel, setDetectedLabel] = useState('')
   const [detectedNeighbourhood, setDetectedNeighbourhood] = useState('')
   const [detecting, setDetecting] = useState(autoDetect)
-  const [manual, setManual] = useState(!autoDetect || Boolean(initialAreaLabel))
-  const [areaInput, setAreaInputState] = useState(initialAreaLabel)
+  const [manual, setManual] = useState(!autoDetect || Boolean(normalizedInitialAreaLabel))
+  const [areaInput, setAreaInputState] = useState(normalizedInitialAreaLabel)
   const [areaSuggestions, setAreaSuggestions] = useState([])
   const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
