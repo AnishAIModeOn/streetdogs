@@ -83,14 +83,11 @@ function formatGuestContact(name, contact) {
   return trimmedName || trimmedContact || null
 }
 
-function findAreaLabel(areas, areaId) {
-  const area = areas.find((entry) => entry.id === areaId)
-  return area ? `${area.city} - ${area.name}` : 'Area unavailable'
-}
-
 function buildSubmittedDogLocation(dog) {
   return (
+    dog?.locality_name ||
     dog?.tagged_area_neighbourhood ||
+    dog?.society_name ||
     dog?.tagged_society_name ||
     dog?.location_description ||
     'Location shared'
@@ -394,7 +391,6 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
       setSubmittedDogPreview({
         id: createdDog.id,
         image: uploadedPhoto.photo_url || selectedImagePreview || '',
-        areaLabel: findAreaLabel(areas, submissionAreaId),
         location: buildSubmittedDogLocation(createdDog),
         name: form.dog_name_or_temp_name.trim() || 'Community dog report',
       })
@@ -499,7 +495,6 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
                       </div>
                       <div className="space-y-2">
                         <p className="text-lg font-semibold text-foreground">{submittedDogPreview.name}</p>
-                        <p className="text-sm font-medium text-muted-foreground">{submittedDogPreview.areaLabel}</p>
                         <p className="text-sm leading-6 text-muted-foreground">{submittedDogPreview.location}</p>
                       </div>
                     </div>

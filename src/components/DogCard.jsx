@@ -6,7 +6,17 @@ function formatLabel(value) {
   return value ? value.replaceAll('_', ' ') : 'Unknown'
 }
 
-export function DogCard({ dog, area, onViewDetails }) {
+function buildDogDisplayLocation(dog) {
+  return (
+    dog.locality_name ||
+    dog.tagged_area_neighbourhood ||
+    dog.society_name ||
+    dog.tagged_society_name ||
+    'Location unavailable'
+  )
+}
+
+export function DogCard({ dog, area: _area, onViewDetails }) {
   const badges = []
 
   if (dog.vaccination_status === 'vaccinated') {
@@ -26,7 +36,7 @@ export function DogCard({ dog, area, onViewDetails }) {
   }
 
   const dogName = dog.dog_name_or_temp_name || `Dog ${dog.id.slice(0, 6)}`
-  const areaLabel = area ? `${area.city} - ${area.name}` : 'Area unavailable'
+  const areaLabel = buildDogDisplayLocation(dog)
 
   return (
     <div className="group flex flex-col overflow-hidden rounded-[1.75rem] border border-white/55 bg-white/95 shadow-soft transition-all duration-500 hover:-translate-y-1 hover:shadow-float">

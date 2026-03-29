@@ -41,6 +41,8 @@ export interface Dog {
   created_by: string | null
   updated_by: string | null
   area_id?: string | null
+  locality_name?: string | null
+  society_name?: string | null
   added_by_user_id?: string | null
   tagged_by_user_id?: string | null
   tagged_society_id?: string | null

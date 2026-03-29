@@ -15,6 +15,17 @@ function formatLabel(value) {
   return value ? value.replaceAll('_', ' ') : 'Not added'
 }
 
+function buildDogDisplayLocation(dog) {
+  return (
+    dog?.locality_name ||
+    dog?.tagged_area_neighbourhood ||
+    dog?.society_name ||
+    dog?.tagged_society_name ||
+    dog?.location_description ||
+    'Location unavailable'
+  )
+}
+
 function formatCommitmentStatus(status) {
   switch (status) {
     case 'fulfilled':
@@ -245,12 +256,8 @@ export function InventoryAdminPage({ user, profile }) {
                     </p>
                     <div className="grid gap-2 sm:grid-cols-2">
                       <InfoTile
-                        label="Area"
-                        value={dog.area ? `${dog.area.city} · ${dog.area.name}` : 'Area unavailable'}
-                      />
-                      <InfoTile
-                        label="Neighbourhood"
-                        value={dog.tagged_area_neighbourhood || 'Not added'}
+                        label="Location"
+                        value={buildDogDisplayLocation(dog)}
                       />
                       <InfoTile
                         label="Pincode"
@@ -455,3 +462,5 @@ function InfoTile({ label, value }) {
     </div>
   )
 }
+
+

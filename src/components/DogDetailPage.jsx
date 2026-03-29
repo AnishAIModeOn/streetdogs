@@ -40,9 +40,19 @@ function formatLabel(value) {
   return value ? value.replaceAll('_', ' ') : 'Not added'
 }
 
+function buildDogDisplayLocation(dog) {
+  return (
+    dog?.locality_name ||
+    dog?.tagged_area_neighbourhood ||
+    dog?.society_name ||
+    dog?.tagged_society_name ||
+    dog?.location_description ||
+    'Location unavailable'
+  )
+}
+
 export function DogDetailPage({ dogId, isAuthenticated, user }) {
   const [dog, setDog] = useState(null)
-  const [area, setArea] = useState(null)
   const [sightings, setSightings] = useState([])
   const [expenses, setExpenses] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -61,7 +71,7 @@ export function DogDetailPage({ dogId, isAuthenticated, user }) {
     const loadData = async () => {
       try {
         setErrorMessage('')
-        const [nextDog, nextAreas, nextSightings, nextExpenses] = await Promise.all([
+        const [nextDog, _nextAreas, nextSightings, nextExpenses] = await Promise.all([
           getDog(dogId),
           listAreas(),
           listDogSightingsForDog(dogId),
@@ -75,7 +85,6 @@ export function DogDetailPage({ dogId, isAuthenticated, user }) {
         setDog(nextDog)
         setSightings(nextSightings)
         setExpenses(nextExpenses)
-        setArea(nextAreas.find((entry) => entry.id === nextDog?.area_id) ?? null)
       } catch (error) {
         if (isMounted) {
           setErrorMessage(error instanceof Error ? error.message : 'Unable to load dog details.')
@@ -257,7 +266,7 @@ export function DogDetailPage({ dogId, isAuthenticated, user }) {
   }
 
   const dogName = dog?.dog_name_or_temp_name || 'Community dog'
-  const areaLabel = area ? `${area.city} · ${area.name}` : 'Area unavailable'
+  const areaLabel = buildDogDisplayLocation(dog)
   const careSummary = dog?.ai_summary || dog?.location_description || dog?.health_notes || ''
   const friendlySummary = careSummary
     ? careSummary

@@ -27,6 +27,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 
 const formatCurrency = (value) => `Rs. ${Number(value || 0).toLocaleString()}`
 
+function buildDogDisplayLocation(dog) {
+  return (
+    dog?.locality_name ||
+    dog?.tagged_area_neighbourhood ||
+    dog?.society_name ||
+    dog?.tagged_society_name ||
+    dog?.location_description ||
+    'Location unavailable'
+  )
+}
+
 function DashboardSkeleton() {
   return (
     <div className="grid gap-5">
@@ -89,10 +100,7 @@ export function DashboardPage({ profile }) {
   )
   const canManageInventory =
     profile?.role === 'inventory_admin' || profile?.role === 'superadmin'
-  const primaryArea =
-    areaMap[profile?.primary_area_id] ||
-    areas.find((area) => area.id === dogs.find((dog) => dog.area_id)?.area_id) ||
-    null
+  const primaryLocationDog = dogs.find((dog) => buildDogDisplayLocation(dog) !== 'Location unavailable') || null
   const recentExpense = expenses[0] || null
 
   const urgentHighlights = [
@@ -146,7 +154,7 @@ export function DashboardPage({ profile }) {
           label: 'Dog record added',
           title:
             recentDogs[0].dog_name_or_temp_name || `Dog ${recentDogs[0].id.slice(0, 6)}`,
-          meta: areaMap[recentDogs[0].area_id]?.name || 'Area pending',
+          meta: buildDogDisplayLocation(recentDogs[0]),
           copy:
             recentDogs[0].short_summary ||
             recentDogs[0].health_notes ||
@@ -259,8 +267,7 @@ export function DashboardPage({ profile }) {
                       Your area
                     </p>
                     <p className="text-sm font-semibold text-foreground sm:text-base">
-                      {primaryArea?.name || 'Your local area'}
-                      {primaryArea?.pincode ? ` · ${primaryArea.pincode}` : ''}
+                      {primaryLocationDog ? buildDogDisplayLocation(primaryLocationDog) : 'Your local area'}
                     </p>
                     <p className="hidden text-xs leading-5 text-muted-foreground sm:block">
                       Local updates and care signals are centered around this community first.
@@ -709,3 +716,7 @@ function StatTile({ label, value, color = 'bg-secondary/40 text-foreground' }) {
     </div>
   )
 }
+
+
+
+
