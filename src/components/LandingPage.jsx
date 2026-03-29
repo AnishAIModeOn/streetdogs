@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Crosshair, Loader2, MapPin, PawPrint } from 'lucide-react'
-import { useAreaSocietyFlow } from '../hooks/use-area-society-flow'
+import { findMatchingAreaId, useAreaSocietyFlow } from '../hooks/use-area-society-flow'
 import { listAreas } from '../lib/communityData'
 import { navigateTo } from '../lib/navigation'
 import { DogCard } from './DogCard'
@@ -61,6 +61,7 @@ export function LandingPage({ onNavigate }) {
     expensesRaised: 0,
     inventoryFulfilled: 0,
   })
+  const [areas, setAreas] = useState([])
   const [areasById, setAreasById] = useState({})
   const [landingDogs, setLandingDogs] = useState([])
   const [isDogsLoading, setIsDogsLoading] = useState(true)
@@ -80,6 +81,10 @@ export function LandingPage({ onNavigate }) {
   const selectedArea = flow.areaContext.neighbourhood || flow.areaContext.areaLabel
   const selectedSociety = flow.selectedSociety
   const showingLabel = selectedArea || 'your community'
+  const matchedAreaId = useMemo(
+    () => findMatchingAreaId(areas, flow.areaContext.neighbourhood || flow.areaContext.areaLabel),
+    [areas, flow.areaContext.areaLabel, flow.areaContext.neighbourhood],
+  )
 
   useEffect(() => {
     let isMounted = true
@@ -87,6 +92,9 @@ export function LandingPage({ onNavigate }) {
     const loadLandingData = async () => {
       try {
         const params = new URLSearchParams()
+        if (matchedAreaId) {
+          params.set('areaId', matchedAreaId)
+        }
         if (flow.areaContext.neighbourhood || flow.areaContext.areaLabel) {
           params.set('area', flow.areaContext.neighbourhood || flow.areaContext.areaLabel)
         }
@@ -133,6 +141,7 @@ export function LandingPage({ onNavigate }) {
       isMounted = false
     }
   }, [
+    matchedAreaId,
     flow.areaContext.areaLabel,
     flow.areaContext.neighbourhood,
     flow.areaContext.pincode,
@@ -150,6 +159,7 @@ export function LandingPage({ onNavigate }) {
           return
         }
 
+        setAreas(areas)
         setAreasById(
           areas.reduce((accumulator, area) => {
             accumulator[area.id] = area
@@ -158,6 +168,7 @@ export function LandingPage({ onNavigate }) {
         )
       } catch {
         if (isMounted) {
+          setAreas([])
           setAreasById({})
         }
       }

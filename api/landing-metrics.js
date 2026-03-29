@@ -61,18 +61,29 @@ function looselyMatches(primary, target) {
   )
 }
 
-function filterDogsForLocation(dogs, { area = '', pincode = '', societyId = '', societyName = '' }) {
+function filterDogsForLocation(
+  dogs,
+  { areaId = '', area = '', pincode = '', societyId = '', societyName = '' },
+) {
+  const normalizedAreaId = normalize(areaId)
   const normalizedArea = normalize(area)
   const normalizedPincode = normalize(pincode)
   const normalizedSocietyId = normalize(societyId)
   const normalizedSocietyName = normalize(societyName)
 
-  if (!normalizedArea && !normalizedPincode && !normalizedSocietyId && !normalizedSocietyName) {
+  if (
+    !normalizedAreaId &&
+    !normalizedArea &&
+    !normalizedPincode &&
+    !normalizedSocietyId &&
+    !normalizedSocietyName
+  ) {
     return dogs
   }
 
   return dogs
     .map((dog) => {
+      const dogAreaId = normalize(dog.area_id)
       const dogArea = normalize(dog.area_name)
       const dogNeighbourhood = normalize(dog.tagged_area_neighbourhood)
       const dogLegacyArea = normalize(dog.area?.name)
@@ -82,7 +93,8 @@ function filterDogsForLocation(dogs, { area = '', pincode = '', societyId = '', 
       const dogSocietyName = normalize(dog.tagged_society_name)
 
       const matchesArea =
-        !normalizedArea ||
+        !normalizedAreaId && !normalizedArea ||
+        dogAreaId === normalizedAreaId ||
         looselyMatches(normalizedArea, dogNeighbourhood) ||
         looselyMatches(normalizedArea, dogArea) ||
         looselyMatches(normalizedArea, dogLegacyArea) ||
@@ -90,25 +102,31 @@ function filterDogsForLocation(dogs, { area = '', pincode = '', societyId = '', 
       const matchesPincode = !normalizedPincode || dogPincode === normalizedPincode
       const matchesSociety =
         !normalizedSocietyId && !normalizedSocietyName
-          ? false
-          : dogSocietyId === normalizedSocietyId ||
-            looselyMatches(normalizedSocietyName, dogSocietyName)
+          ? true
+          : (normalizedSocietyId && dogSocietyId === normalizedSocietyId) ||
+            (normalizedSocietyName && dogSocietyName === normalizedSocietyName)
 
-      const passesPrimaryLocation = normalizedArea
-        ? matchesArea
-        : normalizedPincode
+      const passesAreaFilter = normalizedAreaId
+        ? dogAreaId === normalizedAreaId
+        : normalizedArea
+          ? matchesArea
+          : normalizedPincode
+            ? matchesPincode
+            : true
+      const passesFallbackPincode =
+        !passesAreaFilter && !normalizedAreaId && normalizedArea && normalizedPincode
           ? matchesPincode
-          : true
-      const passesFallbackLocation =
-        !passesPrimaryLocation && normalizedArea && normalizedPincode ? matchesPincode : false
+          : false
 
-      if (!passesPrimaryLocation && !passesFallbackLocation) {
+      if ((!passesAreaFilter && !passesFallbackPincode) || !matchesSociety) {
         return null
       }
 
       return {
         ...dog,
-        _score: matchesSociety ? 2 : matchesPincode ? 1 : 0,
+        _score:
+          (normalizedSocietyId || normalizedSocietyName ? 2 : 0) +
+          (normalizedAreaId ? 1 : matchesPincode ? 1 : 0),
       }
     })
     .filter(Boolean)
@@ -138,12 +156,13 @@ export default async function handler(req, res) {
   }
 
   try {
+    const selectedAreaId = normalize(req.query?.areaId)
     const selectedArea = normalize(req.query?.area)
     const selectedPincode = normalize(req.query?.pincode)
     const selectedSocietyId = normalize(req.query?.societyId)
     const selectedSocietyName = normalize(req.query?.societyName)
     const hasLocationFilter = Boolean(
-      selectedArea || selectedPincode || selectedSocietyId || selectedSocietyName,
+      selectedAreaId || selectedArea || selectedPincode || selectedSocietyId || selectedSocietyName,
     )
 
     let dogsQuery = supabase
@@ -222,6 +241,7 @@ export default async function handler(req, res) {
       area: dog.area_id ? areaMap[dog.area_id] ?? null : null,
     }))
     const matchedDogs = filterDogsForLocation(dogsWithArea, {
+      areaId: selectedAreaId,
       area: selectedArea,
       pincode: selectedPincode,
       societyId: selectedSocietyId,
