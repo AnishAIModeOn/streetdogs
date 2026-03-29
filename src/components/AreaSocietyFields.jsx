@@ -88,7 +88,7 @@ export function AreaSocietyFields({
           ) : null}
         </FormField>
 
-        <div className="min-w-0 overflow-hidden rounded-[1.5rem] border border-border/60 bg-secondary/20 p-3 sm:p-4">
+        <div className="relative z-10 min-w-0 overflow-visible rounded-[1.5rem] border border-border/60 bg-secondary/20 p-3 sm:p-4">
           <SocietyPicker
             pincode={flow.areaContext.pincode}
             neighbourhood={flow.areaContext.neighbourhood}
