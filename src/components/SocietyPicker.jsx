@@ -205,6 +205,7 @@ export function SocietyPicker({
   function handleSearchTermChange(value) {
     setSearchTerm(value)
     setActiveIndex(-1)
+    setSocieties([])
 
     const trimmedValue = value.trim()
     const hasExactMatch = societies.some((society) => society.name.toLowerCase() === trimmedValue.toLowerCase())
@@ -339,7 +340,7 @@ export function SocietyPicker({
                 </p>
               ) : null}
 
-              {!isFetching && !fetchError && searchTerm.trim() && allOptions.length === 0 ? (
+              {!fetchError && searchTerm.trim() && allOptions.length === 0 ? (
                 <p className="px-3 py-3 text-xs text-muted-foreground">
                   No society matched "{searchTerm.trim()}". Keep typing to add it as a pending society.
                 </p>
@@ -351,55 +352,53 @@ export function SocietyPicker({
                 </p>
               ) : null}
 
-              {!isFetching
-                ? allOptions.map((option, i) => (
-                    <button
-                      key={option.key}
-                      type="button"
-                      role="option"
-                      aria-selected={i === activeIndex}
-                      className={[
-                        'flex w-full items-start gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm transition-colors',
-                        i === activeIndex
-                          ? 'bg-secondary/60 text-foreground'
-                          : 'text-foreground/80 hover:bg-secondary/40',
-                      ].join(' ')}
-                      onMouseEnter={() => setActiveIndex(i)}
-                      onMouseDown={(e) => {
-                        e.preventDefault()
-                        handleOptionClick(option)
-                      }}
-                      onTouchEnd={(e) => {
-                        e.preventDefault()
-                        handleOptionClick(option)
-                      }}
-                    >
-                      {option.type === 'create' ? (
-                        <>
-                          <Plus className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                          <span className="min-w-0 break-words">
-                            + Add <strong className="font-semibold">&ldquo;{option.label}&rdquo;</strong>
+              {allOptions.map((option, i) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  role="option"
+                  aria-selected={i === activeIndex}
+                  className={[
+                    'flex w-full items-start gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm transition-colors',
+                    i === activeIndex
+                      ? 'bg-secondary/60 text-foreground'
+                      : 'text-foreground/80 hover:bg-secondary/40',
+                  ].join(' ')}
+                  onMouseEnter={() => setActiveIndex(i)}
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    handleOptionClick(option)
+                  }}
+                  onTouchEnd={(e) => {
+                    e.preventDefault()
+                    handleOptionClick(option)
+                  }}
+                >
+                  {option.type === 'create' ? (
+                    <>
+                      <Plus className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                      <span className="min-w-0 break-words">
+                        + Add <strong className="font-semibold">&ldquo;{option.label}&rdquo;</strong>
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block break-words font-medium">{option.society.name}</span>
+                        {option.society.pincode ? (
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
+                            {option.society.pincode}
                           </span>
-                        </>
-                      ) : (
-                        <>
-                          <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                          <span className="min-w-0 flex-1">
-                            <span className="block break-words font-medium">{option.society.name}</span>
-                            {option.society.pincode ? (
-                              <span className="mt-0.5 block text-xs text-muted-foreground">
-                                {option.society.pincode}
-                              </span>
-                            ) : null}
-                          </span>
-                          {selected?.id === option.society.id ? (
-                            <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                          ) : null}
-                        </>
-                      )}
-                    </button>
-                  ))
-                : null}
+                        ) : null}
+                      </span>
+                      {selected?.id === option.society.id ? (
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                      ) : null}
+                    </>
+                  )}
+                </button>
+              ))}
             </div>
           </div>
         ) : null}
