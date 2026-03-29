@@ -3,8 +3,8 @@
  *
  * Society selection combobox. Pincode is passed in as a prop (detected/entered in AuthPage).
  * - Fetches societies filtered by pincode + optional name search
- * - "Add '[name]'" option when no exact match found
- * - deferCreate=true: skips DB insert, returns _pending object for post-auth creation
+ * - "+ Add '[name]'" option when no results are found
+ * - selecting a new society returns a pending object without touching the DB
  * - onSelect(society | null) fires on every change
  */
 
@@ -18,7 +18,7 @@ import {
   Search,
   X,
 } from 'lucide-react'
-import { createSociety, searchSocieties } from '../lib/communityData'
+import { searchSocieties } from '../lib/communityData'
 
 function useDebouncedValue(value, delay = 280) {
   const [debounced, setDebounced] = useState(value)
@@ -35,14 +35,13 @@ export function SocietyPicker({
   onSelect,
   draftName = '',
   onDraftChange = () => {},
-  deferCreate = false,
+  deferCreate: _deferCreate = false,
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [societies, setSocieties] = useState([])
   const [isFetching, setIsFetching] = useState(false)
   const [fetchError, setFetchError] = useState('')
-  const [isCreating, setIsCreating] = useState(false)
   const [selected, setSelected] = useState(null)
   const [activeIndex, setActiveIndex] = useState(-1)
   const [autoSelectSuppressedContext, setAutoSelectSuppressedContext] = useState('')
@@ -179,38 +178,9 @@ export function SocietyPicker({
 
   function handleOptionClick(option) {
     if (option.type === 'create') {
-      handleCreate(option.label)
+      commitSelection(buildPendingSociety(option.label, { pincode, neighbourhood }))
     } else {
       commitSelection(option.society)
-    }
-  }
-
-  async function handleCreate(name) {
-    if (deferCreate) {
-      commitSelection({
-        id: null,
-        name: name.trim(),
-        pincode,
-        neighbourhood: neighbourhood || null,
-        _pending: true,
-      })
-      return
-    }
-
-    try {
-      setIsCreating(true)
-      setFetchError('')
-      const newSociety = await createSociety({
-        name,
-        pincode,
-        neighbourhood: neighbourhood || null,
-        coordinates: null,
-      })
-      commitSelection(newSociety)
-    } catch (err) {
-      setFetchError(err instanceof Error ? err.message : 'Unable to create society.')
-    } finally {
-      setIsCreating(false)
     }
   }
 
@@ -239,7 +209,7 @@ export function SocietyPicker({
     const trimmedValue = value.trim()
     const hasExactMatch = societies.some((society) => society.name.toLowerCase() === trimmedValue.toLowerCase())
 
-    if (deferCreate && trimmedValue.length >= 2 && !hasExactMatch) {
+    if (trimmedValue.length >= 2 && !hasExactMatch) {
       onDraftChange(trimmedValue)
       return
     }
@@ -369,6 +339,12 @@ export function SocietyPicker({
                 </p>
               ) : null}
 
+              {!isFetching && !fetchError && searchTerm.trim() && allOptions.length === 0 ? (
+                <p className="px-3 py-3 text-xs text-muted-foreground">
+                  No society matched "{searchTerm.trim()}". Keep typing to add it as a pending society.
+                </p>
+              ) : null}
+
               {!isFetching && !fetchError && !pincode && !neighbourhood && !searchTerm ? (
                 <p className="px-3 py-4 text-center text-xs text-muted-foreground">
                   Type a society name to search...
@@ -397,18 +373,12 @@ export function SocietyPicker({
                         e.preventDefault()
                         handleOptionClick(option)
                       }}
-                      disabled={isCreating && option.type === 'create'}
                     >
                       {option.type === 'create' ? (
                         <>
-                          {isCreating ? (
-                            <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-primary" />
-                          ) : (
-                            <Plus className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                          )}
+                          <Plus className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                           <span className="min-w-0 break-words">
-                            Add <strong className="font-semibold">&ldquo;{option.label}&rdquo;</strong> as a new
-                            society
+                            + Add <strong className="font-semibold">&ldquo;{option.label}&rdquo;</strong>
                           </span>
                         </>
                       ) : (
@@ -454,7 +424,7 @@ function buildOptions(societies, searchTerm) {
   const trimmed = searchTerm.trim()
   const hasExactMatch = societies.some((s) => s.name.toLowerCase() === trimmed.toLowerCase())
 
-  if (trimmed.length >= 2 && !hasExactMatch) {
+  if (trimmed.length >= 2 && societies.length === 0 && !hasExactMatch) {
     societyOptions.push({
       key: `create-${trimmed}`,
       type: 'create',
@@ -463,4 +433,17 @@ function buildOptions(societies, searchTerm) {
   }
 
   return societyOptions
+}
+
+function buildPendingSociety(name, { pincode = '', neighbourhood = '' } = {}) {
+  const trimmedName = name.trim()
+
+  return {
+    name: trimmedName,
+    isNew: true,
+    id: null,
+    pincode: pincode || null,
+    neighbourhood: neighbourhood || null,
+    _pending: true,
+  }
 }

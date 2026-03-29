@@ -141,7 +141,6 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
   const isAnalyzingPhoto = dogAiMutation.isPending
   const areaSocietyFlow = useAreaSocietyFlow({
     autoDetect: true,
-    deferSocietyCreate: !activeUser?.id,
   })
 
   useEffect(() => {
@@ -332,18 +331,8 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
         })
       }
 
-      const resolvedSociety = activeUser?.id
-        ? await areaSocietyFlow.resolveSelectedSociety()
-        : areaSocietyFlow.selectedSociety ||
-          (areaSocietyFlow.societyDraftName.trim()
-            ? {
-                id: null,
-                name: areaSocietyFlow.societyDraftName.trim(),
-                pincode: areaSocietyFlow.areaContext.pincode || null,
-                neighbourhood: areaSocietyFlow.areaContext.neighbourhood || null,
-                _pending: true,
-              }
-            : null)
+      const resolvedSociety =
+        areaSocietyFlow.selectedSociety || (await areaSocietyFlow.resolveSelectedSociety())
 
       const guestContact = formatGuestContact(form.guest_name, form.guest_contact)
       const locationDescription = buildLocationDescriptionFromArea(areaSocietyFlow)
@@ -363,9 +352,10 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
         added_by_guest: !activeUser?.id,
         added_by_user_id: activeUser?.id ?? null,
         tagged_by_user_id: activeUser?.id ?? null,
-        tagged_society_id: resolvedSociety?._pending ? null : resolvedSociety?.id ?? null,
+        tagged_society_id:
+          resolvedSociety?._pending || resolvedSociety?.isNew ? null : resolvedSociety?.id ?? null,
         tagged_society_name: resolvedSociety?.name ?? null,
-        society_status: resolvedSociety?._pending
+        society_status: resolvedSociety?._pending || resolvedSociety?.isNew
           ? 'pending'
           : resolvedSociety?.id
             ? 'confirmed'

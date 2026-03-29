@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { createSociety, searchNeighbourhoods } from '../lib/communityData'
+import { searchNeighbourhoods } from '../lib/communityData'
 
 const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? ''
 
@@ -219,7 +219,6 @@ export function useAreaSocietyFlow(options = {}) {
     initialPincode = '',
     initialSociety = null,
     autoDetect = true,
-    deferSocietyCreate = false,
   } = options
 
   const [pincode, setPincode] = useState(initialPincode)
@@ -331,19 +330,7 @@ export function useAreaSocietyFlow(options = {}) {
       return null
     }
 
-    if (!selectedSociety._pending || deferSocietyCreate) {
-      return selectedSociety
-    }
-
-    const createdSociety = await createSociety({
-      name: selectedSociety.name,
-      pincode: selectedSociety.pincode,
-      neighbourhood: selectedSociety.neighbourhood || null,
-      coordinates: null,
-    })
-
-    setSelectedSociety(createdSociety)
-    return createdSociety
+    return selectedSociety
   }
 
   const normalizedAreaInput = normalizeText(areaInput)
