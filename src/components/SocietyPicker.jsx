@@ -86,7 +86,7 @@ export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, defe
   }, [debouncedPincode, debouncedNeighbourhood, debouncedSearch, fetchSocieties])
 
   useEffect(() => {
-    if (selected || isFetching || fetchError || debouncedSearch.trim()) {
+    if (isFetching || fetchError) {
       return
     }
 
@@ -94,7 +94,11 @@ export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, defe
       return
     }
 
-    if (autoSelectSuppressedContext === areaContextKey) {
+    if (selected?.id === societies[0]?.id) {
+      return
+    }
+
+    if (!debouncedSearch.trim() && autoSelectSuppressedContext === areaContextKey) {
       return
     }
 
@@ -105,7 +109,7 @@ export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, defe
     debouncedSearch,
     fetchError,
     isFetching,
-    selected,
+    selected?.id,
     societies,
   ])
 
