@@ -45,6 +45,7 @@ export interface Dog {
   tagged_by_user_id?: string | null
   tagged_society_id?: string | null
   tagged_society_name?: string | null
+  society_status?: 'pending' | 'confirmed' | 'rejected' | null
   tagged_area_pincode?: string | null
   tagged_area_neighbourhood?: string | null
   added_by_guest?: boolean

@@ -232,6 +232,7 @@ export function useAreaSocietyFlow(options = {}) {
   const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [selectedSociety, setSelectedSociety] = useState(initialSociety)
+  const [societyDraftName, setSocietyDraftName] = useState('')
 
   useEffect(() => {
     if (!autoDetect) {
@@ -285,6 +286,7 @@ export function useAreaSocietyFlow(options = {}) {
     setPincode('')
     setShowSuggestions(true)
     setSelectedSociety(null)
+    setSocietyDraftName('')
   }
 
   function selectSuggestion(suggestion) {
@@ -299,6 +301,7 @@ export function useAreaSocietyFlow(options = {}) {
     setAreaSuggestions([])
     setShowSuggestions(false)
     setSelectedSociety(null)
+    setSocietyDraftName('')
   }
 
   function resetToManual() {
@@ -308,6 +311,7 @@ export function useAreaSocietyFlow(options = {}) {
     setPincode('')
     setAreaInputState('')
     setSelectedSociety(null)
+    setSocietyDraftName('')
   }
 
   function detectLocation() {
@@ -382,6 +386,8 @@ export function useAreaSocietyFlow(options = {}) {
     setShowSuggestions,
     selectSuggestion,
     setSelectedSociety,
+    societyDraftName,
+    setSocietyDraftName,
     detectLocation,
     resolveSelectedSociety,
   }

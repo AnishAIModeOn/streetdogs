@@ -29,7 +29,14 @@ function useDebouncedValue(value, delay = 280) {
   return debounced
 }
 
-export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, deferCreate = false }) {
+export function SocietyPicker({
+  pincode = '',
+  neighbourhood = '',
+  onSelect,
+  draftName = '',
+  onDraftChange = () => {},
+  deferCreate = false,
+}) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [societies, setSocieties] = useState([])
@@ -53,10 +60,18 @@ export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, defe
     setSelected(null)
     onSelect(null)
     setSocieties([])
-    setSearchTerm('')
+    setSearchTerm(draftName)
     setAutoSelectSuppressedContext('')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedPincode, debouncedNeighbourhood])
+
+  useEffect(() => {
+    if (selected) {
+      return
+    }
+
+    setSearchTerm(draftName)
+  }, [draftName, selected])
 
   const fetchSocieties = useCallback(async (pc, nb, term) => {
     if (!pc && !nb && !term) {
@@ -204,16 +219,32 @@ export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, defe
     setSearchTerm('')
     setIsOpen(false)
     setActiveIndex(-1)
+    onDraftChange('')
     onSelect(society)
   }
 
   function clearSelection() {
     setSelected(null)
-    setSearchTerm('')
+    setSearchTerm(draftName)
     setIsOpen(false)
     setActiveIndex(-1)
     setAutoSelectSuppressedContext(areaContextKey)
     onSelect(null)
+  }
+
+  function handleSearchTermChange(value) {
+    setSearchTerm(value)
+    setActiveIndex(-1)
+
+    const trimmedValue = value.trim()
+    const hasExactMatch = societies.some((society) => society.name.toLowerCase() === trimmedValue.toLowerCase())
+
+    if (deferCreate && trimmedValue.length >= 2 && !hasExactMatch) {
+      onDraftChange(trimmedValue)
+      return
+    }
+
+    onDraftChange('')
   }
 
   useEffect(() => {
@@ -301,8 +332,7 @@ export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, defe
                 }
                 value={searchTerm}
                 onChange={(e) => {
-                  setSearchTerm(e.target.value)
-                  setActiveIndex(-1)
+                  handleSearchTermChange(e.target.value)
                 }}
                 onKeyDown={handleKeyDown}
                 autoComplete="off"
@@ -312,7 +342,7 @@ export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, defe
                   type="button"
                   onMouseDown={(e) => {
                     e.preventDefault()
-                    setSearchTerm('')
+                    handleSearchTermChange('')
                   }}
                   className="shrink-0 text-muted-foreground hover:text-foreground"
                 >

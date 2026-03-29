@@ -290,6 +290,8 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
     setHasSubmitted(false)
     setIsSignInPromptOpen(false)
     setAiStatusMessage('')
+    areaSocietyFlow.setSelectedSociety(null)
+    areaSocietyFlow.setSocietyDraftName('')
   }
 
   function validateForm() {
@@ -332,7 +334,16 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
 
       const resolvedSociety = activeUser?.id
         ? await areaSocietyFlow.resolveSelectedSociety()
-        : areaSocietyFlow.selectedSociety
+        : areaSocietyFlow.selectedSociety ||
+          (areaSocietyFlow.societyDraftName.trim()
+            ? {
+                id: null,
+                name: areaSocietyFlow.societyDraftName.trim(),
+                pincode: areaSocietyFlow.areaContext.pincode || null,
+                neighbourhood: areaSocietyFlow.areaContext.neighbourhood || null,
+                _pending: true,
+              }
+            : null)
 
       const guestContact = formatGuestContact(form.guest_name, form.guest_contact)
       const locationDescription = buildLocationDescriptionFromArea(areaSocietyFlow)
@@ -354,6 +365,11 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
         tagged_by_user_id: activeUser?.id ?? null,
         tagged_society_id: resolvedSociety?._pending ? null : resolvedSociety?.id ?? null,
         tagged_society_name: resolvedSociety?.name ?? null,
+        society_status: resolvedSociety?._pending
+          ? 'pending'
+          : resolvedSociety?.id
+            ? 'confirmed'
+            : null,
         tagged_area_pincode: areaSocietyFlow.areaContext.pincode || null,
         tagged_area_neighbourhood: areaSocietyFlow.areaContext.neighbourhood || null,
         guest_contact: guestContact,
@@ -385,6 +401,8 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
       })
       setForm(emptyGuestReportForm)
       setSelectedImageFile(null)
+      areaSocietyFlow.setSelectedSociety(null)
+      areaSocietyFlow.setSocietyDraftName('')
       setHasSubmitted(true)
       toast.success('Dog report submitted', {
         description: 'Thank you for helping volunteers notice this dog sooner.',

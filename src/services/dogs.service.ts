@@ -17,6 +17,7 @@ export interface UpsertDogInput {
   tagged_by_user_id?: string | null
   tagged_society_id?: string | null
   tagged_society_name?: string | null
+  society_status?: Dog['society_status']
   tagged_area_pincode?: string | null
   tagged_area_neighbourhood?: string | null
   added_by_guest?: boolean
@@ -122,6 +123,7 @@ export async function createDog(input: UpsertDogInput) {
         area_id: input.area_id ?? null,
         tagged_society_id: input.tagged_society_id ?? null,
         tagged_society_name: input.tagged_society_name ?? null,
+        society_status: input.society_status ?? null,
         tagged_area_pincode: input.tagged_area_pincode ?? null,
         tagged_area_neighbourhood: input.tagged_area_neighbourhood ?? null,
         guest_contact: input.guest_contact ?? null,
@@ -171,6 +173,7 @@ export async function createDog(input: UpsertDogInput) {
       tagged_by_user_id: input.tagged_by_user_id ?? user?.id ?? null,
       tagged_society_id: input.tagged_society_id ?? null,
       tagged_society_name: input.tagged_society_name ?? null,
+      society_status: input.society_status ?? null,
       tagged_area_pincode: input.tagged_area_pincode ?? null,
       tagged_area_neighbourhood: input.tagged_area_neighbourhood ?? null,
       added_by_guest: input.added_by_guest ?? !user,

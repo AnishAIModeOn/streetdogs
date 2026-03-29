@@ -93,6 +93,8 @@ export function AreaSocietyFields({
             pincode={flow.areaContext.pincode}
             neighbourhood={flow.areaContext.neighbourhood}
             onSelect={flow.setSelectedSociety}
+            draftName={flow.societyDraftName}
+            onDraftChange={flow.setSocietyDraftName}
             deferCreate={deferSocietyCreate}
           />
         </div>

@@ -30,6 +30,7 @@ function sanitizeGuestDogPayload(input) {
     tagged_by_user_id: null,
     tagged_society_id: input?.tagged_society_id || null,
     tagged_society_name: normalizeText(input?.tagged_society_name) || null,
+    society_status: normalizeText(input?.society_status) || null,
     tagged_area_pincode: normalizeText(input?.tagged_area_pincode) || null,
     tagged_area_neighbourhood: normalizeText(input?.tagged_area_neighbourhood) || null,
     guest_contact: normalizeText(input?.guest_contact) || null,

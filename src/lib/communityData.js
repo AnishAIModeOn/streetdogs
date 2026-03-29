@@ -369,6 +369,7 @@ export async function createDog(payload) {
     tagged_by_user_id: payload.tagged_by_user_id ?? null,
     tagged_society_id: payload.tagged_society_id ?? null,
     tagged_society_name: payload.tagged_society_name ?? null,
+    society_status: payload.society_status ?? null,
     tagged_area_pincode: payload.tagged_area_pincode ?? null,
     tagged_area_neighbourhood: payload.tagged_area_neighbourhood ?? null,
     ai_summary: payload.ai_summary ?? null,
@@ -383,6 +384,68 @@ export async function createDog(payload) {
   }
 
   return unwrap(await client.from('dogs').insert(safePayload).select().single())
+}
+
+export async function listPendingSocietyDogsForReview({ areaId = null, includeAllAreas = false }) {
+  const client = ensureSupabase()
+  let query = client
+    .from('dogs')
+    .select(
+      `
+        id,
+        dog_name_or_temp_name,
+        location_description,
+        tagged_society_id,
+        tagged_society_name,
+        society_status,
+        tagged_area_pincode,
+        tagged_area_neighbourhood,
+        created_at,
+        area:areas!dogs_area_id_fkey (
+          id,
+          name,
+          city
+        )
+      `,
+    )
+    .eq('society_status', 'pending')
+    .order('created_at', { ascending: false })
+
+  if (!includeAllAreas && areaId) {
+    query = query.eq('area_id', areaId)
+  }
+
+  return unwrap(await query)
+}
+
+export async function reviewPendingSocietyDog({ dogId, action }) {
+  const client = ensureSupabase()
+  const {
+    data: { session },
+  } = await client.auth.getSession()
+
+  if (!session?.access_token) {
+    throw new Error('You must be signed in to review pending societies.')
+  }
+
+  const response = await fetch('/api/admin/pending-societies', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({
+      dogId,
+      action,
+    }),
+  })
+
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok || !payload?.ok || !payload?.dog) {
+    throw new Error(payload?.error || 'Unable to review pending society right now.')
+  }
+
+  return payload.dog
 }
 
 export async function listDogSightings() {

@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ClipboardList, Lock, Package, Users } from 'lucide-react'
+import { BadgeCheck, ClipboardList, Lock, MapPin, Package, Users, XCircle } from 'lucide-react'
 import {
+  listPendingSocietyDogsForReview,
   listInventoryRequestsForReporting,
+  reviewPendingSocietyDog,
   updateInventoryRequestStatus,
 } from '../lib/communityData'
 import { StatusBanner } from './StatusBanner'
@@ -37,8 +39,11 @@ function getCommitmentVariant(status) {
 
 export function InventoryAdminPage({ user, profile }) {
   const [requests, setRequests] = useState([])
+  const [pendingSocietyDogs, setPendingSocietyDogs] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isPendingSocietiesLoading, setIsPendingSocietiesLoading] = useState(true)
   const [isSavingRequestId, setIsSavingRequestId] = useState(null)
+  const [isReviewingDogId, setIsReviewingDogId] = useState(null)
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
 
@@ -57,12 +62,19 @@ export function InventoryAdminPage({ user, profile }) {
     const loadRequests = async () => {
       try {
         setErrorMessage('')
-        const nextRequests = await listInventoryRequestsForReporting({
-          areaId: profile?.primary_area_id,
-          includeAllAreas: isSuperadmin,
-        })
+        const [nextRequests, nextPendingSocietyDogs] = await Promise.all([
+          listInventoryRequestsForReporting({
+            areaId: profile?.primary_area_id,
+            includeAllAreas: isSuperadmin,
+          }),
+          listPendingSocietyDogsForReview({
+            areaId: profile?.primary_area_id,
+            includeAllAreas: isSuperadmin,
+          }),
+        ])
         if (isMounted) {
           setRequests(nextRequests)
+          setPendingSocietyDogs(nextPendingSocietyDogs)
         }
       } catch (error) {
         if (isMounted) {
@@ -73,6 +85,7 @@ export function InventoryAdminPage({ user, profile }) {
       } finally {
         if (isMounted) {
           setIsLoading(false)
+          setIsPendingSocietiesLoading(false)
         }
       }
     }
@@ -82,11 +95,18 @@ export function InventoryAdminPage({ user, profile }) {
   }, [canManageInventory, isSuperadmin, profile?.primary_area_id])
 
   const reloadRequests = async () => {
-    const nextRequests = await listInventoryRequestsForReporting({
-      areaId: profile?.primary_area_id,
-      includeAllAreas: isSuperadmin,
-    })
+    const [nextRequests, nextPendingSocietyDogs] = await Promise.all([
+      listInventoryRequestsForReporting({
+        areaId: profile?.primary_area_id,
+        includeAllAreas: isSuperadmin,
+      }),
+      listPendingSocietyDogsForReview({
+        areaId: profile?.primary_area_id,
+        includeAllAreas: isSuperadmin,
+      }),
+    ])
     setRequests(nextRequests)
+    setPendingSocietyDogs(nextPendingSocietyDogs)
   }
 
   const handleStatusChange = async (request) => {
@@ -116,8 +136,30 @@ export function InventoryAdminPage({ user, profile }) {
       requests: requests.length,
       items: items.length,
       commitments: commitments.length,
+      pendingSocieties: pendingSocietyDogs.length,
     }
-  }, [requests])
+  }, [pendingSocietyDogs.length, requests])
+
+  const handlePendingSocietyReview = async (dog, action) => {
+    try {
+      setIsReviewingDogId(dog.id)
+      setErrorMessage('')
+      setSuccessMessage('')
+      await reviewPendingSocietyDog({ dogId: dog.id, action })
+      await reloadRequests()
+      setSuccessMessage(
+        action === 'confirm'
+          ? 'Pending society confirmed successfully.'
+          : 'Pending society rejected successfully.',
+      )
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : 'Unable to review pending society.',
+      )
+    } finally {
+      setIsReviewingDogId(null)
+    }
+  }
 
   if (!canManageInventory) {
     return (
@@ -166,12 +208,87 @@ export function InventoryAdminPage({ user, profile }) {
             <SnapTile icon={ClipboardList} label="Open requests" value={stats.requests} color="bg-primary/10 text-primary" />
             <SnapTile icon={Package} label="Items listed" value={stats.items} color="bg-amber-50 text-amber-600" />
             <SnapTile icon={Users} label="Commitments" value={stats.commitments} color="bg-emerald-50 text-emerald-600" />
+            <SnapTile icon={BadgeCheck} label="Pending societies" value={stats.pendingSocieties} color="bg-blue-50 text-blue-600" />
           </CardContent>
         </Card>
       </div>
 
       {errorMessage ? <StatusBanner variant="error">{errorMessage}</StatusBanner> : null}
       {successMessage ? <StatusBanner variant="success">{successMessage}</StatusBanner> : null}
+
+      {isPendingSocietiesLoading ? (
+        <div className="h-36 animate-pulse rounded-[2rem] border border-border/50 bg-white/65" />
+      ) : pendingSocietyDogs.length ? (
+        <Card className="rounded-[2rem] border-white/65 bg-white/95 shadow-soft">
+          <CardHeader>
+            <CardTitle>Pending society confirmation</CardTitle>
+            <CardDescription>
+              Review guest-submitted society names before they become confirmed societies in this area.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            {pendingSocietyDogs.map((dog) => (
+              <div
+                key={dog.id}
+                className="rounded-[1.5rem] border border-border/55 bg-secondary/20 p-5"
+              >
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-base font-bold text-foreground">
+                        {dog.tagged_society_name || 'Unnamed pending society'}
+                      </p>
+                      <Badge variant="warning">Pending</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {dog.dog_name_or_temp_name || 'Guest dog report'}
+                    </p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <InfoTile
+                        label="Area"
+                        value={dog.area ? `${dog.area.city} · ${dog.area.name}` : 'Area unavailable'}
+                      />
+                      <InfoTile
+                        label="Neighbourhood"
+                        value={dog.tagged_area_neighbourhood || 'Not added'}
+                      />
+                      <InfoTile
+                        label="Pincode"
+                        value={dog.tagged_area_pincode || 'Not added'}
+                      />
+                      <InfoTile
+                        label="Submitted"
+                        value={new Date(dog.created_at).toLocaleDateString()}
+                      />
+                    </div>
+                    <div className="rounded-xl bg-white/70 px-3 py-2.5">
+                      <p className="text-[0.65rem] font-semibold uppercase tracking-[0.15em] text-muted-foreground">Location</p>
+                      <p className="mt-1 text-sm font-medium text-foreground">{dog.location_description || 'No location description added.'}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
+                    <Button
+                      disabled={isReviewingDogId === dog.id}
+                      onClick={() => handlePendingSocietyReview(dog, 'confirm')}
+                    >
+                      <BadgeCheck className="h-4 w-4" />
+                      {isReviewingDogId === dog.id ? 'Saving...' : 'Confirm society'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      disabled={isReviewingDogId === dog.id}
+                      onClick={() => handlePendingSocietyReview(dog, 'reject')}
+                    >
+                      <XCircle className="h-4 w-4" />
+                      Reject
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {isLoading ? (
         <div className="grid gap-4">
