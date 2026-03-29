@@ -304,7 +304,7 @@ export function LandingPage({ onNavigate }) {
               pincode={flow.areaContext.pincode}
               neighbourhood={flow.areaContext.neighbourhood}
               onSelect={flow.setSelectedSociety}
-              deferCreate={false}
+              deferCreate
             />
           </div>
         </div>
