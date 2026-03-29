@@ -342,10 +342,16 @@ export function useAreaSocietyFlow(options = {}) {
     return createdSociety
   }
 
-  const effectiveNeighbourhood = selectedSociety?.neighbourhood || normalizeText(areaInput) || normalizeText(detectedNeighbourhood)
-  const areaLabel =
-    selectedSociety?.neighbourhood ||
-    (manual ? normalizeText(areaInput) : normalizeText(detectedLabel) || normalizeText(detectedNeighbourhood))
+  const normalizedAreaInput = normalizeText(areaInput)
+  const normalizedDetectedLabel = normalizeText(detectedLabel)
+  const normalizedDetectedNeighbourhood = normalizeText(detectedNeighbourhood)
+  const selectedSocietyNeighbourhood = normalizeText(selectedSociety?.neighbourhood)
+  const fallbackAreaLabel = manual
+    ? normalizedAreaInput
+    : normalizedDetectedLabel || normalizedDetectedNeighbourhood
+  const effectiveNeighbourhood =
+    selectedSocietyNeighbourhood || normalizedAreaInput || normalizedDetectedNeighbourhood
+  const areaLabel = selectedSocietyNeighbourhood || fallbackAreaLabel
 
   const areaContext = useMemo(
     () => ({

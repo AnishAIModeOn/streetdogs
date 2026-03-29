@@ -38,6 +38,7 @@ export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, defe
   const [isCreating, setIsCreating] = useState(false)
   const [selected, setSelected] = useState(null)
   const [activeIndex, setActiveIndex] = useState(-1)
+  const [autoSelectSuppressedContext, setAutoSelectSuppressedContext] = useState('')
 
   const containerRef = useRef(null)
   const inputRef = useRef(null)
@@ -46,12 +47,14 @@ export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, defe
   const debouncedSearch = useDebouncedValue(searchTerm)
   const debouncedPincode = useDebouncedValue(pincode, 400)
   const debouncedNeighbourhood = useDebouncedValue(neighbourhood, 400)
+  const areaContextKey = `${debouncedPincode}::${debouncedNeighbourhood.trim().toLowerCase()}`
 
   useEffect(() => {
     setSelected(null)
     onSelect(null)
     setSocieties([])
     setSearchTerm('')
+    setAutoSelectSuppressedContext('')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedPincode, debouncedNeighbourhood])
 
@@ -81,6 +84,30 @@ export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, defe
       setSocieties([])
     }
   }, [debouncedPincode, debouncedNeighbourhood, debouncedSearch, fetchSocieties])
+
+  useEffect(() => {
+    if (selected || isFetching || fetchError || debouncedSearch.trim()) {
+      return
+    }
+
+    if (societies.length !== 1) {
+      return
+    }
+
+    if (autoSelectSuppressedContext === areaContextKey) {
+      return
+    }
+
+    commitSelection(societies[0])
+  }, [
+    areaContextKey,
+    autoSelectSuppressedContext,
+    debouncedSearch,
+    fetchError,
+    isFetching,
+    selected,
+    societies,
+  ])
 
   useEffect(() => {
     function onOutside(e) {
@@ -179,6 +206,9 @@ export function SocietyPicker({ pincode = '', neighbourhood = '', onSelect, defe
   function clearSelection() {
     setSelected(null)
     setSearchTerm('')
+    setIsOpen(false)
+    setActiveIndex(-1)
+    setAutoSelectSuppressedContext(areaContextKey)
     onSelect(null)
   }
 
