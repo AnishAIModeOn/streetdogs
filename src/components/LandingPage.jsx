@@ -3,6 +3,8 @@ import {
   Crosshair,
   ClipboardPlus,
   ChevronDown,
+  Heart,
+  HeartHandshake,
   House,
   Loader2,
   MapPin,
@@ -308,27 +310,7 @@ export function LandingPage({ onNavigate }) {
               Report faster, browse local dogs, and keep care updates anchored to one area.
             </p>
           </div>
-          <div className="grid gap-2 sm:grid-cols-3">
-            <Button size="lg" className="min-h-12 rounded-2xl" onClick={() => onNavigate('/report-dog')}>
-              Report a Dog
-            </Button>
-            <Button
-              size="lg"
-              variant="secondary"
-              className="min-h-12 rounded-2xl"
-              onClick={() => onNavigate('/signin')}
-            >
-              Contribute to Care
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="min-h-12 rounded-2xl bg-white/80"
-              onClick={() => onNavigate('/signin')}
-            >
-              Adopt / Help
-            </Button>
-          </div>
+          <HeroActionGrid onNavigate={onNavigate} />
         </div>
       </section>
 
@@ -485,6 +467,76 @@ function InlineMetric({ icon: Icon, label, value }) {
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+function HeroActionGrid({ onNavigate }) {
+  const actions = [
+    {
+      label: 'Report Dog',
+      icon: PawPrint,
+      onClick: () => onNavigate('/report-dog'),
+      className:
+        'border-primary/15 bg-[linear-gradient(180deg,rgba(244,176,93,0.18),rgba(255,255,255,0.96))] text-foreground',
+      iconClassName: 'bg-primary text-primary-foreground shadow-soft',
+    },
+    {
+      label: 'Raise Expense',
+      icon: Wallet,
+      onClick: () => onNavigate('/signin'),
+      className:
+        'border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(249,244,236,0.96))] text-foreground',
+      iconClassName: 'bg-secondary/70 text-primary',
+    },
+    {
+      label: 'Contribute',
+      icon: HeartHandshake,
+      onClick: () => onNavigate('/signin'),
+      className:
+        'border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(245,239,230,0.96))] text-foreground',
+      iconClassName: 'bg-secondary/70 text-primary',
+    },
+    {
+      label: 'Adopt / Help',
+      icon: Heart,
+      onClick: () => onNavigate('/signin'),
+      className:
+        'border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(249,243,235,0.96))] text-foreground',
+      iconClassName: 'bg-secondary/70 text-primary',
+    },
+  ]
+
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:gap-4">
+      {actions.map((action) => {
+        const Icon = action.icon
+
+        return (
+          <button
+            key={action.label}
+            type="button"
+            onClick={action.onClick}
+            className={[
+              'aspect-square w-full rounded-2xl border p-4 text-left shadow-soft transition-all duration-200 hover:-translate-y-0.5 hover:shadow-float active:translate-y-0 active:scale-[0.98]',
+              'flex flex-col justify-between gap-3',
+              action.className,
+            ].join(' ')}
+          >
+            <span
+              className={[
+                'flex h-11 w-11 items-center justify-center rounded-2xl',
+                action.iconClassName,
+              ].join(' ')}
+            >
+              <Icon className="h-5 w-5" />
+            </span>
+            <span className="text-sm font-semibold leading-5 text-foreground sm:text-[0.95rem]">
+              {action.label}
+            </span>
+          </button>
+        )
+      })}
+    </div>
   )
 }
 
