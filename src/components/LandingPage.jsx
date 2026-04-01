@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   Crosshair,
   ClipboardPlus,
+  ChevronDown,
   House,
   Loader2,
   MapPin,
@@ -20,6 +21,13 @@ import { SocietyPicker } from './SocietyPicker'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Card, CardContent } from './ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog'
 import { Input } from './ui/input'
 import { Skeleton } from './ui/skeleton'
 
@@ -58,6 +66,7 @@ export function LandingPage({ onNavigate }) {
   const [landingDogs, setLandingDogs] = useState([])
   const [isDogsLoading, setIsDogsLoading] = useState(true)
   const [landingDogsError, setLandingDogsError] = useState('')
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false)
   const persistedLocation = useMemo(() => readStoredLocation(), [])
   const [locationStatus, setLocationStatus] = useState(
     persistedLocation?.areaLabel ? 'saved' : 'detecting',
@@ -79,6 +88,7 @@ export function LandingPage({ onNavigate }) {
   const canonicalAreaLabel =
     (matchedAreaId ? areasById[matchedAreaId]?.name : '') || normalizeAreaLabel(selectedArea)
   const showingLabel = canonicalAreaLabel || 'your community'
+  const headerAreaLabel = canonicalAreaLabel || 'Select area'
 
   useEffect(() => {
     let isMounted = true
@@ -223,47 +233,48 @@ export function LandingPage({ onNavigate }) {
   const urgentDog = landingDogs.find(isNeedsAttentionDog) || null
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-3 px-3 py-3 pb-28 sm:px-4 sm:py-4 sm:pb-32">
-      <section className="sticky top-3 z-30">
-        <Card className="overflow-visible rounded-[1.6rem] border-white/80 bg-[linear-gradient(180deg,rgba(251,247,238,0.95),rgba(255,255,255,0.9))] shadow-[0_16px_40px_rgba(104,85,58,0.12)] backdrop-blur-xl">
-          <CardContent className="space-y-3 p-3 sm:p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[0.68rem] font-bold uppercase tracking-[0.22em] text-primary/80">
-                  Nearby focus
-                </p>
-                <div className="mt-1 flex min-w-0 items-center gap-2">
-                  <MapPin className="h-4 w-4 shrink-0 text-primary" />
-                  <p className="truncate text-sm font-semibold text-foreground">{showingLabel}</p>
-                </div>
-              </div>
-              <Button
-                type="button"
-                variant="secondary"
-                className="h-10 shrink-0 rounded-2xl px-3 shadow-none"
-                onClick={() => {
-                  setLocationStatus('detecting')
-                  flow.detectLocation()
-                }}
-              >
-                {flow.detecting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Crosshair className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
+    <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-3 px-3 py-2 pb-28 sm:px-4 sm:py-3 sm:pb-32">
+      <section className="sticky top-2 z-30">
+        <button
+          type="button"
+          onClick={() => setIsLocationModalOpen(true)}
+          className="flex w-full items-center justify-between gap-2 rounded-[1.2rem] border border-white/80 bg-[linear-gradient(180deg,rgba(251,247,238,0.96),rgba(255,255,255,0.92))] px-3 py-2.5 shadow-[0_12px_30px_rgba(104,85,58,0.1)] backdrop-blur-xl transition-colors hover:bg-[linear-gradient(180deg,rgba(255,250,244,0.98),rgba(255,255,255,0.95))]"
+        >
+          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+            <span className="flex min-w-0 max-w-full items-center gap-1.5 rounded-full bg-secondary/45 px-2.5 py-1 text-xs font-semibold text-foreground">
+              <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
+              <span className="truncate">{headerAreaLabel}</span>
+            </span>
+            {selectedSociety?.name ? (
+              <span className="min-w-0 max-w-[48%] truncate rounded-full bg-white/85 px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                {selectedSociety.name}
+              </span>
+            ) : null}
+          </div>
+          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </button>
+      </section>
 
-            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <Dialog open={isLocationModalOpen} onOpenChange={setIsLocationModalOpen}>
+        <DialogContent className="top-auto bottom-0 w-[calc(100%-1rem)] max-w-none translate-x-[-50%] translate-y-0 rounded-b-none rounded-t-[2rem] border-x-0 border-b-0 p-4 sm:top-1/2 sm:bottom-auto sm:w-[calc(100%-2rem)] sm:max-w-lg sm:-translate-y-1/2 sm:rounded-b-[2rem] sm:border-x sm:border-b sm:p-6">
+          <DialogHeader className="pr-8">
+            <DialogTitle>Choose location</DialogTitle>
+            <DialogDescription>
+              Pick your area, optionally add your society, or use location detection.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded-[1.35rem] border border-white/75 bg-secondary/15 p-3">
               <div className="relative min-w-0">
                 <Input
                   value={flow.areaInput}
-                  placeholder="Area"
+                  placeholder="Select area"
                   onChange={(event) => flow.setAreaInput(event.target.value)}
                   onFocus={() => flow.setShowSuggestions(true)}
                   onBlur={() => window.setTimeout(() => flow.setShowSuggestions(false), 150)}
                   autoComplete="off"
-                  className="h-10 rounded-2xl border-white/75 bg-white/85 pr-10 text-sm shadow-none"
+                  className="h-11 rounded-2xl border-white/75 bg-white/90 pr-10 text-sm shadow-none"
                 />
                 {flow.isFetchingSuggestions ? (
                   <Loader2 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
@@ -289,30 +300,54 @@ export function LandingPage({ onNavigate }) {
                   </div>
                 ) : null}
               </div>
+            </div>
 
-              <div className="min-w-0 rounded-2xl border border-white/75 bg-white/80 px-2 py-1 shadow-none">
-                <SocietyPicker
-                  pincode={flow.areaContext.pincode}
-                  neighbourhood={flow.areaContext.neighbourhood}
-                  onSelect={flow.setSelectedSociety}
-                  deferCreate
-                />
+            <div className="rounded-[1.35rem] border border-white/75 bg-secondary/15 px-3 py-2">
+              <SocietyPicker
+                pincode={flow.areaContext.pincode}
+                neighbourhood={flow.areaContext.neighbourhood}
+                onSelect={flow.setSelectedSociety}
+                deferCreate
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                className="h-11 rounded-2xl"
+                onClick={() => {
+                  setLocationStatus('detecting')
+                  flow.detectLocation()
+                }}
+              >
+                {flow.detecting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Detecting location
+                  </>
+                ) : (
+                  <>
+                    <Crosshair className="h-4 w-4" />
+                    Detect location
+                  </>
+                )}
+              </Button>
+
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <Badge variant="secondary" className="rounded-full bg-secondary/45 px-2.5 py-1 text-[0.68rem]">
+                  {getLocationMessage(locationStatus, flow.detectedLabel, showingLabel, selectedSociety?.name)}
+                </Badge>
+                {selectedSociety?.name ? (
+                  <span className="truncate rounded-full bg-white/75 px-2.5 py-1">
+                    Society: {selectedSociety.name}
+                  </span>
+                ) : null}
               </div>
             </div>
-
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <Badge variant="secondary" className="rounded-full bg-secondary/45 px-2.5 py-1 text-[0.68rem]">
-                {getLocationMessage(locationStatus, flow.detectedLabel, showingLabel, selectedSociety?.name)}
-              </Badge>
-              {selectedSociety?.name ? (
-                <span className="truncate rounded-full bg-white/75 px-2.5 py-1">
-                  Society: {selectedSociety.name}
-                </span>
-              ) : null}
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <section className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-[linear-gradient(145deg,rgba(255,250,243,0.98),rgba(246,239,228,0.94))] p-5 shadow-float">
         <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(244,176,93,0.22),transparent_72%)]" />
