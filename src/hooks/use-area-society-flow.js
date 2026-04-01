@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { searchNeighbourhoods } from '../lib/communityData'
 
 const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? ''
@@ -330,7 +330,7 @@ export function useAreaSocietyFlow(options = {}) {
     setSocietyDraftName('')
   }
 
-  function detectLocation() {
+  const detectLocation = useCallback(() => {
     return detectCurrentLocation({
       setPincode,
       setDetectedNeighbourhood,
@@ -340,9 +340,9 @@ export function useAreaSocietyFlow(options = {}) {
       setSelectedSociety,
       setDetecting,
     })
-  }
+  }, [])
 
-  function applySnapshot(snapshot = {}) {
+  const applySnapshot = useCallback((snapshot = {}) => {
     const nextAreaInput = normalizeAreaLabel(snapshot.areaInput ?? '')
 
     setPincode(snapshot.pincode ?? '')
@@ -356,7 +356,7 @@ export function useAreaSocietyFlow(options = {}) {
     setShowSuggestions(false)
     setSelectedSociety(snapshot.selectedSociety ?? null)
     setSocietyDraftName(snapshot.societyDraftName ?? '')
-  }
+  }, [])
 
   async function resolveSelectedSociety() {
     if (!selectedSociety) {

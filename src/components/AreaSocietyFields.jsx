@@ -49,7 +49,7 @@ export function AreaSocietyFields({
       societyDraftName: flow.societyDraftName,
     })
   }, [
-    draftFlow,
+    draftFlow.applySnapshot,
     flow.areaInput,
     flow.detectedLabel,
     flow.effectiveNeighbourhood,
