@@ -308,17 +308,25 @@ export function LandingPage({ onNavigate }) {
               Report faster, browse local dogs, and keep care updates anchored to one area.
             </p>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Button size="lg" className="rounded-2xl" onClick={() => onNavigate('/report-dog')}>
-              Report Dog
+          <div className="grid gap-2 sm:grid-cols-3">
+            <Button size="lg" className="min-h-12 rounded-2xl" onClick={() => onNavigate('/report-dog')}>
+              Report a Dog
             </Button>
             <Button
               size="lg"
               variant="secondary"
-              className="rounded-2xl"
-              onClick={() => onNavigate('/dogs')}
+              className="min-h-12 rounded-2xl"
+              onClick={() => onNavigate('/signin')}
             >
-              Browse Dogs
+              Contribute to Care
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="min-h-12 rounded-2xl bg-white/80"
+              onClick={() => onNavigate('/signin')}
+            >
+              Adopt / Help
             </Button>
           </div>
         </div>
