@@ -342,6 +342,22 @@ export function useAreaSocietyFlow(options = {}) {
     })
   }
 
+  function applySnapshot(snapshot = {}) {
+    const nextAreaInput = normalizeAreaLabel(snapshot.areaInput ?? '')
+
+    setPincode(snapshot.pincode ?? '')
+    setDetectedLabel(snapshot.detectedLabel ?? '')
+    setDetectedNeighbourhood(snapshot.detectedNeighbourhood ?? '')
+    setDetecting(false)
+    setManual(snapshot.manual ?? Boolean(nextAreaInput))
+    setAreaInputState(nextAreaInput)
+    setAreaSuggestions([])
+    setIsFetchingSuggestions(false)
+    setShowSuggestions(false)
+    setSelectedSociety(snapshot.selectedSociety ?? null)
+    setSocietyDraftName(snapshot.societyDraftName ?? '')
+  }
+
   async function resolveSelectedSociety() {
     if (!selectedSociety) {
       return null
@@ -393,6 +409,7 @@ export function useAreaSocietyFlow(options = {}) {
     societyDraftName,
     setSocietyDraftName,
     detectLocation,
+    applySnapshot,
     resolveSelectedSociety,
   }
 }

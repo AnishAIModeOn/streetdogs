@@ -36,6 +36,8 @@ export function SocietyPicker({
   draftName = '',
   onDraftChange = () => {},
   deferCreate: _deferCreate = false,
+  dropdownPosition = 'bottom',
+  scrollOnOpen = false,
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -141,6 +143,17 @@ export function SocietyPicker({
       document.removeEventListener('touchstart', onOutside)
     }
   }, [])
+
+  useEffect(() => {
+    if (!isOpen || !scrollOnOpen) {
+      return
+    }
+
+    containerRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    })
+  }, [isOpen, scrollOnOpen])
 
   const allOptions = buildOptions(societies, searchTerm)
 
@@ -290,7 +303,12 @@ export function SocietyPicker({
         )}
 
         {isOpen && !selected ? (
-          <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-2xl border border-white/70 bg-white shadow-float">
+          <div
+            className={[
+              'absolute left-0 right-0 z-50 overflow-hidden rounded-2xl border border-white/70 bg-white shadow-float',
+              dropdownPosition === 'top' ? 'bottom-[calc(100%+6px)]' : 'top-[calc(100%+6px)]',
+            ].join(' ')}
+          >
             <div className="flex items-center gap-2 border-b border-border/50 px-3 py-2.5">
               <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
               <input

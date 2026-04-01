@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Crosshair,
   ClipboardPlus,
@@ -6,6 +6,7 @@ import {
   House,
   Loader2,
   MapPin,
+  Navigation,
   Package,
   PawPrint,
   ShieldAlert,
@@ -67,6 +68,7 @@ export function LandingPage({ onNavigate }) {
   const [isDogsLoading, setIsDogsLoading] = useState(true)
   const [landingDogsError, setLandingDogsError] = useState('')
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false)
+  const [locationModalKey, setLocationModalKey] = useState(0)
   const persistedLocation = useMemo(() => readStoredLocation(), [])
   const [locationStatus, setLocationStatus] = useState(
     persistedLocation?.areaLabel ? 'saved' : 'detecting',
@@ -89,6 +91,26 @@ export function LandingPage({ onNavigate }) {
     (matchedAreaId ? areasById[matchedAreaId]?.name : '') || normalizeAreaLabel(selectedArea)
   const showingLabel = canonicalAreaLabel || 'your community'
   const headerAreaLabel = canonicalAreaLabel || 'Select area'
+  const locationDraft = useMemo(
+    () => ({
+      areaInput: flow.areaInput,
+      pincode: flow.pincode,
+      selectedSociety: flow.selectedSociety,
+      manual: flow.manual,
+      detectedLabel: flow.detectedLabel,
+      detectedNeighbourhood: flow.effectiveNeighbourhood,
+      societyDraftName: flow.societyDraftName,
+    }),
+    [
+      flow.areaInput,
+      flow.detectedLabel,
+      flow.effectiveNeighbourhood,
+      flow.manual,
+      flow.pincode,
+      flow.selectedSociety,
+      flow.societyDraftName,
+    ],
+  )
 
   useEffect(() => {
     let isMounted = true
@@ -237,7 +259,10 @@ export function LandingPage({ onNavigate }) {
       <section className="sticky top-2 z-30">
         <button
           type="button"
-          onClick={() => setIsLocationModalOpen(true)}
+          onClick={() => {
+            setLocationModalKey((current) => current + 1)
+            setIsLocationModalOpen(true)
+          }}
           className="flex w-full items-center justify-between gap-2 rounded-[1.2rem] border border-white/80 bg-[linear-gradient(180deg,rgba(251,247,238,0.96),rgba(255,255,255,0.92))] px-3 py-2.5 shadow-[0_12px_30px_rgba(104,85,58,0.1)] backdrop-blur-xl transition-colors hover:bg-[linear-gradient(180deg,rgba(255,250,244,0.98),rgba(255,255,255,0.95))]"
         >
           <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
@@ -255,99 +280,18 @@ export function LandingPage({ onNavigate }) {
         </button>
       </section>
 
-      <Dialog open={isLocationModalOpen} onOpenChange={setIsLocationModalOpen}>
-        <DialogContent className="top-auto bottom-0 w-[calc(100%-1rem)] max-w-none translate-x-[-50%] translate-y-0 rounded-b-none rounded-t-[2rem] border-x-0 border-b-0 p-4 sm:top-1/2 sm:bottom-auto sm:w-[calc(100%-2rem)] sm:max-w-lg sm:-translate-y-1/2 sm:rounded-b-[2rem] sm:border-x sm:border-b sm:p-6">
-          <DialogHeader className="pr-8">
-            <DialogTitle>Choose location</DialogTitle>
-            <DialogDescription>
-              Pick your area, optionally add your society, or use location detection.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="rounded-[1.35rem] border border-white/75 bg-secondary/15 p-3">
-              <div className="relative min-w-0">
-                <Input
-                  value={flow.areaInput}
-                  placeholder="Select area"
-                  onChange={(event) => flow.setAreaInput(event.target.value)}
-                  onFocus={() => flow.setShowSuggestions(true)}
-                  onBlur={() => window.setTimeout(() => flow.setShowSuggestions(false), 150)}
-                  autoComplete="off"
-                  className="h-11 rounded-2xl border-white/75 bg-white/90 pr-10 text-sm shadow-none"
-                />
-                {flow.isFetchingSuggestions ? (
-                  <Loader2 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
-                ) : null}
-                {flow.showSuggestions && flow.areaSuggestions.length > 0 ? (
-                  <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-2xl border border-white/70 bg-white shadow-float">
-                    {flow.areaSuggestions.map((suggestion, index) => (
-                      <button
-                        key={`${suggestion.neighbourhood}-${suggestion.pincode || index}`}
-                        type="button"
-                        className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm transition-colors hover:bg-secondary/35"
-                        onMouseDown={() => flow.selectSuggestion(suggestion)}
-                      >
-                        <MapPin className="h-3.5 w-3.5 shrink-0 text-primary/70" />
-                        <span className="flex-1 truncate">
-                          {suggestion.neighbourhood || suggestion.pincode}
-                        </span>
-                        {suggestion.pincode ? (
-                          <span className="text-xs text-muted-foreground">{suggestion.pincode}</span>
-                        ) : null}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="rounded-[1.35rem] border border-white/75 bg-secondary/15 px-3 py-2">
-              <SocietyPicker
-                pincode={flow.areaContext.pincode}
-                neighbourhood={flow.areaContext.neighbourhood}
-                onSelect={flow.setSelectedSociety}
-                deferCreate
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                className="h-11 rounded-2xl"
-                onClick={() => {
-                  setLocationStatus('detecting')
-                  flow.detectLocation()
-                }}
-              >
-                {flow.detecting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Detecting location
-                  </>
-                ) : (
-                  <>
-                    <Crosshair className="h-4 w-4" />
-                    Detect location
-                  </>
-                )}
-              </Button>
-
-              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <Badge variant="secondary" className="rounded-full bg-secondary/45 px-2.5 py-1 text-[0.68rem]">
-                  {getLocationMessage(locationStatus, flow.detectedLabel, showingLabel, selectedSociety?.name)}
-                </Badge>
-                {selectedSociety?.name ? (
-                  <span className="truncate rounded-full bg-white/75 px-2.5 py-1">
-                    Society: {selectedSociety.name}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {isLocationModalOpen ? (
+        <LocationSelectionModal
+          key={locationModalKey}
+          open={isLocationModalOpen}
+          initialLocation={locationDraft}
+          onClose={() => setIsLocationModalOpen(false)}
+          onApply={(snapshot) => {
+            flow.applySnapshot(snapshot)
+            setIsLocationModalOpen(false)
+          }}
+        />
+      ) : null}
 
       <section className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-[linear-gradient(145deg,rgba(255,250,243,0.98),rgba(246,239,228,0.94))] p-5 shadow-float">
         <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(244,176,93,0.22),transparent_72%)]" />
@@ -536,6 +480,207 @@ function InlineMetric({ icon: Icon, label, value }) {
   )
 }
 
+function LocationSelectionModal({ open, initialLocation, onClose, onApply }) {
+  const [isConfirmDetectOpen, setIsConfirmDetectOpen] = useState(false)
+  const scrollViewportRef = useRef(null)
+  const draftFlow = useAreaSocietyFlow({
+    initialAreaLabel: initialLocation?.areaInput ?? '',
+    initialPincode: initialLocation?.pincode ?? '',
+    initialSociety: initialLocation?.selectedSociety ?? null,
+    autoDetect: false,
+  })
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    window.setTimeout(() => {
+      scrollViewportRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+    }, 60)
+  }, [open])
+
+  const draftSelectedArea = draftFlow.areaContext.neighbourhood || draftFlow.areaContext.areaLabel
+  const hasDraftSelection = Boolean(draftSelectedArea || draftFlow.selectedSociety?.name)
+  const draftShowingLabel = normalizeAreaLabel(draftSelectedArea) || 'Select area'
+  const draftStatus = getDraftLocationStatus(draftFlow)
+
+  async function handleDetectLocation() {
+    setIsConfirmDetectOpen(false)
+    await draftFlow.detectLocation()
+    scrollViewportRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function requestDetectLocation() {
+    if (hasDraftSelection) {
+      setIsConfirmDetectOpen(true)
+      return
+    }
+
+    handleDetectLocation()
+  }
+
+  function applyLocationChanges() {
+    onApply({
+      areaInput: draftFlow.areaInput,
+      pincode: draftFlow.pincode,
+      selectedSociety: draftFlow.selectedSociety,
+      manual: draftFlow.manual,
+      detectedLabel: draftFlow.detectedLabel,
+      detectedNeighbourhood: draftFlow.effectiveNeighbourhood,
+      societyDraftName: draftFlow.societyDraftName,
+    })
+  }
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+        <DialogContent className="inset-0 h-[100dvh] w-full max-w-none translate-x-0 translate-y-0 rounded-none border-0 p-0 sm:left-1/2 sm:top-1/2 sm:h-auto sm:max-h-[90vh] sm:w-[calc(100%-2rem)] sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[2rem] sm:border sm:p-0">
+          <div className="flex h-full flex-col bg-[linear-gradient(180deg,rgba(251,247,238,0.98),rgba(255,255,255,0.98))] sm:max-h-[90vh] sm:rounded-[2rem]">
+            <DialogHeader className="border-b border-white/70 px-4 pb-4 pt-6 pr-14 sm:px-6">
+              <DialogTitle>Choose location</DialogTitle>
+              <DialogDescription>
+                Pick your area, optionally add your society, then apply the change.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div
+              ref={scrollViewportRef}
+              className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+7rem)] sm:px-6 sm:pb-24"
+            >
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <Badge variant="secondary" className="rounded-full bg-secondary/45 px-2.5 py-1 text-[0.68rem]">
+                    {getLocationMessage(
+                      draftStatus,
+                      draftFlow.detectedLabel,
+                      draftShowingLabel,
+                      draftFlow.selectedSociety?.name,
+                    )}
+                  </Badge>
+                  {draftFlow.selectedSociety?.name ? (
+                    <span className="truncate rounded-full bg-white/75 px-2.5 py-1">
+                      Society: {draftFlow.selectedSociety.name}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="rounded-[1.35rem] border border-white/75 bg-secondary/15 p-3">
+                  <div className="mb-2 flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-primary/80" />
+                    <p className="text-sm font-semibold text-foreground">Area</p>
+                  </div>
+                  <div className="relative min-w-0">
+                    <Input
+                      value={draftFlow.areaInput}
+                      placeholder="Select area"
+                      onChange={(event) => draftFlow.setAreaInput(event.target.value)}
+                      onFocus={() => draftFlow.setShowSuggestions(true)}
+                      onBlur={() => window.setTimeout(() => draftFlow.setShowSuggestions(false), 150)}
+                      autoComplete="off"
+                      className="h-11 rounded-2xl border-white/75 bg-white/92 pr-10 text-sm shadow-none"
+                    />
+                    {draftFlow.isFetchingSuggestions ? (
+                      <Loader2 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                    ) : null}
+                    {draftFlow.showSuggestions && draftFlow.areaSuggestions.length > 0 ? (
+                      <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-2xl border border-white/70 bg-white shadow-float">
+                        {draftFlow.areaSuggestions.map((suggestion, index) => (
+                          <button
+                            key={`${suggestion.neighbourhood}-${suggestion.pincode || index}`}
+                            type="button"
+                            className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm transition-colors hover:bg-secondary/35"
+                            onMouseDown={() => draftFlow.selectSuggestion(suggestion)}
+                          >
+                            <MapPin className="h-3.5 w-3.5 shrink-0 text-primary/70" />
+                            <span className="flex-1 truncate">
+                              {suggestion.neighbourhood || suggestion.pincode}
+                            </span>
+                            {suggestion.pincode ? (
+                              <span className="text-xs text-muted-foreground">{suggestion.pincode}</span>
+                            ) : null}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="rounded-[1.35rem] border border-white/75 bg-secondary/15 px-3 py-2">
+                  <SocietyPicker
+                    pincode={draftFlow.areaContext.pincode}
+                    neighbourhood={draftFlow.areaContext.neighbourhood}
+                    onSelect={draftFlow.setSelectedSociety}
+                    draftName={draftFlow.societyDraftName}
+                    onDraftChange={draftFlow.setSocietyDraftName}
+                    deferCreate
+                    dropdownPosition="top"
+                    scrollOnOpen
+                  />
+                </div>
+
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="h-11 rounded-2xl"
+                  onClick={requestDetectLocation}
+                >
+                  {draftFlow.detecting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Detecting location
+                    </>
+                  ) : (
+                    <>
+                      <Navigation className="h-4 w-4" />
+                      Detect location
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <div className="border-t border-white/75 bg-white/92 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:px-6">
+              <div className="flex gap-2">
+                <Button type="button" variant="secondary" className="flex-1 rounded-2xl" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button type="button" className="flex-1 rounded-2xl" onClick={applyLocationChanges}>
+                  Apply
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isConfirmDetectOpen} onOpenChange={setIsConfirmDetectOpen}>
+        <DialogContent className="w-[calc(100%-2rem)] max-w-sm rounded-[1.75rem] p-5">
+          <DialogHeader className="pr-8">
+            <DialogTitle>Replace current selection?</DialogTitle>
+            <DialogDescription>
+              Detecting your location will replace the area and clear the current society selection.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              className="flex-1 rounded-2xl"
+              onClick={() => setIsConfirmDetectOpen(false)}
+            >
+              Keep current
+            </Button>
+            <Button type="button" className="flex-1 rounded-2xl" onClick={handleDetectLocation}>
+              Continue
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
 function LandingBottomNav({ onNavigate }) {
   const currentPath = typeof window === 'undefined' ? '/' : window.location.pathname || '/'
   const items = [
@@ -621,6 +766,26 @@ function getLocationMessage(status, detectedLabel, showingLabel, societyName) {
   }
 
   return 'Location optional'
+}
+
+function getDraftLocationStatus(flow) {
+  if (flow.detecting) {
+    return 'detecting'
+  }
+
+  if (flow.detectedLabel && !flow.manual) {
+    return 'detected'
+  }
+
+  if (flow.selectedSociety?.name) {
+    return 'society'
+  }
+
+  if (flow.areaContext.neighbourhood || flow.areaContext.areaLabel) {
+    return 'manual'
+  }
+
+  return 'idle'
 }
 
 function isNeedsAttentionDog(dog) {
