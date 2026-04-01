@@ -411,7 +411,7 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-4 px-4 py-4 sm:gap-6 sm:px-6 sm:py-6 lg:px-8">
-      <section className="grid gap-3 rounded-[1.75rem] border border-white/65 bg-hero-wash p-4 shadow-float sm:gap-5 sm:rounded-[2rem] sm:p-6 lg:grid-cols-[1.12fr_0.88fr]">
+      <section className="rounded-[1.75rem] border border-white/65 bg-hero-wash p-4 shadow-float sm:rounded-[2rem] sm:p-6">
         <div className="space-y-3 sm:space-y-5">
           <Badge className="w-fit" variant="secondary">Public sighting report</Badge>
           <div className="space-y-1.5 sm:space-y-2">
@@ -423,27 +423,6 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
             </p>
           </div>
         </div>
-
-        <Card className="overflow-hidden rounded-[1.5rem] border-white/65 bg-white/92 sm:rounded-[1.75rem]">
-          <CardHeader className="pb-2 pt-4 sm:pb-3 sm:pt-6">
-            <CardTitle>Before you start</CardTitle>
-            <CardDescription>Short, clear details are enough for a useful first report.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 pb-4 text-sm leading-5 text-muted-foreground sm:space-y-2.5 sm:pb-6 sm:leading-6">
-            {[
-              'Add a photo',
-              'AI can help fill details',
-              'Choose area and society',
-            ].map((tip, index) => (
-              <div key={index} className="flex items-center gap-3 rounded-xl bg-secondary/40 px-3 py-2.5 sm:px-4 sm:py-3">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[0.65rem] font-bold text-primary">
-                  {index + 1}
-                </span>
-                <span className="text-sm leading-5 text-foreground/85">{tip}</span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
       </section>
 
       {errorMessage ? (
