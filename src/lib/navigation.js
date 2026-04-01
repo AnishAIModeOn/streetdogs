@@ -34,7 +34,6 @@ export function isProtectedPath(path) {
     path === '/inventory' ||
     path === '/inventory/admin' ||
     path === '/inventory/new' ||
-    path === '/dogs' ||
     path === '/dogs/new' ||
     path === '/complete-profile' ||
     isRaiseExpensePath(path) ||

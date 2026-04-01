@@ -157,6 +157,8 @@ function App() {
       content = <LandingPage onNavigate={navigateTo} />
     } else if (currentPath === '/report-dog') {
       content = <GuestReportPage onNavigate={navigateTo} currentUser={user} />
+    } else if (currentPath === '/dogs') {
+      content = <DogsPage currentUser={user} />
     } else {
       content = (
         <AuthPage
@@ -191,7 +193,7 @@ function App() {
           <GuestReportPage onNavigate={navigateTo} currentUser={user} />
         ) : null}
         {currentPath === '/dogs/new' ? <AddDogPage user={user} profile={profile} /> : null}
-        {currentPath === '/dogs' ? <DogsPage /> : null}
+        {currentPath === '/dogs' ? <DogsPage currentUser={user} /> : null}
         {currentPath === '/inventory' ? <InventoryPage user={user} profile={profile} /> : null}
         {currentPath === '/inventory/admin' ? (
           <InventoryAdminPage user={user} profile={profile} />

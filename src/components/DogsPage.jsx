@@ -1,37 +1,67 @@
 import { useEffect, useMemo, useState } from 'react'
-import { MapPin, PawPrint, Plus, Search, SlidersHorizontal } from 'lucide-react'
-import { useDogs, useMyOutOfAreaDogs } from '../hooks/use-dogs'
+import { Filter, PawPrint } from 'lucide-react'
+import { useDogs } from '../hooks/use-dogs'
+import { findMatchingAreaId, normalizeAreaLabel } from '../hooks/use-area-society-flow'
 import { listAreas } from '../lib/communityData'
 import { navigateTo } from '../lib/navigation'
+import { DogFilters } from './DogFilters'
 import { DogCard } from './DogCard'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
-import { Input } from './ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 
-export function DogsPage() {
-  const [areas, setAreas] = useState({})
+const LANDING_LOCATION_KEY = 'streetdog-landing-location'
+
+function readStoredLocation() {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  try {
+    const raw = window.localStorage.getItem(LANDING_LOCATION_KEY)
+    if (!raw) {
+      return null
+    }
+
+    const parsed = JSON.parse(raw)
+    return {
+      ...parsed,
+      areaLabel: normalizeAreaLabel(parsed?.areaLabel),
+    }
+  } catch {
+    return null
+  }
+}
+
+export function DogsPage({ currentUser = null }) {
+  const [areas, setAreas] = useState([])
+  const [areasById, setAreasById] = useState({})
   const [errorMessage, setErrorMessage] = useState('')
-  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedSociety, setSelectedSociety] = useState(null)
   const [statusFilter, setStatusFilter] = useState('all')
-
-  const { data: dogs = [], isLoading, error } = useDogs()
-  const {
-    data: outOfAreaDogs = [],
-    isLoading: isOutOfAreaLoading,
-  } = useMyOutOfAreaDogs()
+  const [toggles, setToggles] = useState({
+    recent: false,
+    needsHelp: false,
+    withPhoto: false,
+  })
+  const persistedLocation = useMemo(() => readStoredLocation(), [])
+  const normalizedAreaLabel = normalizeAreaLabel(persistedLocation?.areaLabel)
 
   useEffect(() => {
     let isMounted = true
-    const loadData = async () => {
+
+    const loadAreas = async () => {
       try {
         setErrorMessage('')
         const nextAreas = await listAreas()
-        if (!isMounted) return
-        setAreas(
-          nextAreas.reduce((grouped, area) => {
-            grouped[area.id] = area
-            return grouped
+        if (!isMounted) {
+          return
+        }
+
+        setAreas(nextAreas)
+        setAreasById(
+          nextAreas.reduce((accumulator, area) => {
+            accumulator[area.id] = area
+            return accumulator
           }, {}),
         )
       } catch (error) {
@@ -40,103 +70,131 @@ export function DogsPage() {
         }
       }
     }
-    loadData()
-    return () => { isMounted = false }
+
+    loadAreas()
+
+    return () => {
+      isMounted = false
+    }
   }, [])
 
-  const filteredDogs = useMemo(() => {
-    const normalizedQuery = searchTerm.trim().toLowerCase()
-    return dogs.filter((dog) => {
-      const area = areas[dog.area_id]
-      const dogStatus = dog.status || dog.dog_status || 'active'
-      const haystack = [
-        dog.dog_name_or_temp_name,
-        dog.location_description,
-        dog.health_notes,
-        dog.notes,
-        dog.tagged_area_neighbourhood,
-        dog.tagged_area_pincode,
-        area?.name,
-        area?.city,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-      const matchesSearch = normalizedQuery ? haystack.includes(normalizedQuery) : true
-      const matchesStatus = statusFilter === 'all' ? true : dogStatus === statusFilter
-      return matchesSearch && matchesStatus
-    })
-  }, [areas, dogs, searchTerm, statusFilter])
+  useEffect(() => {
+    setSelectedSociety(persistedLocation?.selectedSociety ?? null)
+  }, [persistedLocation])
 
-  // Out-of-area dogs: deduplicate against home feed (RLS may already handle this,
-  // but be defensive — don't show the same dog twice)
-  const homeAreaDogIds = useMemo(() => new Set(dogs.map((d) => d.id)), [dogs])
-  const uniqueOutOfAreaDogs = useMemo(
-    () => outOfAreaDogs.filter((d) => !homeAreaDogIds.has(d.id)),
-    [outOfAreaDogs, homeAreaDogIds],
+  const matchedAreaId = useMemo(
+    () => findMatchingAreaId(areas, normalizedAreaLabel),
+    [areas, normalizedAreaLabel],
+  )
+  const canonicalArea = matchedAreaId ? areasById[matchedAreaId] : null
+  const areaLabel = canonicalArea?.name || normalizedAreaLabel || 'All visible dogs'
+  const areaNeighbourhood = canonicalArea?.name || normalizedAreaLabel || ''
+  const areaPincode = persistedLocation?.pincode || ''
+
+  const queryFilters = useMemo(
+    () => ({
+      areaName: normalizedAreaLabel || undefined,
+      pincode: areaPincode || undefined,
+      societyId: selectedSociety?.id || undefined,
+      societyName: selectedSociety?._pending ? selectedSociety.name : undefined,
+    }),
+    [areaPincode, normalizedAreaLabel, selectedSociety],
+  )
+
+  const {
+    data: dogs = [],
+    isLoading,
+    error,
+  } = useDogs(queryFilters)
+
+  const filteredDogs = useMemo(
+    () =>
+      dogs.filter((dog) => {
+        const notes = `${dog.health_notes || ''} ${dog.notes || ''} ${dog.ai_injuries || ''}`.toLowerCase()
+        const isRecentlyAdded =
+          dog.created_at ? Date.now() - new Date(dog.created_at).getTime() <= 1000 * 60 * 60 * 24 * 14 : false
+
+        const matchesStatus =
+          statusFilter === 'all' ||
+          (statusFilter === 'active' && (dog.status || dog.dog_status || 'active') === 'active') ||
+          (statusFilter === 'vaccinated' && dog.vaccination_status === 'vaccinated') ||
+          (statusFilter === 'neutered' && dog.sterilization_status === 'sterilized') ||
+          (statusFilter === 'injured' &&
+            (dog.health_status === 'medical_attention' ||
+              notes.includes('injur') ||
+              notes.includes('medical') ||
+              notes.includes('wound')))
+
+        const matchesNeedsHelp =
+          !toggles.needsHelp ||
+          dog.health_status === 'needs_food' ||
+          dog.health_status === 'medical_attention' ||
+          notes.includes('help') ||
+          notes.includes('food') ||
+          notes.includes('injur') ||
+          notes.includes('medical')
+
+        const matchesPhoto = !toggles.withPhoto || Boolean(dog.photo_url)
+        const matchesRecent = !toggles.recent || isRecentlyAdded
+
+        return matchesStatus && matchesNeedsHelp && matchesPhoto && matchesRecent
+      }),
+    [dogs, statusFilter, toggles],
   )
 
   const activeErrorMessage =
-    errorMessage || (error instanceof Error ? error.message : error ? 'Unable to load dog listing.' : '')
+    errorMessage ||
+    (error instanceof Error ? error.message : error ? 'Unable to load dog listing.' : '')
 
   return (
-    <section className="space-y-6">
-      {/* Page header */}
-      <div className="grid gap-4 rounded-[2rem] border border-white/65 bg-hero-wash p-6 shadow-float lg:grid-cols-[1.1fr_0.9fr]">
+    <section className="space-y-5">
+      <div className="grid gap-4 rounded-[2rem] border border-white/70 bg-hero-wash p-5 shadow-float lg:grid-cols-[1.05fr_0.95fr]">
         <div className="space-y-3">
-          <Badge className="w-fit" variant="secondary">
+          <Badge className="w-fit bg-white/85 text-primary shadow-soft" variant="secondary">
             Dog directory
           </Badge>
-          <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
-            Dogs visible to your account
-          </h1>
-          <p className="max-w-lg text-sm leading-7 text-muted-foreground sm:text-[0.95rem]">
-            Browse community records, scan location notes, and open the full dog profile when
-            you&apos;re ready to help.
-          </p>
+          <div className="space-y-2">
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+              Dogs around {areaLabel}
+            </h1>
+            <p className="max-w-lg text-sm leading-6 text-muted-foreground">
+              Explore the full local feed with quick filters for care status, recent additions,
+              and dogs that need help.
+            </p>
+          </div>
         </div>
 
-        {/* Search & filter card */}
-        <div className="rounded-[1.75rem] border border-white/65 bg-white/92 p-5 shadow-soft">
-          <div className="mb-4 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <SlidersHorizontal className="h-3.5 w-3.5" />
+        <div className="rounded-[1.6rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,242,233,0.95))] p-4 shadow-soft">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-secondary/55 text-primary">
+              <Filter className="h-4.5 w-4.5" />
             </div>
             <div>
-              <p className="text-sm font-bold text-foreground">Find a dog</p>
-              <p className="text-xs text-muted-foreground">Search by name, area, or care notes</p>
+              <p className="text-sm font-semibold text-foreground">View all dogs</p>
+              <p className="text-xs text-muted-foreground">
+                Compact cards, smarter filters, and no horizontal scroll.
+              </p>
             </div>
-          </div>
-
-          <div className="grid gap-3">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                className="pl-10"
-                placeholder="Search dogs, area, or notes…"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="adopted">Adopted</SelectItem>
-                <SelectItem value="missing">Missing</SelectItem>
-                <SelectItem value="deceased">Deceased</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button onClick={() => navigateTo('/dogs/new')}>
-              <Plus className="h-4 w-4" />
-              Add a dog record
-            </Button>
           </div>
         </div>
       </div>
+
+      <DogFilters
+        areaLabel={areaLabel}
+        pincode={areaPincode}
+        neighbourhood={areaNeighbourhood}
+        selectedSociety={selectedSociety}
+        onSocietyChange={setSelectedSociety}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
+        toggles={toggles}
+        onToggleChange={(key, value) =>
+          setToggles((current) => ({
+            ...current,
+            [key]: value,
+          }))
+        }
+      />
 
       {activeErrorMessage ? (
         <div className="rounded-2xl border border-red-200 bg-red-50/80 px-5 py-4 text-sm text-red-700">
@@ -144,177 +202,64 @@ export function DogsPage() {
         </div>
       ) : null}
 
-      {/* Results count + clear filters */}
-      {!isLoading && dogs.length > 0 && (
-        <div className="flex items-center justify-between">
+      {!isLoading ? (
+        <div className="flex items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">
-            Showing{' '}
-            <span className="font-semibold text-foreground">{filteredDogs.length}</span>
-            {filteredDogs.length !== dogs.length ? ` of ${dogs.length}` : ''} dog
-            {filteredDogs.length !== 1 ? 's' : ''} in your area
+            Showing <span className="font-semibold text-foreground">{filteredDogs.length}</span> dog
+            {filteredDogs.length === 1 ? '' : 's'}
           </p>
-          {(searchTerm || statusFilter !== 'all') && (
-            <button
-              className="text-xs font-semibold text-primary hover:underline"
-              onClick={() => { setSearchTerm(''); setStatusFilter('all') }}
-            >
-              Clear filters
-            </button>
-          )}
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-auto rounded-full px-0 py-0 text-sm font-semibold text-primary hover:bg-transparent"
+            onClick={() => {
+              setSelectedSociety(persistedLocation?.selectedSociety ?? null)
+              setStatusFilter('all')
+              setToggles({ recent: false, needsHelp: false, withPhoto: false })
+            }}
+          >
+            Reset filters
+          </Button>
         </div>
-      )}
+      ) : null}
 
-      {/* ── Home area dog grid ─────────────────────────────── */}
       {isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, index) => (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, index) => (
             <div
               key={index}
-              className="h-[320px] animate-pulse rounded-3xl border border-border/50 bg-white/65"
+              className="aspect-[0.82] animate-pulse rounded-[1.75rem] border border-border/50 bg-white/65"
             />
           ))}
         </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      ) : filteredDogs.length ? (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4">
           {filteredDogs.map((dog) => (
             <DogCard
               key={dog.id}
               dog={dog}
-              area={areas[dog.area_id]}
-              onViewDetails={() => navigateTo(`/dogs/${dog.id}`)}
+              area={areasById[dog.area_id]}
+              compact
+              onViewDetails={() => navigateTo(currentUser ? `/dogs/${dog.id}` : '/signin')}
             />
           ))}
-
-          {filteredDogs.length === 0 && (
-            <div className="flex flex-col items-center gap-4 rounded-[2rem] border border-dashed border-border bg-white/80 p-12 text-center sm:col-span-2 xl:col-span-3">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-secondary text-primary">
-                <PawPrint className="h-8 w-8" />
-              </div>
-              <div className="space-y-1.5">
-                <h3 className="text-xl font-bold text-foreground">
-                  {dogs.length === 0 ? 'No dogs visible yet' : 'No matches found'}
-                </h3>
-                <p className="max-w-sm text-sm leading-6 text-muted-foreground">
-                  {dogs.length === 0
-                    ? 'Add the first dog in your area or wait for visible records to appear.'
-                    : 'Try a broader search by area, location, or health notes.'}
-                </p>
-              </div>
-              {dogs.length === 0 && (
-                <Button onClick={() => navigateTo('/dogs/new')}>
-                  <Plus className="h-4 w-4" />
-                  Add first dog
-                </Button>
-              )}
-            </div>
-          )}
         </div>
-      )}
-
-      {/* ── Out-of-area dogs you tagged ────────────────────── */}
-      {(isOutOfAreaLoading || uniqueOutOfAreaDogs.length > 0) && (
-        <div className="space-y-4">
-          {/* Section divider */}
-          <div className="flex items-center gap-3">
-            <div className="h-px flex-1 bg-border/60" />
-            <div className="flex items-center gap-2 rounded-full border border-amber-200/80 bg-amber-50/70 px-3 py-1.5">
-              <MapPin className="h-3.5 w-3.5 text-amber-600" />
-              <span className="text-xs font-bold text-amber-700">
-                Dogs you&apos;ve tagged in other areas
-              </span>
-            </div>
-            <div className="h-px flex-1 bg-border/60" />
+      ) : (
+        <div className="flex flex-col items-center gap-4 rounded-[2rem] border border-dashed border-border bg-white/80 p-10 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-secondary text-primary">
+            <PawPrint className="h-8 w-8" />
           </div>
-
-          <p className="text-sm text-muted-foreground">
-            These dogs were tagged outside your home society&apos;s PIN code. Only you can see
-            them here — local volunteers in those areas will see them in their own feed.
-          </p>
-
-          {isOutOfAreaLoading ? (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {Array.from({ length: 2 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="h-[280px] animate-pulse rounded-3xl border border-amber-100 bg-amber-50/40"
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {uniqueOutOfAreaDogs.map((dog) => (
-                <OutOfAreaDogCard
-                  key={dog.id}
-                  dog={dog}
-                  onViewDetails={() => navigateTo(`/dogs/${dog.id}`)}
-                />
-              ))}
-            </div>
-          )}
+          <div className="space-y-1.5">
+            <h3 className="text-xl font-bold text-foreground">No dogs match these filters</h3>
+            <p className="max-w-sm text-sm leading-6 text-muted-foreground">
+              Try another status or clear the optional filters to see more dogs in this area.
+            </p>
+          </div>
+          <Button type="button" variant="secondary" onClick={() => setStatusFilter('all')}>
+            Show all dogs
+          </Button>
         </div>
       )}
     </section>
-  )
-}
-
-// ─── Out-of-area card variant ─────────────────────────────────
-function OutOfAreaDogCard({ dog, onViewDetails }) {
-  const dogName = dog.dog_name_or_temp_name || `Dog ${dog.id.slice(0, 6)}`
-  const locationLabel =
-    dog.tagged_area_neighbourhood
-      ? `${dog.tagged_area_neighbourhood} · ${dog.tagged_area_pincode}`
-      : dog.tagged_area_pincode || dog.location_description || 'Unknown location'
-
-  return (
-    <div className="group flex flex-col overflow-hidden rounded-[1.75rem] border border-amber-200/70 bg-amber-50/40 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-float">
-      {/* Photo */}
-      <div className="relative aspect-[16/10] shrink-0 overflow-hidden bg-amber-100/40">
-        {dog.photo_url ? (
-          <img
-            src={dog.photo_url}
-            alt={dogName}
-            className="h-full w-full object-cover transition-transform duration-[1600ms] ease-out group-hover:scale-[1.04]"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center">
-            <PawPrint className="h-12 w-12 text-amber-300" />
-          </div>
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/5 to-transparent" />
-
-        {/* Out-of-area badge */}
-        <div className="absolute left-3 top-3">
-          <span className="inline-flex items-center gap-1 rounded-full border border-amber-200/40 bg-amber-100/90 px-2.5 py-1 text-[0.65rem] font-bold text-amber-800 backdrop-blur-sm">
-            <MapPin className="h-3 w-3" />
-            Out of area
-          </span>
-        </div>
-
-        {/* Name pill */}
-        <div className="absolute bottom-3 left-3 right-3">
-          <div className="rounded-[1.1rem] border border-white/15 bg-black/30 px-3.5 py-2.5 backdrop-blur-md">
-            <p className="text-[0.95rem] font-bold leading-tight text-white">{dogName}</p>
-            <p className="mt-0.5 text-xs font-medium text-white/75">{locationLabel}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Body */}
-      <div className="flex flex-1 flex-col gap-3 p-4">
-        {dog.location_description && (
-          <div className="flex items-start gap-2 text-sm text-muted-foreground">
-            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
-            <p className="line-clamp-2 leading-5">{dog.location_description}</p>
-          </div>
-        )}
-        <button
-          onClick={onViewDetails}
-          className="mt-auto flex w-full items-center justify-between rounded-xl bg-amber-100/70 px-4 py-2.5 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-200/70"
-        >
-          View Full Profile
-          <MapPin className="h-4 w-4" />
-        </button>
-      </div>
-    </div>
   )
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Crosshair,
+  ArrowRight,
   ClipboardPlus,
   ChevronDown,
   Heart,
@@ -11,7 +11,6 @@ import {
   Navigation,
   Package,
   PawPrint,
-  ShieldAlert,
   Syringe,
   User,
   Wallet,
@@ -19,6 +18,7 @@ import {
 import { findMatchingAreaId, normalizeAreaLabel, useAreaSocietyFlow } from '../hooks/use-area-society-flow'
 import { listAreas } from '../lib/communityData'
 import { navigateTo } from '../lib/navigation'
+import { CommunityStats } from './CommunityStats'
 import { DogCard } from './DogCard'
 import { SocietyPicker } from './SocietyPicker'
 import { Badge } from './ui/badge'
@@ -253,8 +253,7 @@ export function LandingPage({ onNavigate }) {
     )
   }, [canonicalAreaLabel, flow.areaContext.pincode, flow.selectedSociety, selectedArea])
 
-  const visibleNearbyDogs = landingDogs.slice(0, 10)
-  const urgentDog = landingDogs.find(isNeedsAttentionDog) || null
+  const visibleNearbyDogs = landingDogs.slice(0, 4)
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-3 px-3 py-2 pb-28 sm:px-4 sm:py-3 sm:pb-32">
@@ -324,9 +323,17 @@ export function LandingPage({ onNavigate }) {
               {selectedArea ? `Dogs around ${showingLabel}` : 'Dogs near you'}
             </h2>
           </div>
-          <div className="rounded-full bg-secondary/35 px-3 py-1 text-xs font-semibold text-muted-foreground">
-            {landingDogs.length}
-          </div>
+          {landingDogs.length > 4 ? (
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-auto rounded-full px-0 py-0 text-sm font-semibold text-primary hover:bg-transparent"
+              onClick={() => onNavigate('/dogs')}
+            >
+              View all
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          ) : null}
         </div>
 
         {landingDogsError ? (
@@ -336,9 +343,9 @@ export function LandingPage({ onNavigate }) {
         ) : null}
 
         {isDogsLoading ? (
-          <div className="-mx-3 flex gap-3 overflow-x-auto px-3 pb-1 sm:mx-0 sm:px-0">
-            {Array.from({ length: 3 }).map((_, index) => (
-              <Card key={index} className="min-w-[272px] rounded-[1.75rem] border-white/70 bg-white/90 shadow-soft">
+          <div className="grid grid-cols-2 gap-3">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Card key={index} className="rounded-[1.75rem] border-white/70 bg-white/90 shadow-soft">
                 <CardContent className="space-y-3 p-4">
                   <Skeleton className="aspect-[16/10] w-full" />
                   <Skeleton className="h-4 w-32" />
@@ -351,12 +358,13 @@ export function LandingPage({ onNavigate }) {
         ) : null}
 
         {!isDogsLoading && visibleNearbyDogs.length ? (
-          <div className="-mx-3 flex gap-3 overflow-x-auto px-3 pb-1 sm:mx-0 sm:px-0">
+          <div className="grid grid-cols-2 gap-3">
             {visibleNearbyDogs.map((dog) => (
-              <div key={dog.id} className="w-[272px] min-w-[272px] sm:w-[300px] sm:min-w-[300px]">
+              <div key={dog.id}>
                 <DogCard
                   dog={dog}
                   area={buildDogArea(dog, areasById)}
+                  compact
                   onViewDetails={() => navigateTo(`/dogs/${dog.id}`)}
                 />
               </div>
@@ -381,52 +389,6 @@ export function LandingPage({ onNavigate }) {
         ) : null}
       </section>
 
-      {urgentDog ? (
-        <section>
-          <Card className="overflow-hidden rounded-[1.75rem] border-rose-200/70 bg-[linear-gradient(145deg,rgba(255,244,242,0.98),rgba(255,250,247,0.96))] shadow-soft">
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-rose-500 text-white shadow-soft">
-                  <ShieldAlert className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1 space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge className="bg-white text-rose-700" variant="secondary">
-                      Urgent Need
-                    </Badge>
-                    <span className="text-xs font-medium text-rose-700/80">
-                      {buildDogDisplayLocation(urgentDog)}
-                    </span>
-                  </div>
-                  <div>
-                    <h3 className="text-base font-semibold text-foreground">
-                      {urgentDog.dog_name_or_temp_name || 'Dog needs attention'}
-                    </h3>
-                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                      {urgentDog.health_notes ||
-                        urgentDog.location_description ||
-                        'This dog has an urgent care or food-related update.'}
-                    </p>
-                  </div>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <Button className="rounded-2xl" onClick={() => navigateTo(`/dogs/${urgentDog.id}`)}>
-                      View Dog
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="rounded-2xl bg-white/80"
-                      onClick={() => onNavigate('/report-dog')}
-                    >
-                      Report Dog
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </section>
-      ) : null}
-
       <section className="space-y-3">
         <div className="space-y-1">
           <p className="text-[0.7rem] font-bold uppercase tracking-[0.2em] text-primary/80">
@@ -435,38 +397,18 @@ export function LandingPage({ onNavigate }) {
           <h2 className="text-xl font-semibold tracking-tight text-foreground">Quick stats</h2>
         </div>
 
-        <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:px-0 lg:grid-cols-4">
-          <InlineMetric icon={PawPrint} label="Dogs" value={metrics.totalDogs} />
-          <InlineMetric icon={Syringe} label="Vaccinated" value={metrics.vaccinatedDogs} />
-          <InlineMetric
-            icon={Wallet}
-            label="Raised"
-            value={`Rs. ${Number(metrics.expensesRaised).toLocaleString()}`}
-          />
-          <InlineMetric icon={Package} label="Food" value={metrics.inventoryFulfilled} />
-        </div>
+        <CommunityStats
+          stats={[
+            { icon: PawPrint, label: 'Dogs', value: metrics.totalDogs },
+            { icon: Syringe, label: 'Vaccinated', value: metrics.vaccinatedDogs },
+            { icon: Wallet, label: 'Raised', value: `Rs. ${Number(metrics.expensesRaised).toLocaleString()}` },
+            { icon: ClipboardPlus, label: 'Tasks', value: metrics.inventoryFulfilled },
+          ]}
+        />
       </section>
 
       <LandingBottomNav onNavigate={onNavigate} />
     </main>
-  )
-}
-
-function InlineMetric({ icon: Icon, label, value }) {
-  return (
-    <Card className="min-w-[164px] rounded-[1.4rem] border-white/70 bg-white/92 shadow-soft sm:min-w-0">
-      <CardContent className="flex items-center gap-3 p-3.5">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-secondary/45 text-primary">
-          <Icon className="h-4.5 w-4.5" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            {label}
-          </p>
-          <p className="truncate text-base font-semibold text-foreground">{value}</p>
-        </div>
-      </CardContent>
-    </Card>
   )
 }
 
@@ -794,16 +736,6 @@ function buildDogArea(dog, areasById) {
   }
 }
 
-function buildDogDisplayLocation(dog) {
-  return (
-    dog.tagged_area_neighbourhood ||
-    dog.tagged_society_name ||
-    dog.location_description ||
-    dog.area_name ||
-    'Location unavailable'
-  )
-}
-
 function getLocationMessage(status, detectedLabel, showingLabel, societyName) {
   if (status === 'detecting') {
     return 'Detecting location'
@@ -846,16 +778,4 @@ function getDraftLocationStatus(flow) {
   }
 
   return 'idle'
-}
-
-function isNeedsAttentionDog(dog) {
-  const notes = `${dog.health_notes || ''} ${dog.notes || ''}`.toLowerCase()
-
-  return (
-    dog.health_status === 'medical_attention' ||
-    dog.health_status === 'needs_food' ||
-    notes.includes('medical') ||
-    notes.includes('injur') ||
-    notes.includes('food')
-  )
 }

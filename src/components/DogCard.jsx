@@ -16,7 +16,7 @@ function buildDogDisplayLocation(dog) {
   )
 }
 
-export function DogCard({ dog, area: _area, onViewDetails }) {
+export function DogCard({ dog, area: _area, onViewDetails, compact = false }) {
   const badges = []
 
   if (dog.vaccination_status === 'vaccinated') {
@@ -37,9 +37,21 @@ export function DogCard({ dog, area: _area, onViewDetails }) {
 
   const dogName = dog.dog_name_or_temp_name || `Dog ${dog.id.slice(0, 6)}`
   const areaLabel = buildDogDisplayLocation(dog)
+  const cardClassName = compact
+    ? 'rounded-[1.4rem] shadow-soft duration-300'
+    : 'rounded-[1.75rem] shadow-soft duration-500'
+  const contentClassName = compact ? 'gap-2.5 p-3' : 'gap-3 p-4'
+  const badgeClassName = compact ? 'text-[0.62rem]' : 'text-[0.7rem]'
+  const imageNameClassName = compact ? 'text-[0.85rem]' : 'text-[0.95rem]'
+  const imageLocationClassName = compact ? 'text-[0.7rem]' : 'text-xs'
 
   return (
-    <div className="group flex flex-col overflow-hidden rounded-[1.75rem] border border-white/55 bg-white/95 shadow-soft transition-all duration-500 hover:-translate-y-1 hover:shadow-float">
+    <div
+      className={[
+        'group flex h-full flex-col overflow-hidden border border-white/55 bg-white/95 transition-all hover:-translate-y-1 hover:shadow-float',
+        cardClassName,
+      ].join(' ')}
+    >
       <div className="relative aspect-[16/10] shrink-0 overflow-hidden bg-secondary/40">
         {dog.photo_url ? (
           <img
@@ -60,7 +72,7 @@ export function DogCard({ dog, area: _area, onViewDetails }) {
             <Badge
               key={badge.label}
               variant={badge.variant}
-              className="border border-white/30 bg-white/90 text-[0.7rem] shadow-sm backdrop-blur-sm"
+              className={`border border-white/30 bg-white/90 shadow-sm backdrop-blur-sm ${badgeClassName}`}
             >
               {badge.label}
             </Badge>
@@ -69,14 +81,14 @@ export function DogCard({ dog, area: _area, onViewDetails }) {
 
         <div className="absolute bottom-3 left-3 right-3">
           <div className="rounded-[1.1rem] border border-white/18 bg-black/30 px-3.5 py-2.5 backdrop-blur-md">
-            <p className="text-[0.95rem] font-bold leading-tight text-white">{dogName}</p>
-            <p className="mt-0.5 text-xs font-medium text-white/75">{areaLabel}</p>
+            <p className={`font-bold leading-tight text-white ${imageNameClassName}`}>{dogName}</p>
+            <p className={`mt-0.5 font-medium text-white/75 ${imageLocationClassName}`}>{areaLabel}</p>
           </div>
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 p-4">
-        <div className="flex items-start gap-2 text-sm text-muted-foreground">
+      <div className={`flex flex-1 flex-col ${contentClassName}`}>
+        <div className={`flex items-start gap-2 text-muted-foreground ${compact ? 'text-[0.78rem]' : 'text-sm'}`}>
           <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />
           <p className="line-clamp-2 leading-5">
             {dog.location_description || 'Location details will be added by volunteers.'}
@@ -85,7 +97,7 @@ export function DogCard({ dog, area: _area, onViewDetails }) {
 
         <Button
           variant="secondary"
-          className="mt-auto w-full justify-between rounded-xl font-semibold"
+          className={`mt-auto w-full justify-between rounded-xl font-semibold ${compact ? 'h-10 px-3 text-[0.78rem]' : ''}`}
           onClick={onViewDetails}
         >
           View Full Profile
