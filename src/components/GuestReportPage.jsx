@@ -689,14 +689,9 @@ export function GuestReportPage({ onNavigate, currentUser = null }) {
                     flow={areaSocietyFlow}
                     deferSocietyCreate={!activeUser?.id}
                     cardTitle="Area and society"
-                    cardCopy="Share where the dog was last seen so StreetDog App can route this report to the right local volunteers. The report can still be saved even if there is no exact StreetDog App area match."
+                    compact
                   />
                   {fieldErrors.area ? <FormMessage>{fieldErrors.area}</FormMessage> : null}
-                  {matchedAreaName ? (
-                    <FormDescription>
-                      Matched StreetDog App area: {matchedAreaName.name}
-                    </FormDescription>
-                  ) : null}
 
                   <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
                     <Button type="button" variant="outline" onClick={() => onNavigate('/')}>
