@@ -256,21 +256,10 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
     event.preventDefault()
     try {
       setErrorMessage('')
-      const result = await signInMutation.mutateAsync({
+      await signInMutation.mutateAsync({
         email: signInForm.email.trim(),
         password: signInForm.password,
       })
-
-      if (result?.user?.id) {
-        const profileUpdate = {}
-        if (areaLabel) profileUpdate.neighbourhood = areaLabel
-        if (pincode) profileUpdate.pincode = pincode
-        if (selectedSociety) {
-          const societyId = await resolveSociety(selectedSociety)
-          if (societyId) profileUpdate.society_id = societyId
-        }
-        if (Object.keys(profileUpdate).length) tryUpdateProfile(profileUpdate)
-      }
 
       const authState = await onSignedIn()
       onNavigate(authState.redirectTo)
@@ -485,9 +474,6 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
             />
           </FormField>
 
-          {areaField}
-          {societyPicker}
-
           <Button type="submit" size="lg" disabled={isSubmitting}>
             {isSubmitting ? (
               <>
@@ -498,10 +484,6 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
               'Sign in'
             )}
           </Button>
-
-          <FormMessage className="text-muted-foreground">
-            Area-specific visibility is applied after sign-in.
-          </FormMessage>
         </form>
       )}
     </AuthShell>
