@@ -51,7 +51,7 @@ function buildDogDisplayLocation(dog) {
   )
 }
 
-export function DogDetailPage({ dogId, isAuthenticated, user }) {
+export function DogDetailPage({ dogId, isAuthenticated, user, profile }) {
   const [dog, setDog] = useState(null)
   const [sightings, setSightings] = useState([])
   const [expenses, setExpenses] = useState([])
@@ -266,6 +266,9 @@ export function DogDetailPage({ dogId, isAuthenticated, user }) {
   }
 
   const dogName = dog?.dog_name_or_temp_name || 'Community dog'
+  const canRaiseExpense =
+    isAuthenticated &&
+    ['end_user', 'inventory_admin', 'superadmin'].includes(profile?.role || 'end_user')
   const areaLabel = buildDogDisplayLocation(dog)
   const careSummary = dog?.ai_summary || dog?.location_description || dog?.health_notes || ''
   const friendlySummary = careSummary
@@ -445,14 +448,14 @@ export function DogDetailPage({ dogId, isAuthenticated, user }) {
                   <HeartHandshake className="h-4 w-4" />
                 </Button>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {isAuthenticated ? (
+                  {canRaiseExpense ? (
                     <Button
                       size="lg"
                       variant="secondary"
                       className="w-full justify-between"
                       onClick={() => navigateTo(`/dogs/${dog.id}/raise-expense`)}
                     >
-                      Volunteer
+                      Raise Expense
                       <ArrowRight className="h-4 w-4" />
                     </Button>
                   ) : null}
@@ -668,13 +671,13 @@ export function DogDetailPage({ dogId, isAuthenticated, user }) {
                 <p className="text-sm leading-6 text-muted-foreground">
                   This dog does not have an active expense record right now.
                 </p>
-                {isAuthenticated ? (
-                  <div>
-                    <Button onClick={() => navigateTo(`/dogs/${dog.id}/raise-expense`)}>
-                      Start a support appeal
-                    </Button>
-                  </div>
-                ) : null}
+                  {canRaiseExpense ? (
+                    <div>
+                      <Button onClick={() => navigateTo(`/dogs/${dog.id}/raise-expense`)}>
+                        Raise Expense
+                      </Button>
+                    </div>
+                  ) : null}
               </CardContent>
             </Card>
           ) : (

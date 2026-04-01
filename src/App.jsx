@@ -201,7 +201,12 @@ function App() {
         ) : null}
         {currentPath === '/admin/users' ? <AdminUsersPage profile={profile} /> : null}
         {dogId ? (
-          <DogDetailPage dogId={dogId} isAuthenticated={Boolean(user)} user={user} />
+          <DogDetailPage
+            dogId={dogId}
+            isAuthenticated={Boolean(user)}
+            user={user}
+            profile={profile}
+          />
         ) : null}
         {raiseExpenseDogId ? <RaiseExpensePage dogId={raiseExpenseDogId} user={user} /> : null}
         {currentPath === '/dashboard' ? <DashboardPage profile={profile} /> : null}
