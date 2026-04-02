@@ -218,10 +218,20 @@ export async function listProfilesForAdmin() {
           full_name,
           role,
           status,
+          home_locality_id,
+          society_id,
           created_at,
-          primary_area:areas!profiles_primary_area_id_fkey (
+          home_locality:localities!profiles_home_locality_id_fkey (
+            id,
             name,
             city
+          ),
+          society:societies!profiles_society_id_fkey (
+            id,
+            name,
+            locality_id,
+            neighbourhood,
+            pincode
           )
         `,
       )
@@ -246,6 +256,44 @@ export async function countPendingContributions() {
 export async function updateUserRole(userId, role) {
   const client = ensureSupabase()
   return unwrap(await client.from('profiles').update({ role }).eq('id', userId).select().single())
+}
+
+export async function updateUserAdminSettings(userId, payload) {
+  const client = ensureSupabase()
+  return unwrap(
+    await client
+      .from('profiles')
+      .update({
+        role: payload.role,
+        home_locality_id: payload.home_locality_id ?? null,
+        society_id: payload.society_id ?? null,
+      })
+      .eq('id', userId)
+      .select(
+        `
+          id,
+          full_name,
+          role,
+          status,
+          home_locality_id,
+          society_id,
+          created_at,
+          home_locality:localities!profiles_home_locality_id_fkey (
+            id,
+            name,
+            city
+          ),
+          society:societies!profiles_society_id_fkey (
+            id,
+            name,
+            locality_id,
+            neighbourhood,
+            pincode
+          )
+        `,
+      )
+      .single(),
+  )
 }
 
 export async function listInventoryRequestsForArea(areaId) {
