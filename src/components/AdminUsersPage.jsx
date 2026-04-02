@@ -22,6 +22,19 @@ import {
 import { FormField, FormLabel } from './ui/form'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 
+function NativeSelect({ value, onChange, disabled = false, children }) {
+  return (
+    <select
+      className="flex h-11 w-full rounded-2xl border border-input bg-white/90 px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      disabled={disabled}
+    >
+      {children}
+    </select>
+  )
+}
+
 const roleOptions = ['end_user', 'inventory_admin', 'superadmin']
 const ALL_FILTER_VALUE = '__all__'
 const NO_LOCALITY_VALUE = '__none__'
@@ -614,46 +627,36 @@ export function AdminUsersPage({ profile }) {
           <div className="grid gap-4 md:grid-cols-2">
             <FormField>
               <FormLabel>Role</FormLabel>
-              <Select value={editForm.role} onValueChange={handleEditRoleChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {roleOptions.map((role) => (
-                    <SelectItem key={role} value={role}>
-                      {formatRole(role)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <NativeSelect value={editForm.role} onChange={handleEditRoleChange}>
+                {roleOptions.map((role) => (
+                  <option key={role} value={role}>
+                    {formatRole(role)}
+                  </option>
+                ))}
+              </NativeSelect>
             </FormField>
 
             <FormField>
               <FormLabel>Area</FormLabel>
-              <Select
+              <NativeSelect
                 value={editForm.home_locality_id || NO_LOCALITY_VALUE}
-                onValueChange={handleEditLocalityChange}
+                onChange={handleEditLocalityChange}
                 disabled={editForm.role === 'superadmin'}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select locality" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_LOCALITY_VALUE}>No locality</SelectItem>
-                  {editLocalityOptions.map((locality) => (
-                    <SelectItem key={locality.id} value={locality.id}>
-                      {formatLocalityOption(locality)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <option value={NO_LOCALITY_VALUE}>No locality</option>
+                {editLocalityOptions.map((locality) => (
+                  <option key={locality.id} value={locality.id}>
+                    {formatLocalityOption(locality)}
+                  </option>
+                ))}
+              </NativeSelect>
             </FormField>
 
             <FormField className="md:col-span-2">
               <FormLabel>Society</FormLabel>
-              <Select
+              <NativeSelect
                 value={editForm.society_id || NO_SOCIETY_VALUE}
-                onValueChange={(value) =>
+                onChange={(value) =>
                   setEditForm((current) => ({
                     ...current,
                     society_id: value === NO_SOCIETY_VALUE ? '' : value,
@@ -661,18 +664,13 @@ export function AdminUsersPage({ profile }) {
                 }
                 disabled={editForm.role === 'superadmin' || !editForm.home_locality_id}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select society" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_SOCIETY_VALUE}>No society</SelectItem>
-                  {(societiesByLocality[editForm.home_locality_id] ?? []).map((society) => (
-                    <SelectItem key={society.id} value={society.id}>
-                      {society.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <option value={NO_SOCIETY_VALUE}>No society</option>
+                {(societiesByLocality[editForm.home_locality_id] ?? []).map((society) => (
+                  <option key={society.id} value={society.id}>
+                    {society.name}
+                  </option>
+                ))}
+              </NativeSelect>
             </FormField>
           </div>
 
