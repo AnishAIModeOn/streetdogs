@@ -1,36 +1,16 @@
 import { AuthShell } from './AuthShell'
+import { AreaSocietyFields } from './AreaSocietyFields'
 import { StatusBanner } from './StatusBanner'
 import { Button } from './ui/button'
 import { FormDescription, FormField, FormLabel } from './ui/form'
 import { Input } from './ui/input'
 import { useProfile } from '../hooks/useProfile'
 
-function getLocalityName(locality) {
-  return (
-    locality?.name ||
-    locality?.locality_name ||
-    locality?.neighbourhood ||
-    locality?.label ||
-    locality?.title ||
-    'Unknown area'
-  )
-}
-
-function getLocalityId(locality) {
-  return String(locality?.id || locality?.locality_id || locality?.uuid || locality?.value || '')
-}
-
-function getSocietyId(society) {
-  return String(society?.id || society?.society_id || society?.uuid || society?.value || '')
-}
-
 export function ProfilePage({ user, profile, onComplete, onSignOut }) {
   const {
     form,
     setForm,
-    localities,
-    societies,
-    selectedLocality,
+    areaSocietyFlow,
     isLoading,
     isSaving,
     errorMessage,
@@ -99,65 +79,12 @@ export function ProfilePage({ user, profile, onComplete, onSignOut }) {
             </FormDescription>
           </FormField>
 
-          <div className="grid gap-4 rounded-[1.6rem] border border-white/70 bg-secondary/18 p-4">
-            <div>
-              <p className="text-base font-semibold text-foreground">Your Location</p>
-              <p className="text-sm text-muted-foreground">
-                Choose your area first, then optionally attach your society.
-              </p>
-            </div>
-
-            <FormField>
-              <FormLabel>Area</FormLabel>
-              <select
-                value={form.home_locality_id}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    home_locality_id: event.target.value,
-                    society_id: '',
-                  }))
-                }
-                className="flex h-11 w-full items-center rounded-2xl border border-input bg-white/90 px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="">Select your area</option>
-                {localities.map((locality) => (
-                  <option key={getLocalityId(locality)} value={getLocalityId(locality)}>
-                    {[locality.city, getLocalityName(locality)].filter(Boolean).join(' - ')}
-                  </option>
-                ))}
-              </select>
-              <FormDescription>Required. Loaded from the `localities` table.</FormDescription>
-            </FormField>
-
-            <FormField>
-              <FormLabel>Society</FormLabel>
-              <select
-                value={form.society_id || ''}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    society_id: event.target.value,
-                  }))
-                }
-                disabled={!form.home_locality_id}
-                className="flex h-11 w-full items-center rounded-2xl border border-input bg-white/90 px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <option value="">
-                  {form.home_locality_id ? 'No society' : 'Choose area first'}
-                </option>
-                {societies.map((society) => (
-                  <option key={getSocietyId(society)} value={getSocietyId(society)}>
-                    {society.name || society.society_name || society.title || 'Unnamed society'}
-                  </option>
-                ))}
-              </select>
-              <FormDescription>
-                Optional. Societies are loaded only for the selected area.
-                {selectedLocality ? ` Current area: ${getLocalityName(selectedLocality)}.` : ''}
-              </FormDescription>
-            </FormField>
-          </div>
+          <AreaSocietyFields
+            flow={areaSocietyFlow}
+            deferSocietyCreate
+            cardTitle="Area and society"
+            compact
+          />
 
           <Button type="submit" size="lg" disabled={isSaving}>
             {isSaving ? 'Saving profile...' : 'Save profile'}

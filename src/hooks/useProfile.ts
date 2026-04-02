@@ -1,138 +1,123 @@
 import { useEffect, useMemo, useState } from 'react'
 import { emptyProfileCompletionForm } from '../data/seedData'
-import { getProfile, listLocalities, listSocietiesByLocality, updateProfile } from '../lib/communityData'
+import { createSociety, getProfile } from '../lib/communityData'
+import { normalizeAreaLabel, useAreaSocietyFlow } from './use-area-society-flow'
+import { getAuthState, updateMyProfile } from '../services/auth.service'
 
-function getLocalityName(locality: any) {
-  return (
-    locality?.name ||
-    locality?.locality_name ||
-    locality?.neighbourhood ||
-    locality?.label ||
-    locality?.title ||
-    ''
-  )
-}
-
-function getLocalityId(locality: any) {
-  return String(locality?.id || locality?.locality_id || locality?.uuid || locality?.value || '')
-}
-
-function getSocietyId(society: any) {
-  return String(society?.id || society?.society_id || society?.uuid || society?.value || '')
-}
-
-function compareLocalities(a: any, b: any) {
-  const aLabel = [a?.city || '', getLocalityName(a)].join(' ').trim().toLowerCase()
-  const bLabel = [b?.city || '', getLocalityName(b)].join(' ').trim().toLowerCase()
-  return aLabel.localeCompare(bLabel)
+type SocietyShape = {
+  id?: string | null
+  name?: string | null
+  pincode?: string | null
+  neighbourhood?: string | null
+  _pending?: boolean
 }
 
 type ProfileShape = {
   id: string
   full_name?: string | null
   upi_id?: string | null
-  home_locality_id?: string | null
+  area_name?: string | null
+  neighbourhood?: string | null
+  pincode?: string | null
+  primary_area_id?: string | null
   society_id?: string | null
+  societies?: SocietyShape | null
+}
+
+function getInitialAreaLabel(profile: ProfileShape | null) {
+  return normalizeAreaLabel(
+    profile?.societies?.neighbourhood || profile?.neighbourhood || profile?.area_name || '',
+  )
+}
+
+function getInitialSociety(profile: ProfileShape | null) {
+  if (!profile?.societies?.name && !profile?.society_id) {
+    return null
+  }
+
+  return {
+    id: profile?.society_id || profile?.societies?.id || null,
+    name: profile?.societies?.name || '',
+    pincode: profile?.societies?.pincode || profile?.pincode || null,
+    neighbourhood:
+      profile?.societies?.neighbourhood || profile?.neighbourhood || profile?.area_name || null,
+  }
+}
+
+async function resolveSocietyId(selectedSociety: SocietyShape | null) {
+  if (!selectedSociety) {
+    return null
+  }
+
+  if (!selectedSociety._pending) {
+    return selectedSociety.id ?? null
+  }
+
+  if (!selectedSociety.name || !selectedSociety.pincode) {
+    throw new Error('Please choose an area with a pincode before adding a new society.')
+  }
+
+  const created = await createSociety({
+    name: selectedSociety.name,
+    pincode: selectedSociety.pincode,
+    neighbourhood: selectedSociety.neighbourhood || null,
+    coordinates: null,
+  })
+
+  return created?.id ?? null
 }
 
 export function useProfile(userId: string, initialProfile: ProfileShape | null) {
-  const [localities, setLocalities] = useState<any[]>([])
-  const [societies, setSocieties] = useState<any[]>([])
+  const initialAreaLabel = useMemo(() => getInitialAreaLabel(initialProfile), [initialProfile])
+  const initialPincode = useMemo(
+    () => initialProfile?.societies?.pincode || initialProfile?.pincode || '',
+    [initialProfile],
+  )
+  const initialSociety = useMemo(() => getInitialSociety(initialProfile), [initialProfile])
   const [form, setForm] = useState({
     ...emptyProfileCompletionForm,
     full_name: initialProfile?.full_name || '',
-    home_locality_id: initialProfile?.home_locality_id || '',
-    society_id: initialProfile?.society_id || '',
     upi_id: initialProfile?.upi_id || '',
   })
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+
+  const areaSocietyFlow = useAreaSocietyFlow({
+    autoDetect: false,
+    initialAreaLabel,
+    initialPincode,
+    initialSociety,
+  })
 
   useEffect(() => {
     setForm((current) => ({
       ...current,
       full_name: initialProfile?.full_name || '',
-      home_locality_id: initialProfile?.home_locality_id || '',
-      society_id: initialProfile?.society_id || '',
       upi_id: initialProfile?.upi_id || '',
     }))
+  }, [initialProfile?.full_name, initialProfile?.upi_id])
+
+  useEffect(() => {
+    areaSocietyFlow.applySnapshot({
+      areaInput: initialAreaLabel,
+      pincode: initialPincode,
+      selectedSociety: initialSociety,
+      manual: true,
+      detectedLabel: '',
+      detectedNeighbourhood: '',
+      societyDraftName: '',
+    })
   }, [
-    initialProfile?.full_name,
-    initialProfile?.home_locality_id,
-    initialProfile?.society_id,
-    initialProfile?.upi_id,
+    areaSocietyFlow.applySnapshot,
+    initialAreaLabel,
+    initialPincode,
+    initialSociety,
   ])
 
-  useEffect(() => {
-    let isMounted = true
-
-    const loadLocalities = async () => {
-      try {
-        setErrorMessage('')
-        const nextLocalities = await listLocalities()
-        if (isMounted) {
-          setLocalities([...nextLocalities].sort(compareLocalities))
-        }
-      } catch (error) {
-        if (isMounted) {
-          setErrorMessage(error instanceof Error ? error.message : 'Unable to load localities.')
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    loadLocalities()
-
-    return () => {
-      isMounted = false
-    }
-  }, [])
-
-  useEffect(() => {
-    let isMounted = true
-
-    const loadSocieties = async () => {
-      if (!form.home_locality_id) {
-        setSocieties([])
-        return
-      }
-
-      try {
-        setErrorMessage('')
-        const nextSocieties = await listSocietiesByLocality(form.home_locality_id)
-        if (!isMounted) {
-          return
-        }
-
-        setSocieties(nextSocieties)
-        if (
-          form.society_id &&
-          !nextSocieties.some((society) => getSocietyId(society) === form.society_id)
-        ) {
-          setForm((current) => ({ ...current, society_id: '' }))
-        }
-      } catch (error) {
-        if (isMounted) {
-          setErrorMessage(error instanceof Error ? error.message : 'Unable to load societies.')
-          setSocieties([])
-        }
-      }
-    }
-
-    loadSocieties()
-
-    return () => {
-      isMounted = false
-    }
-  }, [form.home_locality_id, form.society_id])
-
-  const selectedLocality = useMemo(
-    () => localities.find((locality) => getLocalityId(locality) === form.home_locality_id) ?? null,
-    [form.home_locality_id, localities],
+  const selectedAreaLabel = useMemo(
+    () => normalizeAreaLabel(areaSocietyFlow.areaContext.neighbourhood || areaSocietyFlow.areaLabel),
+    [areaSocietyFlow.areaContext.neighbourhood, areaSocietyFlow.areaLabel],
   )
 
   async function saveProfile() {
@@ -142,33 +127,30 @@ export function useProfile(userId: string, initialProfile: ProfileShape | null) 
       throw new Error('Full name is required.')
     }
 
-    if (!form.home_locality_id) {
+    if (!selectedAreaLabel) {
       throw new Error('Area is required.')
-    }
-
-    if (
-      form.society_id &&
-      !societies.some(
-        (society) =>
-          getSocietyId(society) === form.society_id &&
-          String(society.locality_id || society.home_locality_id || '') === form.home_locality_id,
-      )
-    ) {
-      throw new Error('Selected society does not belong to the chosen area.')
     }
 
     setIsSaving(true)
     setErrorMessage('')
 
     try {
-      await updateProfile(userId, {
+      const societyId = await resolveSocietyId(areaSocietyFlow.selectedSociety)
+      const profileUpdate: Record<string, string | null> = {
         full_name: trimmedFullName,
-        home_locality_id: form.home_locality_id,
-        society_id: form.society_id || null,
         upi_id: form.upi_id.trim() || null,
-      })
+        neighbourhood: selectedAreaLabel || null,
+        pincode: areaSocietyFlow.areaContext.pincode || null,
+        society_id: societyId,
+      }
 
-      return await getProfile(userId)
+      await updateMyProfile({
+        id: userId,
+        ...profileUpdate,
+      } as any)
+
+      const authState = await getAuthState().catch(() => null)
+      return authState?.profile ?? (await getProfile(userId))
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to save your profile.'
       setErrorMessage(message)
@@ -181,9 +163,7 @@ export function useProfile(userId: string, initialProfile: ProfileShape | null) 
   return {
     form,
     setForm,
-    localities,
-    societies,
-    selectedLocality,
+    areaSocietyFlow,
     isLoading,
     isSaving,
     errorMessage,
