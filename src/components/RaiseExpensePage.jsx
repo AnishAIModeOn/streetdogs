@@ -1,16 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Loader2, MapPin, UploadCloud } from 'lucide-react'
+import { Building2, Check, Dog, Loader2, MapPin } from 'lucide-react'
 import { emptyExpenseForm } from '../data/seedData'
-import { findMatchingAreaId, useAreaSocietyFlow } from '../hooks/use-area-society-flow'
 import { useDogs } from '../hooks/use-dogs'
 import { getDog, getProfile, listAreas } from '../lib/communityData'
 import { navigateTo } from '../lib/navigation'
-import {
-  useCreateExpense,
-  useCreateExpenseReceipt,
-  useUploadExpenseReceipt,
-} from '../hooks/use-expenses'
-import { SocietyPicker } from './SocietyPicker'
+import { useCreateExpense } from '../hooks/use-expenses'
 import { StatusBanner } from './StatusBanner'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
@@ -21,11 +15,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from './ui/textarea'
 
 const expenseTypes = ['food', 'medical', 'vaccination', 'rescue', 'other']
-const modeOptions = [
-  { value: 'dog', label: 'For Dog' },
-  { value: 'area', label: 'For Area' },
-  { value: 'society', label: 'For Society' },
-]
 
 function formatLabel(value) {
   return value.replaceAll('_', ' ')
@@ -42,16 +31,19 @@ function buildDogDisplayLocation(dog) {
   )
 }
 
-function resolveSubmissionAreaId({ matchedAreaId, currentAreaId, areas, fallbackAreaId }) {
-  const validAreaIds = new Set(areas.map((area) => area.id))
-
-  for (const candidate of [matchedAreaId, currentAreaId, fallbackAreaId]) {
-    if (candidate && validAreaIds.has(candidate)) {
-      return candidate
-    }
+function toSocietyState(profile) {
+  if (!profile?.society_id && !profile?.societies?.name) {
+    return null
   }
 
-  return areas[0]?.id || ''
+  return {
+    id: profile?.society_id || profile?.societies?.id || null,
+    name: profile?.societies?.name || '',
+  }
+}
+
+function normalizeText(value) {
+  return (value || '').trim().toLowerCase()
 }
 
 export function RaiseExpensePage({ dogId, user }) {
@@ -59,21 +51,15 @@ export function RaiseExpensePage({ dogId, user }) {
   const [profile, setProfile] = useState(null)
   const [areas, setAreas] = useState([])
   const [form, setForm] = useState(emptyExpenseForm)
-  const [mode, setMode] = useState(dogId ? 'dog' : 'area')
-  const [selectedDogId, setSelectedDogId] = useState(dogId ?? '')
+  const [selectedDogIds, setSelectedDogIds] = useState(dogId ? [dogId] : [])
+  const [selectedSociety, setSelectedSociety] = useState(null)
+  const [societyName, setSocietyName] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
-  const [selectedReceiptFile, setSelectedReceiptFile] = useState(null)
   const { data: dogs = [] } = useDogs()
   const createExpenseMutation = useCreateExpense()
-  const createExpenseReceiptMutation = useCreateExpenseReceipt()
-  const uploadExpenseReceiptMutation = useUploadExpenseReceipt()
-
-  const flow = useAreaSocietyFlow({
-    autoDetect: false,
-  })
 
   useEffect(() => {
     let isMounted = true
@@ -95,46 +81,10 @@ export function RaiseExpensePage({ dogId, user }) {
         setAreas(nextAreas)
         setLinkedDog(nextDog)
 
-        if (nextDog) {
-          const dogArea = nextAreas.find((entry) => entry.id === nextDog.area_id)
-          if (dogArea) {
-            flow.applySnapshot({
-              areaInput: dogArea.name,
-              pincode: nextDog.tagged_area_pincode ?? '',
-              selectedSociety: nextDog.tagged_society_name
-                ? {
-                    id: nextDog.tagged_society_id ?? null,
-                    name: nextDog.tagged_society_name,
-                    pincode: nextDog.tagged_area_pincode ?? null,
-                    neighbourhood: dogArea.name,
-                  }
-                : null,
-              manual: true,
-              detectedLabel: '',
-              detectedNeighbourhood: dogArea.name,
-              societyDraftName: '',
-            })
-          }
-        } else {
-          const primaryArea = nextProfile?.primary_area_id
-            ? nextAreas.find((entry) => entry.id === nextProfile.primary_area_id)
-            : null
-
-          flow.applySnapshot({
-            areaInput:
-              nextProfile?.societies?.neighbourhood ||
-              nextProfile?.neighbourhood ||
-              primaryArea?.name ||
-              '',
-            pincode: nextProfile?.societies?.pincode || nextProfile?.pincode || '',
-            selectedSociety: nextProfile?.societies || null,
-            manual: true,
-            detectedLabel: '',
-            detectedNeighbourhood:
-              nextProfile?.societies?.neighbourhood || nextProfile?.neighbourhood || primaryArea?.name || '',
-            societyDraftName: '',
-          })
-        }
+        const nextSociety = toSocietyState(nextProfile)
+        setSelectedSociety(nextSociety)
+        setSocietyName(nextSociety?.name || '')
+        setSelectedDogIds(nextDog?.id ? [nextDog.id] : dogId ? [dogId] : [])
       } catch (error) {
         if (isMounted) {
           setErrorMessage(error instanceof Error ? error.message : 'Unable to load expense form context.')
@@ -151,96 +101,85 @@ export function RaiseExpensePage({ dogId, user }) {
     return () => {
       isMounted = false
     }
-  }, [dogId, flow.applySnapshot, user.id])
+  }, [dogId, user.id])
 
-  const areasById = useMemo(
-    () => Object.fromEntries(areas.map((area) => [area.id, area])),
-    [areas],
-  )
+  const areasById = useMemo(() => Object.fromEntries(areas.map((area) => [area.id, area])), [areas])
 
-  const selectedDog = useMemo(
-    () => dogs.find((dog) => dog.id === selectedDogId) || linkedDog || null,
-    [dogs, linkedDog, selectedDogId],
-  )
+  const profileAreaId = profile?.home_locality_id || profile?.primary_area_id || linkedDog?.area_id || ''
+  const currentArea = profileAreaId ? areasById[profileAreaId] : null
+  const normalizedSocietyName = normalizeText(societyName)
+
+  const filteredDogs = useMemo(() => {
+    return dogs.filter((dog) => {
+      if (!profileAreaId || dog.area_id !== profileAreaId) {
+        return false
+      }
+
+      if (!normalizedSocietyName) {
+        return true
+      }
+
+      if (selectedSociety?.id) {
+        return dog.tagged_society_id === selectedSociety.id
+      }
+
+      return normalizeText(dog.tagged_society_name) === normalizedSocietyName
+    })
+  }, [dogs, normalizedSocietyName, profileAreaId, selectedSociety?.id])
 
   useEffect(() => {
-    if (mode !== 'dog' || !selectedDog) {
+    const allowedDogIds = new Set(filteredDogs.map((dog) => dog.id))
+    setSelectedDogIds((current) => current.filter((id) => allowedDogIds.has(id)))
+  }, [filteredDogs])
+
+  const selectedDogs = useMemo(
+    () => filteredDogs.filter((dog) => selectedDogIds.includes(dog.id)),
+    [filteredDogs, selectedDogIds],
+  )
+
+  const expenseScope = selectedDogs.length === 0 ? (normalizedSocietyName ? 'society' : 'area') : selectedDogs.length === 1 ? 'dog' : 'group'
+
+  const dogSummary =
+    expenseScope === 'area'
+      ? 'This will be raised as an area expense.'
+      : expenseScope === 'society'
+        ? 'This will be raised as a society expense.'
+        : expenseScope === 'dog'
+          ? `This will be raised for ${selectedDogs[0]?.dog_name_or_temp_name || 'the selected dog'}.`
+          : `This will be raised as a group expense for ${selectedDogs.length} dogs.`
+
+  const handleDogToggle = (dogIdToToggle) => {
+    setSelectedDogIds((current) =>
+      current.includes(dogIdToToggle)
+        ? current.filter((dogIdValue) => dogIdValue !== dogIdToToggle)
+        : [...current, dogIdToToggle],
+    )
+  }
+
+  const handleSocietyNameChange = (event) => {
+    const nextValue = event.target.value
+    setSocietyName(nextValue)
+
+    if (!nextValue.trim()) {
+      setSelectedSociety(null)
       return
     }
 
-    const dogArea = areasById[selectedDog.area_id]
-    if (!dogArea) {
-      return
+    if (normalizeText(selectedSociety?.name) !== normalizeText(nextValue)) {
+      setSelectedSociety((current) => (current ? { ...current, id: null, name: nextValue } : { id: null, name: nextValue }))
     }
-
-    flow.applySnapshot({
-      areaInput: dogArea.name,
-      pincode: selectedDog.tagged_area_pincode ?? '',
-      selectedSociety: selectedDog.tagged_society_name
-        ? {
-            id: selectedDog.tagged_society_id ?? null,
-            name: selectedDog.tagged_society_name,
-            pincode: selectedDog.tagged_area_pincode ?? null,
-            neighbourhood: dogArea.name,
-          }
-        : null,
-      manual: true,
-      detectedLabel: '',
-      detectedNeighbourhood: dogArea.name,
-      societyDraftName: '',
-    })
-  }, [areasById, flow.applySnapshot, mode, selectedDog])
-
-  const matchedAreaId = useMemo(
-    () => findMatchingAreaId(areas, flow.areaContext.neighbourhood || flow.areaContext.areaLabel),
-    [areas, flow.areaContext.areaLabel, flow.areaContext.neighbourhood],
-  )
-
-  const currentArea = matchedAreaId ? areasById[matchedAreaId] : null
-  const dogOptions = useMemo(
-    () =>
-      dogs.map((dog) => ({
-        id: dog.id,
-        label: dog.dog_name_or_temp_name || `Dog ${dog.id.slice(0, 6)}`,
-        location: buildDogDisplayLocation(dog),
-      })),
-    [dogs],
-  )
-
-  const contextSummary = useMemo(() => {
-    if (mode === 'dog' && selectedDog) {
-      return {
-        title: selectedDog.dog_name_or_temp_name || 'Unnamed dog',
-        subtitle: buildDogDisplayLocation(selectedDog),
-        area: currentArea ? `${currentArea.city} · ${currentArea.name}` : 'Area unavailable',
-      }
-    }
-
-    if (mode === 'society') {
-      return {
-        title: flow.selectedSociety?.name || 'Choose a society',
-        subtitle: 'Society-level expense',
-        area: currentArea ? `${currentArea.city} · ${currentArea.name}` : 'Choose an area first',
-      }
-    }
-
-    return {
-      title: currentArea ? currentArea.name : 'Choose an area',
-      subtitle: 'Area-level expense',
-      area: currentArea ? `${currentArea.city} · ${currentArea.name}` : 'Area unavailable',
-    }
-  }, [currentArea, flow.selectedSociety?.name, mode, selectedDog])
+  }
 
   const handleSubmit = async (event) => {
     event.preventDefault()
 
-    if (!form.total_amount || Number(form.total_amount) <= 0) {
-      setErrorMessage('Please enter a total amount greater than 0.')
+    if (!profileAreaId || !currentArea) {
+      setErrorMessage('Your profile must have a home area before you can raise an expense.')
       return
     }
 
-    if (!form.disclaimer_accepted) {
-      setErrorMessage('Please accept the disclaimer before raising this expense.')
+    if (!form.total_amount || Number(form.total_amount) <= 0) {
+      setErrorMessage('Please enter an amount greater than 0.')
       return
     }
 
@@ -252,79 +191,49 @@ export function RaiseExpensePage({ dogId, user }) {
       return
     }
 
-    if (mode === 'dog' && !selectedDog?.id) {
-      setErrorMessage('Select a dog before creating a dog-linked expense.')
-      return
-    }
-
-    const submissionAreaId = resolveSubmissionAreaId({
-      matchedAreaId,
-      currentAreaId: currentArea?.id || '',
-      areas,
-      fallbackAreaId: profile?.primary_area_id || '',
-    })
-
-    if ((mode === 'area' || mode === 'society') && !submissionAreaId) {
-      setErrorMessage('Select a valid area before raising this expense.')
-      return
-    }
-
-    if (mode === 'society' && !flow.selectedSociety?.name) {
-      setErrorMessage('Select a society before raising a society-level expense.')
-      return
-    }
-
     try {
       setIsSaving(true)
       setErrorMessage('')
       setSuccessMessage('')
 
       const totalAmount = Number(form.total_amount)
+      const trimmedDescription = form.description.trim()
+      const selectedDogNames = selectedDogs
+        .map((dog) => dog.dog_name_or_temp_name || `Dog ${dog.id.slice(0, 6)}`)
+        .join(', ')
+
+      const descriptionParts = [trimmedDescription]
+      if (selectedDogs.length > 1) {
+        descriptionParts.push(`Group expense for: ${selectedDogNames}`)
+      }
+
+      const targetScope = selectedDogs.length === 1 ? 'dog' : normalizedSocietyName ? 'society' : 'area'
       const payload = {
-        dog_id: mode === 'dog' ? selectedDog.id : null,
+        dog_id: selectedDogs.length === 1 ? selectedDogs[0].id : null,
         raised_by_user_id: user.id,
-        area_id: mode === 'dog' ? selectedDog.area_id : submissionAreaId,
-        target_scope: mode,
-        target_society_id: mode === 'society' ? flow.selectedSociety?.id ?? null : null,
-        target_society_name: mode === 'society' ? flow.selectedSociety?.name ?? null : null,
+        area_id: profileAreaId,
+        target_scope: targetScope,
+        target_society_id: targetScope !== 'dog' ? selectedSociety?.id ?? null : null,
+        target_society_name: targetScope !== 'dog' && normalizedSocietyName ? societyName.trim() : null,
         expense_type: form.expense_type,
-        description: form.description.trim() || null,
+        description: descriptionParts.filter(Boolean).join('\n\n') || null,
         total_amount: totalAmount,
         amount_contributed: 0,
         amount_pending: totalAmount,
-        disclaimer_accepted: true,
+        disclaimer_accepted: false,
         status: 'open',
       }
 
-      const createdExpense = await createExpenseMutation.mutateAsync(payload)
-
-      if (selectedReceiptFile) {
-        const uploadedReceipt = await uploadExpenseReceiptMutation.mutateAsync({
-          file: selectedReceiptFile,
-          userId: user.id,
-        })
-
-        await createExpenseReceiptMutation.mutateAsync({
-          expense_id: createdExpense.id,
-          uploaded_by_user_id: user.id,
-          file_url: uploadedReceipt.receipt_url,
-        })
-      } else if (form.receipt_url.trim()) {
-        await createExpenseReceiptMutation.mutateAsync({
-          expense_id: createdExpense.id,
-          uploaded_by_user_id: user.id,
-          file_url: form.receipt_url.trim(),
-        })
-      }
+      await createExpenseMutation.mutateAsync(payload)
 
       setSuccessMessage(
-        mode === 'dog'
+        targetScope === 'dog'
           ? 'Expense raised successfully. Redirecting back to the dog detail page...'
           : 'Expense raised successfully. Redirecting to the dashboard...',
       )
 
       window.setTimeout(() => {
-        navigateTo(mode === 'dog' ? `/dogs/${selectedDog.id}` : '/dashboard')
+        navigateTo(targetScope === 'dog' ? `/dogs/${selectedDogs[0].id}` : '/dashboard')
       }, 1200)
     } catch (error) {
       const message =
@@ -339,7 +248,7 @@ export function RaiseExpensePage({ dogId, user }) {
 
   if (isLoading) {
     return (
-      <section className="space-y-6">
+      <section className="mx-auto max-w-2xl space-y-4">
         <Card className="rounded-[2rem] border-white/70 bg-white/90 shadow-soft">
           <CardContent className="space-y-3 p-6">
             <div className="h-6 w-40 animate-pulse rounded-full bg-secondary/50" />
@@ -352,7 +261,7 @@ export function RaiseExpensePage({ dogId, user }) {
 
   if (dogId && !linkedDog) {
     return (
-      <section className="space-y-6">
+      <section className="mx-auto max-w-2xl space-y-4">
         <Card className="rounded-[2rem] border-dashed border-border bg-white/90 shadow-soft">
           <CardContent className="space-y-2 p-8 text-center">
             <h3 className="text-xl font-semibold text-foreground">Dog not available</h3>
@@ -371,75 +280,33 @@ export function RaiseExpensePage({ dogId, user }) {
   }
 
   return (
-    <section className="space-y-6">
-      <div className="grid gap-4 rounded-[2rem] border border-white/65 bg-hero-wash p-6 shadow-float lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="space-y-4">
+    <section className="mx-auto max-w-2xl space-y-4">
+      <Card className="rounded-[2rem] border-white/65 bg-hero-wash shadow-float">
+        <CardContent className="space-y-3 p-5 sm:p-6">
           <Badge className="w-fit" variant="secondary">
             Raise Expense
           </Badge>
-          <div className="space-y-2">
-            <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
-              Start an expense appeal
+          <div className="space-y-1.5">
+            <h1 className="text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
+              Raise an expense
             </h1>
-            <p className="max-w-lg text-sm leading-7 text-muted-foreground sm:text-[0.95rem]">
-              Raise support for one dog, a full area, or a specific society without leaving the dashboard flow.
+            <p className="text-sm leading-6 text-muted-foreground">
+              Area comes from your profile. Add a society if needed and optionally link one or more dogs.
             </p>
           </div>
-          <div className="inline-flex rounded-[1.1rem] border border-white/75 bg-white/75 p-1 shadow-soft">
-            {modeOptions.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setMode(option.value)}
-                className={[
-                  'rounded-[0.95rem] px-3 py-2 text-sm font-semibold transition-colors',
-                  mode === option.value
-                    ? 'bg-primary text-primary-foreground shadow-soft'
-                    : 'text-foreground/70 hover:bg-secondary/35 hover:text-foreground',
-                ].join(' ')}
-              >
-                {option.label}
-              </button>
-            ))}
+          <div className="rounded-[1.4rem] border border-white/70 bg-white/85 px-4 py-3 text-sm text-foreground shadow-soft">
+            {dogSummary}
           </div>
-        </div>
-
-        <Card className="overflow-hidden rounded-[1.75rem] border-white/65 bg-white/92">
-          <CardHeader className="pb-3">
-            <CardTitle>Expense context</CardTitle>
-            <CardDescription>
-              The appeal will be linked according to the mode you choose.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2.5 text-sm leading-6">
-            <div className="flex items-center gap-3 rounded-xl bg-secondary/35 px-4 py-3">
-              <span className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground">
-                {mode === 'dog' ? 'Dog' : mode === 'society' ? 'Society' : 'Area'}
-              </span>
-              <span className="font-semibold text-foreground">{contextSummary.title}</span>
-            </div>
-            <div className="flex items-center gap-3 rounded-xl bg-secondary/35 px-4 py-3">
-              <span className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground">Context</span>
-              <span className="font-semibold text-foreground">{contextSummary.subtitle}</span>
-            </div>
-            <div className="flex items-center gap-3 rounded-xl bg-secondary/35 px-4 py-3">
-              <span className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground">Area</span>
-              <span className="font-semibold text-foreground">{contextSummary.area}</span>
-            </div>
-            <div className="rounded-xl bg-secondary/25 px-4 py-3 text-muted-foreground">
-              Expenses without a dog stay visible at the area or society level for dashboard and contribution flows.
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+        </CardContent>
+      </Card>
 
       {errorMessage ? <StatusBanner variant="error">{errorMessage}</StatusBanner> : null}
       {successMessage ? <StatusBanner variant="success">{successMessage}</StatusBanner> : null}
 
       {!profile?.upi_id ? (
         <Card className="rounded-[2rem] border-orange-200 bg-orange-50/80 shadow-soft">
-          <CardContent className="space-y-3 p-6">
-            <h3 className="text-xl font-semibold text-foreground">UPI ID required</h3>
+          <CardContent className="space-y-3 p-5 sm:p-6">
+            <h3 className="text-lg font-semibold text-foreground">UPI ID required</h3>
             <p className="text-sm leading-6 text-muted-foreground">
               To raise an expense appeal you must first add your UPI ID.
             </p>
@@ -451,57 +318,110 @@ export function RaiseExpensePage({ dogId, user }) {
       ) : null}
 
       {profile?.upi_id ? (
-        <form className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]" onSubmit={handleSubmit}>
-          <Card className="rounded-[2rem] border-white/70 bg-white/90 shadow-soft">
-            <CardHeader>
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <Card className="rounded-[2rem] border-white/70 bg-white/92 shadow-soft">
+            <CardHeader className="pb-4">
               <CardTitle>Expense details</CardTitle>
-              <CardDescription>
-                Keep the form simple and clear so supporters immediately understand what is needed.
-              </CardDescription>
+              <CardDescription>Compact form for area, society, single-dog, or group expenses.</CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-5">
-              {mode === 'dog' ? (
-                <FormField>
-                  <FormLabel>Select dog</FormLabel>
-                  <Select value={selectedDogId} onValueChange={setSelectedDogId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose a dog" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {dogOptions.map((dogOption) => (
-                        <SelectItem key={dogOption.id} value={dogOption.id}>
-                          {dogOption.label} · {dogOption.location}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>Only required when the expense is for one specific dog.</FormDescription>
-                </FormField>
-              ) : (
-                <>
-                  <AreaSelectionField flow={flow} />
-                  {mode === 'society' ? (
-                    <div className="rounded-[1.35rem] border border-white/75 bg-secondary/15 px-3 py-2">
-                      <SocietyPicker
-                        pincode={flow.areaContext.pincode}
-                        neighbourhood={flow.areaContext.neighbourhood}
-                        onSelect={flow.setSelectedSociety}
-                        draftName={flow.societyDraftName}
-                        onDraftChange={flow.setSocietyDraftName}
-                        deferCreate
-                      />
+            <CardContent className="space-y-4">
+              <FormField>
+                <FormLabel>Area</FormLabel>
+                <div className="flex items-start gap-3 rounded-[1.35rem] border border-white/75 bg-secondary/15 px-4 py-3">
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary/75" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">
+                      {currentArea?.name || profile?.neighbourhood || 'Area unavailable'}
+                    </p>
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      {currentArea?.city || profile?.city || 'From your profile'}
+                    </p>
+                  </div>
+                </div>
+                <FormDescription>This is locked to your profile home area.</FormDescription>
+              </FormField>
+
+              <FormField>
+                <FormLabel>Society</FormLabel>
+                <div className="relative">
+                  <Building2 className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-primary/70" />
+                  <Input
+                    value={societyName}
+                    placeholder="Optional society"
+                    onChange={handleSocietyNameChange}
+                    className="pl-11"
+                  />
+                </div>
+                <FormDescription>Optional. Clear it for an area expense, or keep/edit it for society filtering.</FormDescription>
+              </FormField>
+
+              <FormField>
+                <FormLabel>Select dogs</FormLabel>
+                <div className="space-y-2 rounded-[1.5rem] border border-white/75 bg-secondary/10 p-3">
+                  <div className="flex items-center justify-between gap-3 px-1">
+                    <p className="text-sm font-medium text-foreground">
+                      {filteredDogs.length} dog{filteredDogs.length === 1 ? '' : 's'} available
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedDogIds.length} selected
+                    </p>
+                  </div>
+
+                  {filteredDogs.length === 0 ? (
+                    <div className="rounded-[1.2rem] bg-white/80 px-4 py-3 text-sm text-muted-foreground">
+                      No dogs match this area{normalizedSocietyName ? ' and society' : ''}. Leave this empty to raise an area or society expense.
                     </div>
-                  ) : null}
-                </>
-              )}
+                  ) : (
+                    <div className="grid gap-2">
+                      {filteredDogs.map((dog) => {
+                        const isSelected = selectedDogIds.includes(dog.id)
+                        return (
+                          <button
+                            key={dog.id}
+                            type="button"
+                            onClick={() => handleDogToggle(dog.id)}
+                            className={[
+                              'flex items-start gap-3 rounded-[1.2rem] border px-3 py-3 text-left transition-colors',
+                              isSelected
+                                ? 'border-primary/40 bg-primary/10'
+                                : 'border-white/70 bg-white/85 hover:bg-secondary/20',
+                            ].join(' ')}
+                          >
+                            <span
+                              className={[
+                                'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border',
+                                isSelected
+                                  ? 'border-primary bg-primary text-primary-foreground'
+                                  : 'border-border bg-white text-transparent',
+                              ].join(' ')}
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                            </span>
+                            <Dog className="mt-0.5 h-4 w-4 shrink-0 text-primary/80" />
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-sm font-semibold text-foreground">
+                                {dog.dog_name_or_temp_name || `Dog ${dog.id.slice(0, 6)}`}
+                              </span>
+                              <span className="block text-xs leading-5 text-muted-foreground">
+                                {buildDogDisplayLocation(dog)}
+                              </span>
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+                <FormDescription>
+                  No dogs selected means {normalizedSocietyName ? 'a society expense' : 'an area expense'}.
+                </FormDescription>
+              </FormField>
 
               <FormField>
                 <FormLabel>Expense type</FormLabel>
                 <Select
                   value={form.expense_type}
-                  onValueChange={(value) =>
-                    setForm((current) => ({ ...current, expense_type: value }))
-                  }
+                  onValueChange={(value) => setForm((current) => ({ ...current, expense_type: value }))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select expense type" />
@@ -517,7 +437,7 @@ export function RaiseExpensePage({ dogId, user }) {
               </FormField>
 
               <FormField>
-                <FormLabel>Total amount</FormLabel>
+                <FormLabel>Amount</FormLabel>
                 <Input
                   required
                   type="number"
@@ -542,153 +462,31 @@ export function RaiseExpensePage({ dogId, user }) {
                 />
               </FormField>
 
-              <FormField>
-                <FormLabel>Receipt URL</FormLabel>
-                <Input
-                  type="url"
-                  placeholder="Receipt URL (optional)"
-                  value={form.receipt_url}
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, receipt_url: event.target.value }))
+              <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    navigateTo(dogId && linkedDog ? `/dogs/${linkedDog.id}` : '/dashboard')
                   }
-                />
-                <FormDescription>
-                  Add a bill, estimate, or proof link if you already have one.
-                </FormDescription>
-              </FormField>
-
-              <FormField>
-                <FormLabel>Receipt upload</FormLabel>
-                <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-[1.5rem] border border-dashed border-border bg-secondary/15 px-5 py-8 text-center transition hover:bg-secondary/25">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                    <UploadCloud className="h-5 w-5" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-foreground">
-                      {selectedReceiptFile ? selectedReceiptFile.name : 'Choose a receipt file'}
-                    </p>
-                    <p className="text-xs leading-5 text-muted-foreground">
-                      Upload a bill or proof file to StreetDog App storage.
-                    </p>
-                  </div>
-                  <input
-                    className="sr-only"
-                    type="file"
-                    accept="image/*,.pdf"
-                    onChange={(event) => setSelectedReceiptFile(event.target.files?.[0] ?? null)}
-                  />
-                </label>
-                <FormDescription>
-                  You can upload a receipt file, paste a receipt URL, or do both.
-                </FormDescription>
-              </FormField>
+                >
+                  {dogId && linkedDog ? 'Back to Dog' : 'Back to Dashboard'}
+                </Button>
+                <Button type="submit" disabled={isSaving}>
+                  {isSaving ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Raising expense...
+                    </span>
+                  ) : (
+                    'Raise Expense'
+                  )}
+                </Button>
+              </div>
             </CardContent>
           </Card>
-
-          <div className="grid gap-5">
-            <Card className="rounded-[2rem] border-white/70 bg-white/90 shadow-soft">
-              <CardHeader>
-                <CardTitle>Before you submit</CardTitle>
-                <CardDescription>
-                  A little context helps StreetDog App stay trustworthy and easy to support.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-3 text-sm leading-6 text-muted-foreground">
-                <div className="rounded-2xl bg-secondary/40 p-4">
-                  Share the real amount needed and keep the description specific.
-                </div>
-                <div className="rounded-2xl bg-secondary/40 p-4">
-                  Your UPI ID will be used by supporters to pay you directly.
-                </div>
-                <div className="rounded-2xl bg-secondary/40 p-4">
-                  Dog selection is optional now, but area context is still required for visibility.
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-[2rem] border-white/70 bg-white/90 shadow-soft">
-              <CardHeader>
-                <CardTitle>Disclaimer</CardTitle>
-                <CardDescription>
-                  Please confirm that this request is valid before creating the expense.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-4">
-                <label className="flex items-start gap-3 rounded-2xl border border-border/70 bg-secondary/20 p-4 text-sm text-foreground">
-                  <input
-                    className="mt-1 h-4 w-4 accent-[hsl(var(--primary))]"
-                    type="checkbox"
-                    checked={form.disclaimer_accepted}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        disclaimer_accepted: event.target.checked,
-                      }))
-                    }
-                  />
-                  <span>
-                    I confirm this expense is valid and I accept the disclaimer requirement.
-                  </span>
-                </label>
-
-                <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => navigateTo(mode === 'dog' && selectedDog ? `/dogs/${selectedDog.id}` : '/dashboard')}
-                  >
-                    {mode === 'dog' && selectedDog ? 'Back to Dog' : 'Back to Dashboard'}
-                  </Button>
-                  <Button type="submit" disabled={isSaving}>
-                    {isSaving ? 'Raising expense...' : 'Raise Expense'}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
         </form>
       ) : null}
     </section>
-  )
-}
-
-function AreaSelectionField({ flow }) {
-  return (
-    <FormField>
-      <FormLabel>Area</FormLabel>
-      <div className="relative min-w-0">
-        <Input
-          value={flow.areaInput}
-          placeholder="Select area"
-          onChange={(event) => flow.setAreaInput(event.target.value)}
-          onFocus={() => flow.setShowSuggestions(true)}
-          onBlur={() => window.setTimeout(() => flow.setShowSuggestions(false), 150)}
-          autoComplete="off"
-          className="h-11 rounded-2xl border-white/75 bg-white/92 pr-10 text-sm shadow-none"
-        />
-        {flow.isFetchingSuggestions ? (
-          <Loader2 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
-        ) : null}
-        {flow.showSuggestions && flow.areaSuggestions.length > 0 ? (
-          <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-2xl border border-white/70 bg-white shadow-float">
-            {flow.areaSuggestions.map((suggestion, index) => (
-              <button
-                key={`${suggestion.neighbourhood}-${suggestion.pincode || index}`}
-                type="button"
-                className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm transition-colors hover:bg-secondary/35"
-                onMouseDown={() => flow.selectSuggestion(suggestion)}
-              >
-                <MapPin className="h-3.5 w-3.5 shrink-0 text-primary/70" />
-                <span className="flex-1 truncate">{suggestion.neighbourhood || suggestion.pincode}</span>
-                {suggestion.pincode ? (
-                  <span className="text-xs text-muted-foreground">{suggestion.pincode}</span>
-                ) : null}
-              </button>
-            ))}
-          </div>
-        ) : null}
-      </div>
-      <FormDescription>Required for area-level and society-level expenses.</FormDescription>
-    </FormField>
   )
 }

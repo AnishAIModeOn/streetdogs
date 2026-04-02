@@ -187,7 +187,13 @@ export async function listSocietiesByLocality(localityId) {
 
 export async function getProfile(userId) {
   const client = ensureSupabase()
-  return unwrap(await client.from('profiles').select('*').eq('id', userId).maybeSingle())
+  return unwrap(
+    await client
+      .from('profiles')
+      .select('*, societies(id, name, pincode, neighbourhood)')
+      .eq('id', userId)
+      .maybeSingle(),
+  )
 }
 
 export async function updateProfile(userId, payload) {
