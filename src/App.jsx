@@ -13,7 +13,7 @@ import { InventoryPage } from './components/InventoryPage'
 import { LandingPage } from './components/LandingPage'
 import { LoadingView } from './components/LoadingView'
 import { NewInventoryRequestPage } from './components/NewInventoryRequestPage'
-import { ProfileCompletionPage } from './components/ProfileCompletionPage'
+import { ProfilePage } from './components/ProfilePage'
 import { RaiseExpensePage } from './components/RaiseExpensePage'
 import { Toaster } from './components/ui/toaster'
 import { resolveAuthProfileState, signOutUser, subscribeToAuthChanges } from './lib/auth'
@@ -182,7 +182,7 @@ function App() {
         onSignOut={handleSignOut}
       >
         {currentPath === '/profile' ? (
-          <ProfileCompletionPage
+          <ProfilePage
             user={user}
             profile={profile}
             onComplete={handleProfileUpdated}

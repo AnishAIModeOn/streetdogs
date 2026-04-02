@@ -29,7 +29,8 @@ export interface Profile {
   role: ProfileRole
   city: string | null
   area_name: string | null
-  primary_area_id?: string | null
+  home_locality_id?: string | null
+  society_id?: string | null
   upi_id?: string | null
   status?: 'active' | 'inactive' | null
   created_at: string

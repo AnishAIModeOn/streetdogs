@@ -164,6 +164,29 @@ export async function listAreas() {
   )
 }
 
+export async function listLocalities() {
+  const client = ensureSupabase()
+  return unwrap(
+    await client.from('localities').select('*').order('city', { ascending: true }).order('name'),
+  )
+}
+
+export async function listSocietiesByLocality(localityId) {
+  const client = ensureSupabase()
+
+  if (!localityId) {
+    return []
+  }
+
+  return unwrap(
+    await client
+      .from('societies')
+      .select('*')
+      .eq('locality_id', localityId)
+      .order('name', { ascending: true }),
+  )
+}
+
 export async function getProfile(userId) {
   const client = ensureSupabase()
   return unwrap(await client.from('profiles').select('*').eq('id', userId).maybeSingle())
