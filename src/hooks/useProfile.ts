@@ -13,6 +13,14 @@ function getLocalityName(locality: any) {
   )
 }
 
+function getLocalityId(locality: any) {
+  return String(locality?.id || locality?.locality_id || locality?.uuid || locality?.value || '')
+}
+
+function getSocietyId(society: any) {
+  return String(society?.id || society?.society_id || society?.uuid || society?.value || '')
+}
+
 function compareLocalities(a: any, b: any) {
   const aLabel = [a?.city || '', getLocalityName(a)].join(' ').trim().toLowerCase()
   const bLabel = [b?.city || '', getLocalityName(b)].join(' ').trim().toLowerCase()
@@ -103,7 +111,7 @@ export function useProfile(userId: string, initialProfile: ProfileShape | null) 
         setSocieties(nextSocieties)
         if (
           form.society_id &&
-          !nextSocieties.some((society) => society.id === form.society_id)
+          !nextSocieties.some((society) => getSocietyId(society) === form.society_id)
         ) {
           setForm((current) => ({ ...current, society_id: '' }))
         }
@@ -123,7 +131,7 @@ export function useProfile(userId: string, initialProfile: ProfileShape | null) 
   }, [form.home_locality_id, form.society_id])
 
   const selectedLocality = useMemo(
-    () => localities.find((locality) => locality.id === form.home_locality_id) ?? null,
+    () => localities.find((locality) => getLocalityId(locality) === form.home_locality_id) ?? null,
     [form.home_locality_id, localities],
   )
 
@@ -141,7 +149,9 @@ export function useProfile(userId: string, initialProfile: ProfileShape | null) 
     if (
       form.society_id &&
       !societies.some(
-        (society) => society.id === form.society_id && society.locality_id === form.home_locality_id,
+        (society) =>
+          getSocietyId(society) === form.society_id &&
+          String(society.locality_id || society.home_locality_id || '') === form.home_locality_id,
       )
     ) {
       throw new Error('Selected society does not belong to the chosen area.')

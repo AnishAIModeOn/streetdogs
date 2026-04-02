@@ -17,6 +17,14 @@ function getLocalityName(locality) {
   )
 }
 
+function getLocalityId(locality) {
+  return String(locality?.id || locality?.locality_id || locality?.uuid || locality?.value || '')
+}
+
+function getSocietyId(society) {
+  return String(society?.id || society?.society_id || society?.uuid || society?.value || '')
+}
+
 export function ProfilePage({ user, profile, onComplete, onSignOut }) {
   const {
     form,
@@ -117,7 +125,7 @@ export function ProfilePage({ user, profile, onComplete, onSignOut }) {
                 </SelectTrigger>
                 <SelectContent>
                   {localities.map((locality) => (
-                    <SelectItem key={locality.id} value={locality.id}>
+                    <SelectItem key={getLocalityId(locality)} value={getLocalityId(locality)}>
                       {[locality.city, getLocalityName(locality)].filter(Boolean).join(' - ')}
                     </SelectItem>
                   ))}
@@ -146,8 +154,8 @@ export function ProfilePage({ user, profile, onComplete, onSignOut }) {
                 <SelectContent>
                   <SelectItem value="__none__">No society</SelectItem>
                   {societies.map((society) => (
-                    <SelectItem key={society.id} value={society.id}>
-                      {society.name}
+                    <SelectItem key={getSocietyId(society)} value={getSocietyId(society)}>
+                      {society.name || society.society_name || society.title || 'Unnamed society'}
                     </SelectItem>
                   ))}
                 </SelectContent>
