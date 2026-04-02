@@ -159,6 +159,7 @@ export async function createExpense(input: CreateExpenseInput) {
     const { data, error } = await supabase
       .from('expenses')
       .insert({
+        created_by: user.id,
         dog_id: legacyInput.dog_id ?? null,
         raised_by_user_id: legacyInput.raised_by_user_id ?? user.id,
         area_id: legacyInput.area_id ?? null,
