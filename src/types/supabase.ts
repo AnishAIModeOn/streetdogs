@@ -12,6 +12,9 @@ export type SterilizationStatus =
   | 'sterilized'
 export type HealthStatus = 'observation' | 'needs_food' | 'medical_attention' | 'stable'
 export type ExpenseStatus =
+  | 'pending_approval'
+  | 'approved'
+  | 'rejected'
   | 'open'
   | 'funded'
   | 'settled'
@@ -29,10 +32,19 @@ export interface Profile {
   role: ProfileRole
   city: string | null
   area_name: string | null
+  neighbourhood?: string | null
+  pincode?: string | null
   home_locality_id?: string | null
+  primary_area_id?: string | null
   society_id?: string | null
   upi_id?: string | null
   status?: 'active' | 'inactive' | null
+  societies?: {
+    id?: string | null
+    name?: string | null
+    pincode?: string | null
+    neighbourhood?: string | null
+  } | null
   created_at: string
   updated_at: string
 }
@@ -106,6 +118,8 @@ export interface Expense {
   expense_status?: ExpenseStatus | null
   status?: ExpenseStatus | null
   incurred_at?: string | null
+  approved_by?: string | null
+  approved_at?: string | null
   disclaimer_accepted?: boolean
   receipt_path: string | null
   receipt_url: string | null

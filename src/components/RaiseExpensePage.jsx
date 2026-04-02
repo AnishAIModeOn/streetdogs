@@ -5,6 +5,7 @@ import { findMatchingAreaId, normalizeAreaLabel, useAreaSocietyFlow } from '../h
 import { useDogs } from '../hooks/use-dogs'
 import { getDog, getProfile, listAreas } from '../lib/communityData'
 import { navigateTo } from '../lib/navigation'
+import { EXPENSE_PENDING_APPROVAL_STATUS } from '../lib/expense-status'
 import {
   useCreateExpense,
   useCreateExpenseReceipt,
@@ -335,7 +336,7 @@ export function RaiseExpensePage({ dogId, user }) {
         amount_contributed: 0,
         amount_pending: totalAmount,
         disclaimer_accepted: false,
-        status: 'open',
+        status: EXPENSE_PENDING_APPROVAL_STATUS,
       })
 
       const uploadedReceipt = await uploadExpenseReceiptMutation.mutateAsync({
@@ -351,8 +352,8 @@ export function RaiseExpensePage({ dogId, user }) {
 
       setSuccessMessage(
         targetScope === 'dog'
-          ? 'Expense raised successfully. Redirecting back to the dog detail page...'
-          : 'Expense raised successfully. Redirecting to the dashboard...',
+          ? 'Expense submitted for approval. It will appear after an inventory admin or superadmin approves it.'
+          : 'Expense submitted for approval. It will show on the dashboard after approval.',
       )
 
       window.setTimeout(() => {

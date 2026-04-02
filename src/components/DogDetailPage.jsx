@@ -17,8 +17,12 @@ import {
   listAreas,
   listDogSightingsForDog,
   listExpensesForDog,
+  listPendingExpensesForDogByUser,
   recordContribution,
 } from '../lib/communityData'
+import {
+  canContributeToExpenseStatus,
+} from '../lib/expense-status'
 import { navigateTo } from '../lib/navigation'
 import { StatusBanner } from './StatusBanner'
 import { Badge } from './ui/badge'
@@ -55,6 +59,7 @@ export function DogDetailPage({ dogId, isAuthenticated, user, profile }) {
   const [dog, setDog] = useState(null)
   const [sightings, setSightings] = useState([])
   const [expenses, setExpenses] = useState([])
+  const [pendingOwnExpenses, setPendingOwnExpenses] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
@@ -71,11 +76,12 @@ export function DogDetailPage({ dogId, isAuthenticated, user, profile }) {
     const loadData = async () => {
       try {
         setErrorMessage('')
-        const [nextDog, _nextAreas, nextSightings, nextExpenses] = await Promise.all([
+        const [nextDog, _nextAreas, nextSightings, nextExpenses, nextPendingOwnExpenses] = await Promise.all([
           getDog(dogId),
           listAreas(),
           listDogSightingsForDog(dogId),
           listExpensesForDog(dogId),
+          listPendingExpensesForDogByUser(dogId, user?.id),
         ])
 
         if (!isMounted) {
@@ -85,6 +91,7 @@ export function DogDetailPage({ dogId, isAuthenticated, user, profile }) {
         setDog(nextDog)
         setSightings(nextSightings)
         setExpenses(nextExpenses)
+        setPendingOwnExpenses(nextPendingOwnExpenses)
       } catch (error) {
         if (isMounted) {
           setErrorMessage(error instanceof Error ? error.message : 'Unable to load dog details.')
@@ -101,11 +108,15 @@ export function DogDetailPage({ dogId, isAuthenticated, user, profile }) {
     return () => {
       isMounted = false
     }
-  }, [dogId])
+  }, [dogId, user?.id])
 
   const reloadExpenses = async () => {
-    const nextExpenses = await listExpensesForDog(dogId)
+    const [nextExpenses, nextPendingOwnExpenses] = await Promise.all([
+      listExpensesForDog(dogId),
+      listPendingExpensesForDogByUser(dogId, user?.id),
+    ])
     setExpenses(nextExpenses)
+    setPendingOwnExpenses(nextPendingOwnExpenses)
   }
 
   const formatMoney = (value) => Number(value ?? 0).toLocaleString()
@@ -204,6 +215,11 @@ export function DogDetailPage({ dogId, isAuthenticated, user, profile }) {
   }
 
   const validatePaymentAmount = (expense) => {
+    if (!canContributeToExpenseStatus(expense.status)) {
+      setErrorMessage('This expense is not approved for contributions yet.')
+      return null
+    }
+
     const contributionAmount = Number(paymentForm.amount)
 
     if (!paymentForm.amount || contributionAmount <= 0) {
@@ -251,7 +267,7 @@ export function DogDetailPage({ dogId, isAuthenticated, user, profile }) {
 
   const handlePrimaryContribution = () => {
     const openExpense = expenses.find((expense) => {
-      const isClosed = expense.status === 'funded' || expense.status === 'closed'
+      const isClosed = !canContributeToExpenseStatus(expense.status)
       const canContribute =
         user?.id !== expense.raised_by_user_id && Number(expense.amount_pending) > 0
       return !isClosed && canContribute
@@ -664,12 +680,50 @@ export function DogDetailPage({ dogId, isAuthenticated, user, profile }) {
         </div>
 
         <div className="grid gap-4">
+          {pendingOwnExpenses.length ? (
+            <Card className="rounded-[2rem] border-amber-200 bg-amber-50/75 shadow-soft">
+              <CardContent className="space-y-3 p-6">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="warning">Awaiting approval</Badge>
+                  <p className="text-sm font-semibold text-foreground">
+                    Your expense request is under review
+                  </p>
+                </div>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  Inventory admins and superadmins need to approve this expense before it becomes visible on the dashboard or accepts contributions.
+                </p>
+                <div className="grid gap-3">
+                  {pendingOwnExpenses.map((expense) => (
+                    <div
+                      key={expense.id}
+                      className="rounded-[1.35rem] border border-amber-200/70 bg-white/80 p-4"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">
+                            {formatLabel(expense.expense_type)} expense
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Created {new Date(expense.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <p className="text-sm font-bold text-foreground">
+                          Rs. {formatMoney(expense.total_amount ?? expense.amount)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
+
           {expenses.length === 0 ? (
             <Card className="rounded-[2rem] border-dashed border-border bg-white/92">
               <CardContent className="space-y-3 p-10 text-center">
                 <h3 className="text-xl font-semibold text-foreground">No support appeals yet</h3>
                 <p className="text-sm leading-6 text-muted-foreground">
-                  This dog does not have an active expense record right now.
+                  This dog does not have an approved expense record right now.
                 </p>
                   {canRaiseExpense ? (
                     <div>
@@ -688,8 +742,7 @@ export function DogDetailPage({ dogId, isAuthenticated, user, profile }) {
               const topSupporters = getContributorLeaderboard(expense).slice(0, 3)
               const contributionsClosed =
                 user?.id === expense.raised_by_user_id ||
-                expense.status === 'funded' ||
-                expense.status === 'closed'
+                !canContributeToExpenseStatus(expense.status)
 
               return (
                 <Card
@@ -831,7 +884,9 @@ export function DogDetailPage({ dogId, isAuthenticated, user, profile }) {
                               <div className="text-sm leading-6 text-muted-foreground">
                                 {user?.id === expense.raised_by_user_id
                                   ? 'You raised this expense, so contribution actions are hidden.'
-                                  : 'This expense is no longer accepting contributions.'}
+                                  : expense.status === 'pending_approval'
+                                    ? 'This expense is awaiting approval and cannot accept contributions yet.'
+                                    : 'This expense is no longer accepting contributions.'}
                               </div>
                             ) : (
                               <div className="space-y-4">
@@ -1055,12 +1110,18 @@ function InfoTile({ label, value }) {
 
 function formatExpenseStatus(status) {
   switch (status) {
+    case 'approved':
+      return 'Approved'
     case 'partially_funded':
       return 'Partially Funded'
     case 'funded':
       return 'Funded'
     case 'closed':
       return 'Closed'
+    case 'rejected':
+      return 'Rejected'
+    case 'pending_approval':
+      return 'Pending Approval'
     default:
       return 'Open'
   }
@@ -1078,6 +1139,10 @@ function formatContributionStatus(status) {
 }
 
 function getExpenseBadgeVariant(status) {
+  if (status === 'approved') {
+    return 'success'
+  }
+
   if (status === 'funded') {
     return 'success'
   }
@@ -1088,6 +1153,14 @@ function getExpenseBadgeVariant(status) {
 
   if (status === 'partially_funded') {
     return 'warning'
+  }
+
+  if (status === 'pending_approval') {
+    return 'warning'
+  }
+
+  if (status === 'rejected') {
+    return 'outline'
   }
 
   return 'danger'

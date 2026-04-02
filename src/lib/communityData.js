@@ -1,4 +1,10 @@
 import { ensureSupabase } from './supabaseClient'
+import {
+  EXPENSE_APPROVED_STATUS,
+  EXPENSE_PENDING_APPROVAL_STATUS,
+  EXPENSE_REJECTED_STATUS,
+  VISIBLE_EXPENSE_STATUSES,
+} from './expense-status'
 
 function toErrorMessage(error) {
   if (!error) {
@@ -523,7 +529,35 @@ export async function listExpensesForDog(dogId) {
       `,
     )
     .eq('dog_id', dogId)
+    .in('status', VISIBLE_EXPENSE_STATUSES)
     .order('created_at', { ascending: false }),
+  )
+}
+
+export async function listPendingExpensesForDogByUser(dogId, userId) {
+  const client = ensureSupabase()
+
+  if (!dogId || !userId) {
+    return []
+  }
+
+  return unwrap(
+    await client
+      .from('expenses')
+      .select(
+        `
+          *,
+          expense_receipts (
+            id,
+            file_url,
+            uploaded_at
+          )
+        `,
+      )
+      .eq('dog_id', dogId)
+      .eq('raised_by_user_id', userId)
+      .eq('status', EXPENSE_PENDING_APPROVAL_STATUS)
+      .order('created_at', { ascending: false }),
   )
 }
 
@@ -542,10 +576,77 @@ export async function createExpense(payload) {
     amount_contributed: payload.amount_contributed ?? 0,
     amount_pending: payload.amount_pending,
     disclaimer_accepted: Boolean(payload.disclaimer_accepted),
-    status: payload.status ?? 'open',
+    status: payload.status ?? EXPENSE_PENDING_APPROVAL_STATUS,
   }
 
   return unwrap(await client.from('expenses').insert(safePayload).select().single())
+}
+
+export async function listPendingExpenseApprovals({ areaId = null, includeAllAreas = false } = {}) {
+  const client = ensureSupabase()
+  let query = client
+    .from('expenses')
+    .select(
+      `
+        *,
+        area:areas!expenses_area_id_fkey (
+          id,
+          name,
+          city
+        ),
+        raised_by_profile:profiles!expenses_raised_by_user_id_fkey (
+          full_name,
+          upi_id
+        ),
+        expense_receipts (
+          id,
+          file_url,
+          uploaded_at
+        )
+      `,
+    )
+    .eq('status', EXPENSE_PENDING_APPROVAL_STATUS)
+    .order('created_at', { ascending: false })
+
+  if (!includeAllAreas && areaId) {
+    query = query.eq('area_id', areaId)
+  }
+
+  return unwrap(await query)
+}
+
+export async function approveExpense(expenseId, approvedByUserId) {
+  const client = ensureSupabase()
+  return unwrap(
+    await client
+      .from('expenses')
+      .update({
+        status: EXPENSE_APPROVED_STATUS,
+        approved_by: approvedByUserId,
+        approved_at: new Date().toISOString(),
+      })
+      .eq('id', expenseId)
+      .eq('status', EXPENSE_PENDING_APPROVAL_STATUS)
+      .select()
+      .single(),
+  )
+}
+
+export async function rejectExpense(expenseId) {
+  const client = ensureSupabase()
+  return unwrap(
+    await client
+      .from('expenses')
+      .update({
+        status: EXPENSE_REJECTED_STATUS,
+        approved_by: null,
+        approved_at: null,
+      })
+      .eq('id', expenseId)
+      .eq('status', EXPENSE_PENDING_APPROVAL_STATUS)
+      .select()
+      .single(),
+  )
 }
 
 export async function createExpenseReceipt(payload) {

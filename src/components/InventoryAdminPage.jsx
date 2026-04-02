@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BadgeCheck, ClipboardList, Lock, MapPin, Package, Users, XCircle } from 'lucide-react'
+import { BadgeCheck, ClipboardList, Lock, MapPin, Package, ReceiptText, Users, XCircle } from 'lucide-react'
 import {
+  approveExpense,
+  listPendingExpenseApprovals,
   listPendingSocietyDogsForReview,
+  rejectExpense,
   listInventoryRequestsForReporting,
   reviewPendingSocietyDog,
   updateInventoryRequestStatus,
@@ -51,10 +54,12 @@ function getCommitmentVariant(status) {
 export function InventoryAdminPage({ user, profile }) {
   const [requests, setRequests] = useState([])
   const [pendingSocietyDogs, setPendingSocietyDogs] = useState([])
+  const [pendingExpenses, setPendingExpenses] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [isPendingSocietiesLoading, setIsPendingSocietiesLoading] = useState(true)
   const [isSavingRequestId, setIsSavingRequestId] = useState(null)
   const [isReviewingDogId, setIsReviewingDogId] = useState(null)
+  const [isReviewingExpenseId, setIsReviewingExpenseId] = useState(null)
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
 
@@ -73,7 +78,7 @@ export function InventoryAdminPage({ user, profile }) {
     const loadRequests = async () => {
       try {
         setErrorMessage('')
-        const [nextRequests, nextPendingSocietyDogs] = await Promise.all([
+        const [nextRequests, nextPendingSocietyDogs, nextPendingExpenses] = await Promise.all([
           listInventoryRequestsForReporting({
             areaId: profile?.primary_area_id,
             includeAllAreas: isSuperadmin,
@@ -82,10 +87,15 @@ export function InventoryAdminPage({ user, profile }) {
             areaId: profile?.primary_area_id,
             includeAllAreas: isSuperadmin,
           }),
+          listPendingExpenseApprovals({
+            areaId: profile?.primary_area_id,
+            includeAllAreas: isSuperadmin,
+          }),
         ])
         if (isMounted) {
           setRequests(nextRequests)
           setPendingSocietyDogs(nextPendingSocietyDogs)
+          setPendingExpenses(nextPendingExpenses)
         }
       } catch (error) {
         if (isMounted) {
@@ -106,7 +116,7 @@ export function InventoryAdminPage({ user, profile }) {
   }, [canManageInventory, isSuperadmin, profile?.primary_area_id])
 
   const reloadRequests = async () => {
-    const [nextRequests, nextPendingSocietyDogs] = await Promise.all([
+    const [nextRequests, nextPendingSocietyDogs, nextPendingExpenses] = await Promise.all([
       listInventoryRequestsForReporting({
         areaId: profile?.primary_area_id,
         includeAllAreas: isSuperadmin,
@@ -115,9 +125,14 @@ export function InventoryAdminPage({ user, profile }) {
         areaId: profile?.primary_area_id,
         includeAllAreas: isSuperadmin,
       }),
+      listPendingExpenseApprovals({
+        areaId: profile?.primary_area_id,
+        includeAllAreas: isSuperadmin,
+      }),
     ])
     setRequests(nextRequests)
     setPendingSocietyDogs(nextPendingSocietyDogs)
+    setPendingExpenses(nextPendingExpenses)
   }
 
   const handleStatusChange = async (request) => {
@@ -148,8 +163,9 @@ export function InventoryAdminPage({ user, profile }) {
       items: items.length,
       commitments: commitments.length,
       pendingSocieties: pendingSocietyDogs.length,
+      pendingExpenses: pendingExpenses.length,
     }
-  }, [pendingSocietyDogs.length, requests])
+  }, [pendingExpenses.length, pendingSocietyDogs.length, requests])
 
   const handlePendingSocietyReview = async (dog, action) => {
     try {
@@ -169,6 +185,31 @@ export function InventoryAdminPage({ user, profile }) {
       )
     } finally {
       setIsReviewingDogId(null)
+    }
+  }
+
+  const handlePendingExpenseReview = async (expense, action) => {
+    try {
+      setIsReviewingExpenseId(expense.id)
+      setErrorMessage('')
+      setSuccessMessage('')
+      if (action === 'approve') {
+        await approveExpense(expense.id, user.id)
+      } else {
+        await rejectExpense(expense.id)
+      }
+      await reloadRequests()
+      setSuccessMessage(
+        action === 'approve'
+          ? 'Expense approved and now visible for contributions.'
+          : 'Expense rejected successfully.',
+      )
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : 'Unable to review that expense.',
+      )
+    } finally {
+      setIsReviewingExpenseId(null)
     }
   }
 
@@ -220,12 +261,103 @@ export function InventoryAdminPage({ user, profile }) {
             <SnapTile icon={Package} label="Items listed" value={stats.items} color="bg-amber-50 text-amber-600" />
             <SnapTile icon={Users} label="Commitments" value={stats.commitments} color="bg-emerald-50 text-emerald-600" />
             <SnapTile icon={BadgeCheck} label="Pending societies" value={stats.pendingSocieties} color="bg-blue-50 text-blue-600" />
+            <SnapTile icon={ReceiptText} label="Pending expenses" value={stats.pendingExpenses} color="bg-rose-50 text-rose-600" />
           </CardContent>
         </Card>
       </div>
 
       {errorMessage ? <StatusBanner variant="error">{errorMessage}</StatusBanner> : null}
       {successMessage ? <StatusBanner variant="success">{successMessage}</StatusBanner> : null}
+
+      {isLoading ? (
+        <div className="h-36 animate-pulse rounded-[2rem] border border-border/50 bg-white/65" />
+      ) : pendingExpenses.length ? (
+        <Card className="rounded-[2rem] border-white/65 bg-white/95 shadow-soft">
+          <CardHeader>
+            <CardTitle>Pending expense approvals</CardTitle>
+            <CardDescription>
+              Approve or reject newly raised expense appeals before they appear on dashboards or accept contributions.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            {pendingExpenses.map((expense) => (
+              <div
+                key={expense.id}
+                className="rounded-[1.5rem] border border-border/55 bg-secondary/20 p-5"
+              >
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-base font-bold text-foreground">
+                        {formatLabel(expense.expense_type)} expense
+                      </p>
+                      <Badge variant="warning">Pending approval</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Raised by {expense.raised_by_profile?.full_name || 'Community member'}
+                    </p>
+                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                      <InfoTile
+                        label="Amount"
+                        value={`Rs. ${Number(expense.total_amount ?? expense.amount ?? 0).toLocaleString()}`}
+                      />
+                      <InfoTile
+                        label="Scope"
+                        value={formatLabel(expense.target_scope)}
+                      />
+                      <InfoTile
+                        label="Area"
+                        value={expense.area ? `${expense.area.city} · ${expense.area.name}` : 'Area unavailable'}
+                      />
+                      <InfoTile
+                        label="Created"
+                        value={new Date(expense.created_at).toLocaleDateString()}
+                      />
+                    </div>
+                    {expense.target_society_name ? (
+                      <InfoTile label="Society" value={expense.target_society_name} />
+                    ) : null}
+                    <div className="rounded-xl bg-white/70 px-3 py-2.5">
+                      <p className="text-[0.65rem] font-semibold uppercase tracking-[0.15em] text-muted-foreground">Description</p>
+                      <p className="mt-1 text-sm font-medium text-foreground">
+                        {expense.description || 'No description added.'}
+                      </p>
+                    </div>
+                    {expense.expense_receipts?.[0]?.file_url ? (
+                      <a
+                        href={expense.expense_receipts[0].file_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 text-sm font-semibold text-primary underline-offset-4 hover:underline"
+                      >
+                        <ReceiptText className="h-4 w-4" />
+                        View receipt
+                      </a>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
+                    <Button
+                      disabled={isReviewingExpenseId === expense.id}
+                      onClick={() => handlePendingExpenseReview(expense, 'approve')}
+                    >
+                      <BadgeCheck className="h-4 w-4" />
+                      {isReviewingExpenseId === expense.id ? 'Saving...' : 'Approve'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      disabled={isReviewingExpenseId === expense.id}
+                      onClick={() => handlePendingExpenseReview(expense, 'reject')}
+                    >
+                      <XCircle className="h-4 w-4" />
+                      Reject
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {isPendingSocietiesLoading ? (
         <div className="h-36 animate-pulse rounded-[2rem] border border-border/50 bg-white/65" />

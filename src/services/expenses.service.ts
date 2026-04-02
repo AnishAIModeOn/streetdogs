@@ -1,4 +1,10 @@
 import { requireSupabase } from '../integrations/supabase/client'
+import {
+  EXPENSE_APPROVED_STATUS,
+  EXPENSE_PENDING_APPROVAL_STATUS,
+  EXPENSE_REJECTED_STATUS,
+  VISIBLE_EXPENSE_STATUSES,
+} from '../lib/expense-status'
 import type { Contribution, Expense, ExpenseWithContributions } from '../types/supabase'
 
 function toExpenseError(error: any, fallbackMessage: string) {
@@ -25,6 +31,7 @@ export interface CreateExpenseInput {
   amount: number
   incurred_at?: string
   expense_status?: Expense['expense_status']
+  status?: Expense['status']
   receipt_path?: string | null
   receipt_url?: string | null
 }
@@ -47,38 +54,43 @@ export interface CreateExpenseReceiptInput {
   file_url: string
 }
 
-export async function listExpenses(dogId?: string) {
+const expenseSelect = `
+  *,
+  raised_by_profile:profiles!expenses_raised_by_user_id_fkey (
+    full_name,
+    upi_id
+  ),
+  expense_receipts (
+    id,
+    file_url,
+    uploaded_at
+  ),
+  contributions (
+    id,
+    contributor_user_id,
+    amount,
+    payment_status,
+    contributed_at,
+    contributor_profile:profiles!contributions_contributor_user_id_fkey (
+      full_name
+    )
+  )
+`
+
+export async function listExpenses(dogId?: string, options?: { approvedOnly?: boolean }) {
   const supabase = requireSupabase()
+  const approvedOnly = options?.approvedOnly ?? true
   let query = supabase
     .from('expenses')
-    .select(
-      `
-        *,
-        raised_by_profile:profiles!expenses_raised_by_user_id_fkey (
-          full_name,
-          upi_id
-        ),
-        expense_receipts (
-          id,
-          file_url,
-          uploaded_at
-        ),
-        contributions (
-          id,
-          contributor_user_id,
-          amount,
-          payment_status,
-          contributed_at,
-          contributor_profile:profiles!contributions_contributor_user_id_fkey (
-            full_name
-          )
-        )
-      `,
-    )
+    .select(expenseSelect)
     .order('created_at', { ascending: false })
 
   if (dogId) {
     query = query.eq('dog_id', dogId)
+  }
+
+  if (approvedOnly) {
+    query = query.in('status', VISIBLE_EXPENSE_STATUSES)
   }
 
   const { data, error } = await query
@@ -94,30 +106,7 @@ export async function getExpenseById(expenseId: string) {
   const supabase = requireSupabase()
   const { data, error } = await supabase
     .from('expenses')
-    .select(
-      `
-        *,
-        raised_by_profile:profiles!expenses_raised_by_user_id_fkey (
-          full_name,
-          upi_id
-        ),
-        expense_receipts (
-          id,
-          file_url,
-          uploaded_at
-        ),
-        contributions (
-          id,
-          contributor_user_id,
-          amount,
-          payment_status,
-          contributed_at,
-          contributor_profile:profiles!contributions_contributor_user_id_fkey (
-            full_name
-          )
-        )
-      `,
-    )
+    .select(expenseSelect)
     .eq('id', expenseId)
     .single()
 
@@ -171,7 +160,7 @@ export async function createExpense(input: CreateExpenseInput) {
         amount_contributed: legacyInput.amount_contributed ?? 0,
         amount_pending: legacyInput.amount_pending ?? legacyInput.amount ?? 0,
         disclaimer_accepted: Boolean(legacyInput.disclaimer_accepted),
-        status: legacyInput.status ?? 'open',
+        status: legacyInput.status ?? EXPENSE_PENDING_APPROVAL_STATUS,
       })
       .select('*')
       .single()
@@ -187,12 +176,98 @@ export async function createExpense(input: CreateExpenseInput) {
     .from('expenses')
     .insert({
       ...input,
+      status: input.status ?? EXPENSE_PENDING_APPROVAL_STATUS,
     })
     .select('*')
     .single()
 
   if (error) {
     throw toExpenseError(error, 'Unable to create the expense.')
+  }
+
+  return data as Expense
+}
+
+export async function listPendingExpenseApprovals(options?: {
+  areaId?: string | null
+  includeAllAreas?: boolean
+}) {
+  const supabase = requireSupabase()
+  let query = supabase
+    .from('expenses')
+    .select(
+      `
+        ${expenseSelect},
+        area:areas!expenses_area_id_fkey (
+          id,
+          name,
+          city
+        )
+      `,
+    )
+    .eq('status', EXPENSE_PENDING_APPROVAL_STATUS)
+    .order('created_at', { ascending: false })
+
+  if (!options?.includeAllAreas && options?.areaId) {
+    query = query.eq('area_id', options.areaId)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    throw toExpenseError(error, 'Unable to load pending expense approvals.')
+  }
+
+  return data as Array<ExpenseWithContributions & {
+    area?: { id?: string | null; name?: string | null; city?: string | null } | null
+  }>
+}
+
+export async function approveExpense(expenseId: string) {
+  const supabase = requireSupabase()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    throw new Error('Not authenticated.')
+  }
+
+  const { data, error } = await supabase
+    .from('expenses')
+    .update({
+      status: EXPENSE_APPROVED_STATUS,
+      approved_by: user.id,
+      approved_at: new Date().toISOString(),
+    })
+    .eq('id', expenseId)
+    .eq('status', EXPENSE_PENDING_APPROVAL_STATUS)
+    .select('*')
+    .single()
+
+  if (error) {
+    throw toExpenseError(error, 'Unable to approve this expense.')
+  }
+
+  return data as Expense
+}
+
+export async function rejectExpense(expenseId: string) {
+  const supabase = requireSupabase()
+  const { data, error } = await supabase
+    .from('expenses')
+    .update({
+      status: EXPENSE_REJECTED_STATUS,
+      approved_by: null,
+      approved_at: null,
+    })
+    .eq('id', expenseId)
+    .eq('status', EXPENSE_PENDING_APPROVAL_STATUS)
+    .select('*')
+    .single()
+
+  if (error) {
+    throw toExpenseError(error, 'Unable to reject this expense.')
   }
 
   return data as Expense

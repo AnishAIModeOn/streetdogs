@@ -256,7 +256,7 @@ export function DashboardPage({ profile }) {
 
         return filteredDogIds.has(expense.dog_id)
       }),
-    [expenses, filteredDogIds, selection.matchedAreaId],
+    [expenses, filteredDogIds, selection.matchedAreaId, selection.selectedSocietyName],
   )
 
   const urgentCounts = useMemo(() => {
