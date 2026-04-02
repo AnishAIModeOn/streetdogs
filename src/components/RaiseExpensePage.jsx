@@ -179,6 +179,23 @@ export function RaiseExpensePage({ dogId, user }) {
     [areaSocietyFlow.areaContext.neighbourhood, areaSocietyFlow.areaLabel, areas],
   )
 
+  const profileFallbackAreaId = useMemo(
+    () =>
+      findMatchingAreaId(
+        areas,
+        profile?.area_name ||
+          profile?.neighbourhood ||
+          profile?.societies?.neighbourhood ||
+          '',
+      ),
+    [
+      areas,
+      profile?.area_name,
+      profile?.neighbourhood,
+      profile?.societies?.neighbourhood,
+    ],
+  )
+
   const currentArea = useMemo(() => {
     if (matchedAreaId) {
       return areas.find((area) => area.id === matchedAreaId) || null
@@ -193,6 +210,7 @@ export function RaiseExpensePage({ dogId, user }) {
     matchedAreaId ||
     currentArea?.id ||
     profile?.primary_area_id ||
+    profileFallbackAreaId ||
     linkedDog?.area_id ||
     ''
 
