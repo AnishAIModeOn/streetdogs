@@ -3,7 +3,6 @@ import { StatusBanner } from './StatusBanner'
 import { Button } from './ui/button'
 import { FormDescription, FormField, FormLabel } from './ui/form'
 import { Input } from './ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { useProfile } from '../hooks/useProfile'
 
 function getLocalityName(locality) {
@@ -110,56 +109,49 @@ export function ProfilePage({ user, profile, onComplete, onSignOut }) {
 
             <FormField>
               <FormLabel>Area</FormLabel>
-              <Select
+              <select
                 value={form.home_locality_id}
-                onValueChange={(value) =>
+                onChange={(event) =>
                   setForm((current) => ({
                     ...current,
-                    home_locality_id: value,
+                    home_locality_id: event.target.value,
                     society_id: '',
                   }))
                 }
+                className="flex h-11 w-full items-center rounded-2xl border border-input bg-white/90 px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select your area" />
-                </SelectTrigger>
-                <SelectContent>
-                  {localities.map((locality) => (
-                    <SelectItem key={getLocalityId(locality)} value={getLocalityId(locality)}>
-                      {[locality.city, getLocalityName(locality)].filter(Boolean).join(' - ')}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <option value="">Select your area</option>
+                {localities.map((locality) => (
+                  <option key={getLocalityId(locality)} value={getLocalityId(locality)}>
+                    {[locality.city, getLocalityName(locality)].filter(Boolean).join(' - ')}
+                  </option>
+                ))}
+              </select>
               <FormDescription>Required. Loaded from the `localities` table.</FormDescription>
             </FormField>
 
             <FormField>
               <FormLabel>Society</FormLabel>
-              <Select
-                value={form.society_id || '__none__'}
-                onValueChange={(value) =>
+              <select
+                value={form.society_id || ''}
+                onChange={(event) =>
                   setForm((current) => ({
                     ...current,
-                    society_id: value === '__none__' ? '' : value,
+                    society_id: event.target.value,
                   }))
                 }
                 disabled={!form.home_locality_id}
+                className="flex h-11 w-full items-center rounded-2xl border border-input bg-white/90 px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={form.home_locality_id ? 'Select your society' : 'Choose area first'}
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">No society</SelectItem>
-                  {societies.map((society) => (
-                    <SelectItem key={getSocietyId(society)} value={getSocietyId(society)}>
-                      {society.name || society.society_name || society.title || 'Unnamed society'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <option value="">
+                  {form.home_locality_id ? 'No society' : 'Choose area first'}
+                </option>
+                {societies.map((society) => (
+                  <option key={getSocietyId(society)} value={getSocietyId(society)}>
+                    {society.name || society.society_name || society.title || 'Unnamed society'}
+                  </option>
+                ))}
+              </select>
               <FormDescription>
                 Optional. Societies are loaded only for the selected area.
                 {selectedLocality ? ` Current area: ${getLocalityName(selectedLocality)}.` : ''}
