@@ -116,7 +116,8 @@ export function RaiseExpensePage({ dogId, user }) {
         setAreas(nextAreas)
         setLinkedDog(nextDog)
 
-        const initialAreaId = nextProfile?.home_locality_id || nextProfile?.primary_area_id || nextDog?.area_id || ''
+        const initialAreaId =
+          nextProfile?.primary_area_id || nextProfile?.home_locality_id || nextDog?.area_id || ''
         const initialArea = initialAreaId ? nextAreas.find((area) => area.id === initialAreaId) : null
         const initialSociety =
           nextProfile?.societies?.name || nextProfile?.society_id
@@ -183,9 +184,17 @@ export function RaiseExpensePage({ dogId, user }) {
       return areas.find((area) => area.id === matchedAreaId) || null
     }
 
-    const profileAreaId = profile?.home_locality_id || profile?.primary_area_id || linkedDog?.area_id || ''
+    const profileAreaId =
+      profile?.primary_area_id || profile?.home_locality_id || linkedDog?.area_id || ''
     return profileAreaId ? areas.find((area) => area.id === profileAreaId) || null : null
   }, [areas, linkedDog?.area_id, matchedAreaId, profile?.home_locality_id, profile?.primary_area_id])
+
+  const resolvedAreaId =
+    matchedAreaId ||
+    currentArea?.id ||
+    profile?.primary_area_id ||
+    linkedDog?.area_id ||
+    ''
 
   const selectedSociety = areaSocietyFlow.selectedSociety
   const areaLabel = normalizeAreaLabel(
@@ -241,7 +250,7 @@ export function RaiseExpensePage({ dogId, user }) {
   const handleSubmit = async (event) => {
     event.preventDefault()
 
-    if (!matchedAreaId && !currentArea?.id) {
+    if (!resolvedAreaId) {
       setErrorMessage('Please choose your area using the same area picker as profile and sign-up.')
       return
     }
@@ -284,7 +293,7 @@ export function RaiseExpensePage({ dogId, user }) {
       const createdExpense = await createExpenseMutation.mutateAsync({
         dog_id: selectedDogs.length === 1 ? selectedDogs[0].id : null,
         raised_by_user_id: user.id,
-        area_id: matchedAreaId || currentArea?.id || null,
+        area_id: resolvedAreaId || null,
         target_scope: targetScope,
         target_society_id: targetScope !== 'dog' ? selectedSociety?._pending ? null : selectedSociety?.id ?? null : null,
         target_society_name: targetScope !== 'dog' ? selectedSociety?.name ?? null : null,
