@@ -167,7 +167,7 @@ export function RaiseExpensePage({ dogId, user }) {
     return () => {
       isMounted = false
     }
-  }, [areaSocietyFlow, dogId, user.id])
+  }, [areaSocietyFlow.applySnapshot, dogId, user.id])
 
   const matchedAreaId = useMemo(
     () =>
