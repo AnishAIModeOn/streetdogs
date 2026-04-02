@@ -220,6 +220,8 @@ export async function listProfilesForAdmin() {
           status,
           home_locality_id,
           society_id,
+          neighbourhood,
+          pincode,
           created_at,
           home_locality:localities!profiles_home_locality_id_fkey (*),
           society:societies!profiles_society_id_fkey (
@@ -263,6 +265,8 @@ export async function updateUserAdminSettings(userId, payload) {
         role: payload.role,
         home_locality_id: payload.home_locality_id ?? null,
         society_id: payload.society_id ?? null,
+        neighbourhood: payload.neighbourhood ?? null,
+        pincode: payload.pincode ?? null,
       })
       .eq('id', userId)
       .select(
@@ -273,6 +277,8 @@ export async function updateUserAdminSettings(userId, payload) {
           status,
           home_locality_id,
           society_id,
+          neighbourhood,
+          pincode,
           created_at,
           home_locality:localities!profiles_home_locality_id_fkey (*),
           society:societies!profiles_society_id_fkey (

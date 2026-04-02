@@ -363,6 +363,8 @@ export function AdminUsersPage({ profile }) {
         role: editForm.role,
         home_locality_id: isSuperadminRole ? null : resolvedLocalityId,
         society_id: isSuperadminRole ? null : resolvedSocietyId,
+        neighbourhood: isSuperadminRole ? null : areaSocietyFlow.areaLabel || null,
+        pincode: isSuperadminRole ? null : areaSocietyFlow.areaContext.pincode || null,
       })
       await refetchUsers()
       closeEditModal()
@@ -518,7 +520,7 @@ export function AdminUsersPage({ profile }) {
                       </p>
                       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                         <MapPin className="h-3 w-3" />
-                        {buildUserLocationLabel(user)}
+                        {buildUserLocationSummary(user)}
                       </p>
                       <p className="text-[0.7rem] text-muted-foreground/80">
                         {user.society?.name ? `Society: ${user.society.name}` : 'No society assigned'}
@@ -679,4 +681,15 @@ function resolveAdminLocalityId({ localities, flow, fallbackLocalityId }) {
   }
 
   return fallbackLocalityId
+}
+
+function buildUserLocationSummary(user) {
+  const neighbourhoodLabel = normalizeAreaLabel(user.neighbourhood || '')
+  const baseLabel = buildUserLocationLabel(user)
+
+  if (baseLabel !== 'Locality not set') {
+    return baseLabel
+  }
+
+  return neighbourhoodLabel || user.pincode || 'Area not set'
 }
