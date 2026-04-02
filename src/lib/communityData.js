@@ -166,9 +166,7 @@ export async function listAreas() {
 
 export async function listLocalities() {
   const client = ensureSupabase()
-  return unwrap(
-    await client.from('localities').select('*').order('city', { ascending: true }).order('name'),
-  )
+  return unwrap(await client.from('localities').select('*'))
 }
 
 export async function listSocietiesByLocality(localityId) {

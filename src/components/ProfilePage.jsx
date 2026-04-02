@@ -6,6 +6,17 @@ import { Input } from './ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { useProfile } from '../hooks/useProfile'
 
+function getLocalityName(locality) {
+  return (
+    locality?.name ||
+    locality?.locality_name ||
+    locality?.neighbourhood ||
+    locality?.label ||
+    locality?.title ||
+    'Unknown area'
+  )
+}
+
 export function ProfilePage({ user, profile, onComplete, onSignOut }) {
   const {
     form,
@@ -107,7 +118,7 @@ export function ProfilePage({ user, profile, onComplete, onSignOut }) {
                 <SelectContent>
                   {localities.map((locality) => (
                     <SelectItem key={locality.id} value={locality.id}>
-                      {[locality.city, locality.name].filter(Boolean).join(' - ') || locality.name}
+                      {[locality.city, getLocalityName(locality)].filter(Boolean).join(' - ')}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -143,7 +154,7 @@ export function ProfilePage({ user, profile, onComplete, onSignOut }) {
               </Select>
               <FormDescription>
                 Optional. Societies are loaded only for the selected area.
-                {selectedLocality?.name ? ` Current area: ${selectedLocality.name}.` : ''}
+                {selectedLocality ? ` Current area: ${getLocalityName(selectedLocality)}.` : ''}
               </FormDescription>
             </FormField>
           </div>

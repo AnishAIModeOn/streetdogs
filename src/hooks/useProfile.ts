@@ -2,6 +2,23 @@ import { useEffect, useMemo, useState } from 'react'
 import { emptyProfileCompletionForm } from '../data/seedData'
 import { getProfile, listLocalities, listSocietiesByLocality, updateProfile } from '../lib/communityData'
 
+function getLocalityName(locality: any) {
+  return (
+    locality?.name ||
+    locality?.locality_name ||
+    locality?.neighbourhood ||
+    locality?.label ||
+    locality?.title ||
+    ''
+  )
+}
+
+function compareLocalities(a: any, b: any) {
+  const aLabel = [a?.city || '', getLocalityName(a)].join(' ').trim().toLowerCase()
+  const bLabel = [b?.city || '', getLocalityName(b)].join(' ').trim().toLowerCase()
+  return aLabel.localeCompare(bLabel)
+}
+
 type ProfileShape = {
   id: string
   full_name?: string | null
@@ -47,7 +64,7 @@ export function useProfile(userId: string, initialProfile: ProfileShape | null) 
         setErrorMessage('')
         const nextLocalities = await listLocalities()
         if (isMounted) {
-          setLocalities(nextLocalities)
+          setLocalities([...nextLocalities].sort(compareLocalities))
         }
       } catch (error) {
         if (isMounted) {
