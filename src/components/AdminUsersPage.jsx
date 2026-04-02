@@ -44,7 +44,13 @@ function getRoleColor(role) {
 
 function UserAvatar({ name }) {
   const initials = name
-    ? name.split(' ').filter(Boolean).slice(0, 2).map((n) => n[0]).join('').toUpperCase()
+    ? name
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((n) => n[0])
+        .join('')
+        .toUpperCase()
     : '?'
   return (
     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
@@ -73,10 +79,28 @@ function formatLocalityOption(locality) {
   return localityCity ? `${localityCity} · ${localityName}` : localityName
 }
 
-function buildUserLocationLabel(user) {
-  const localityName = getLocalityName(user.home_locality)
-  const localityCity = getLocalityCity(user.home_locality)
-  const localityLabel = user.home_locality ? (localityCity ? `${localityCity} · ${localityName}` : localityName) : ''
+function getUserEffectiveLocalityId(user) {
+  return user.home_locality_id || user.home_locality?.id || user.society?.locality_id || ''
+}
+
+function getUserEffectiveLocality(user, localitiesById) {
+  if (user.home_locality) {
+    return user.home_locality
+  }
+
+  const fallbackLocalityId = user.society?.locality_id
+  return fallbackLocalityId ? localitiesById.get(fallbackLocalityId) ?? null : null
+}
+
+function buildUserLocationLabel(user, localitiesById) {
+  const effectiveLocality = getUserEffectiveLocality(user, localitiesById)
+  const localityName = getLocalityName(effectiveLocality)
+  const localityCity = getLocalityCity(effectiveLocality)
+  const localityLabel = effectiveLocality
+    ? localityCity
+      ? `${localityCity} · ${localityName}`
+      : localityName
+    : ''
 
   if (user.society?.name && localityLabel) {
     return `${localityLabel} · ${user.society.name}`
@@ -84,6 +108,10 @@ function buildUserLocationLabel(user) {
 
   if (localityLabel) {
     return localityLabel
+  }
+
+  if (user.society?.name) {
+    return user.society.name
   }
 
   return 'Locality not set'
@@ -155,15 +183,21 @@ export function AdminUsersPage({ profile }) {
   }, [filterLocalityId, filterSocietyId])
 
   useEffect(() => {
-    if (!editingUser?.home_locality_id) {
+    const effectiveLocalityId = editingUser ? getUserEffectiveLocalityId(editingUser) : ''
+    if (!effectiveLocalityId) {
       return
     }
 
-    fetchSocietiesForLocality(editingUser.home_locality_id).catch(() => {})
-  }, [editingUser?.home_locality_id])
+    fetchSocietiesForLocality(effectiveLocalityId).catch(() => {})
+  }, [editingUser])
 
   const localityOptions = useMemo(
-    () => [...localities].sort((left, right) => `${left.city} ${left.name}`.localeCompare(`${right.city} ${right.name}`)),
+    () => [...localities].sort((left, right) => formatLocalityOption(left).localeCompare(formatLocalityOption(right))),
+    [localities],
+  )
+
+  const localitiesById = useMemo(
+    () => new Map(localities.map((locality) => [locality.id, locality])),
     [localities],
   )
 
@@ -178,11 +212,13 @@ export function AdminUsersPage({ profile }) {
   const filteredUsers = useMemo(
     () =>
       users.filter((user) => {
+        const effectiveLocalityId = getUserEffectiveLocalityId(user)
+
         if (filterRole !== ALL_FILTER_VALUE && user.role !== filterRole) {
           return false
         }
 
-        if (filterLocalityId !== ALL_FILTER_VALUE && user.home_locality_id !== filterLocalityId) {
+        if (filterLocalityId !== ALL_FILTER_VALUE && effectiveLocalityId !== filterLocalityId) {
           return false
         }
 
@@ -200,7 +236,7 @@ export function AdminUsersPage({ profile }) {
       total: users.length,
       admins: users.filter((user) => ['inventory_admin', 'superadmin'].includes(user.role)).length,
       missingLocality: users.filter(
-        (user) => user.role === 'inventory_admin' && !user.home_locality_id,
+        (user) => user.role === 'inventory_admin' && !getUserEffectiveLocalityId(user),
       ).length,
       inactiveProfiles: users.filter((user) => user.status === 'inactive').length,
     }),
@@ -217,13 +253,14 @@ export function AdminUsersPage({ profile }) {
     setErrorMessage('')
     setSuccessMessage('')
 
-    if (user.home_locality_id) {
-      await fetchSocietiesForLocality(user.home_locality_id)
+    const effectiveLocalityId = getUserEffectiveLocalityId(user)
+    if (effectiveLocalityId) {
+      await fetchSocietiesForLocality(effectiveLocalityId)
     }
 
     setEditForm({
       role: user.role || 'end_user',
-      home_locality_id: user.home_locality_id || '',
+      home_locality_id: effectiveLocalityId,
       society_id: user.society_id || '',
     })
     setEditingUser(user)
@@ -248,15 +285,12 @@ export function AdminUsersPage({ profile }) {
         }
       }
 
+      const fallbackLocalityId = current.home_locality_id || getUserEffectiveLocalityId(editingUser || {})
       return {
         ...current,
         role,
-        home_locality_id:
-          current.home_locality_id || editingUser?.home_locality_id || '',
-        society_id:
-          current.home_locality_id || editingUser?.home_locality_id
-            ? current.society_id
-            : '',
+        home_locality_id: fallbackLocalityId,
+        society_id: fallbackLocalityId ? current.society_id : '',
       }
     })
   }
@@ -476,7 +510,7 @@ export function AdminUsersPage({ profile }) {
                       </p>
                       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                         <MapPin className="h-3 w-3" />
-                        {buildUserLocationLabel(user)}
+                        {buildUserLocationLabel(user, localitiesById)}
                       </p>
                       <p className="text-[0.7rem] text-muted-foreground/80">
                         {user.society?.name ? `Society: ${user.society.name}` : 'No society assigned'}
