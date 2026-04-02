@@ -77,6 +77,35 @@ function matchesSociety(dog, society) {
   )
 }
 
+function resolveExpenseAreaId({
+  areas,
+  selectedDogs,
+  matchedAreaId,
+  currentAreaId,
+  profile,
+  linkedDog,
+  areaLabel,
+}) {
+  const labelMatchId = findMatchingAreaId(
+    areas,
+    areaLabel ||
+      profile?.area_name ||
+      profile?.neighbourhood ||
+      profile?.societies?.neighbourhood ||
+      '',
+  )
+
+  return (
+    selectedDogs[0]?.area_id ||
+    matchedAreaId ||
+    currentAreaId ||
+    profile?.primary_area_id ||
+    labelMatchId ||
+    linkedDog?.area_id ||
+    ''
+  )
+}
+
 export function RaiseExpensePage({ dogId, user }) {
   const [linkedDog, setLinkedDog] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -179,23 +208,6 @@ export function RaiseExpensePage({ dogId, user }) {
     [areaSocietyFlow.areaContext.neighbourhood, areaSocietyFlow.areaLabel, areas],
   )
 
-  const profileFallbackAreaId = useMemo(
-    () =>
-      findMatchingAreaId(
-        areas,
-        profile?.area_name ||
-          profile?.neighbourhood ||
-          profile?.societies?.neighbourhood ||
-          '',
-      ),
-    [
-      areas,
-      profile?.area_name,
-      profile?.neighbourhood,
-      profile?.societies?.neighbourhood,
-    ],
-  )
-
   const currentArea = useMemo(() => {
     if (matchedAreaId) {
       return areas.find((area) => area.id === matchedAreaId) || null
@@ -205,14 +217,6 @@ export function RaiseExpensePage({ dogId, user }) {
       profile?.primary_area_id || profile?.home_locality_id || linkedDog?.area_id || ''
     return profileAreaId ? areas.find((area) => area.id === profileAreaId) || null : null
   }, [areas, linkedDog?.area_id, matchedAreaId, profile?.home_locality_id, profile?.primary_area_id])
-
-  const resolvedAreaId =
-    matchedAreaId ||
-    currentArea?.id ||
-    profile?.primary_area_id ||
-    profileFallbackAreaId ||
-    linkedDog?.area_id ||
-    ''
 
   const selectedSociety = areaSocietyFlow.selectedSociety
   const areaLabel = normalizeAreaLabel(
@@ -238,6 +242,16 @@ export function RaiseExpensePage({ dogId, user }) {
     () => filteredDogs.filter((dog) => selectedDogIds.includes(dog.id)),
     [filteredDogs, selectedDogIds],
   )
+
+  const resolvedAreaId = resolveExpenseAreaId({
+    areas,
+    selectedDogs,
+    matchedAreaId,
+    currentAreaId: currentArea?.id || '',
+    profile,
+    linkedDog,
+    areaLabel,
+  })
 
   const expenseScope =
     selectedDogs.length === 0
