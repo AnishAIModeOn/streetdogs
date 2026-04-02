@@ -174,6 +174,33 @@ export function AdminUsersPage({ profile }) {
     return nextSocieties
   }
 
+  const seedSocietyOptionForUser = (user, localityId) => {
+    if (!localityId || !user?.society?.id) {
+      return
+    }
+
+    setSocietiesByLocality((current) => {
+      const existing = current[localityId] ?? []
+      if (existing.some((society) => society.id === user.society.id)) {
+        return current
+      }
+
+      return {
+        ...current,
+        [localityId]: [
+          ...existing,
+          {
+            id: user.society.id,
+            name: user.society.name,
+            locality_id: localityId,
+            neighbourhood: user.society.neighbourhood ?? null,
+            pincode: user.society.pincode ?? null,
+          },
+        ].sort((left, right) => left.name.localeCompare(right.name)),
+      }
+    })
+  }
+
   useEffect(() => {
     if (filterLocalityId === ALL_FILTER_VALUE || filterSocietyId !== ALL_FILTER_VALUE) {
       return
@@ -254,16 +281,17 @@ export function AdminUsersPage({ profile }) {
     setSuccessMessage('')
 
     const effectiveLocalityId = getUserEffectiveLocalityId(user)
-    if (effectiveLocalityId) {
-      await fetchSocietiesForLocality(effectiveLocalityId)
-    }
-
     setEditForm({
       role: user.role || 'end_user',
       home_locality_id: effectiveLocalityId,
       society_id: user.society_id || '',
     })
     setEditingUser(user)
+
+    if (effectiveLocalityId) {
+      seedSocietyOptionForUser(user, effectiveLocalityId)
+      fetchSocietiesForLocality(effectiveLocalityId).catch(() => {})
+    }
   }
 
   const closeEditModal = () => {
