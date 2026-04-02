@@ -42,6 +42,10 @@ function buildDogDisplayLocation(dog) {
   )
 }
 
+function resolveSubmissionAreaId({ matchedAreaId, currentAreaId, areas, fallbackAreaId }) {
+  return matchedAreaId || currentAreaId || fallbackAreaId || areas[0]?.id || ''
+}
+
 export function RaiseExpensePage({ dogId, user }) {
   const [linkedDog, setLinkedDog] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -103,19 +107,25 @@ export function RaiseExpensePage({ dogId, user }) {
               societyDraftName: '',
             })
           }
-        } else if (nextProfile?.primary_area_id) {
-          const primaryArea = nextAreas.find((entry) => entry.id === nextProfile.primary_area_id)
-          if (primaryArea) {
-            flow.applySnapshot({
-              areaInput: primaryArea.name,
-              pincode: '',
-              selectedSociety: null,
-              manual: true,
-              detectedLabel: '',
-              detectedNeighbourhood: primaryArea.name,
-              societyDraftName: '',
-            })
-          }
+        } else {
+          const primaryArea = nextProfile?.primary_area_id
+            ? nextAreas.find((entry) => entry.id === nextProfile.primary_area_id)
+            : null
+
+          flow.applySnapshot({
+            areaInput:
+              nextProfile?.societies?.neighbourhood ||
+              nextProfile?.neighbourhood ||
+              primaryArea?.name ||
+              '',
+            pincode: nextProfile?.societies?.pincode || nextProfile?.pincode || '',
+            selectedSociety: nextProfile?.societies || null,
+            manual: true,
+            detectedLabel: '',
+            detectedNeighbourhood:
+              nextProfile?.societies?.neighbourhood || nextProfile?.neighbourhood || primaryArea?.name || '',
+            societyDraftName: '',
+          })
         }
       } catch (error) {
         if (isMounted) {
@@ -239,7 +249,14 @@ export function RaiseExpensePage({ dogId, user }) {
       return
     }
 
-    if ((mode === 'area' || mode === 'society') && !matchedAreaId) {
+    const submissionAreaId = resolveSubmissionAreaId({
+      matchedAreaId,
+      currentAreaId: currentArea?.id || '',
+      areas,
+      fallbackAreaId: profile?.primary_area_id || '',
+    })
+
+    if ((mode === 'area' || mode === 'society') && !submissionAreaId) {
       setErrorMessage('Select a valid area before raising this expense.')
       return
     }
@@ -258,7 +275,7 @@ export function RaiseExpensePage({ dogId, user }) {
       const payload = {
         dog_id: mode === 'dog' ? selectedDog.id : null,
         raised_by_user_id: user.id,
-        area_id: mode === 'dog' ? selectedDog.area_id : matchedAreaId,
+        area_id: mode === 'dog' ? selectedDog.area_id : submissionAreaId,
         target_scope: mode,
         target_society_id: mode === 'society' ? flow.selectedSociety?.id ?? null : null,
         target_society_name: mode === 'society' ? flow.selectedSociety?.name ?? null : null,
