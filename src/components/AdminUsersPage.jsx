@@ -236,6 +236,21 @@ export function AdminUsersPage({ profile }) {
     [filterLocalityId, societiesByLocality],
   )
 
+  const editLocalityOptions = useMemo(() => {
+    if (!editingUser) {
+      return localityOptions
+    }
+
+    const effectiveLocality = getUserEffectiveLocality(editingUser, localitiesById)
+    if (!effectiveLocality?.id || localityOptions.some((locality) => locality.id === effectiveLocality.id)) {
+      return localityOptions
+    }
+
+    return [...localityOptions, effectiveLocality].sort((left, right) =>
+      formatLocalityOption(left).localeCompare(formatLocalityOption(right)),
+    )
+  }, [editingUser, localitiesById, localityOptions])
+
   const filteredUsers = useMemo(
     () =>
       users.filter((user) => {
@@ -625,7 +640,7 @@ export function AdminUsersPage({ profile }) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NO_LOCALITY_VALUE}>No locality</SelectItem>
-                  {localityOptions.map((locality) => (
+                  {editLocalityOptions.map((locality) => (
                     <SelectItem key={locality.id} value={locality.id}>
                       {formatLocalityOption(locality)}
                     </SelectItem>
