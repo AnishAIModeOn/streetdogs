@@ -1,6 +1,19 @@
 import { requireSupabase } from '../integrations/supabase/client'
 import type { Contribution, Expense, ExpenseWithContributions } from '../types/supabase'
 
+function toExpenseError(error: any, fallbackMessage: string) {
+  if (!error) {
+    return new Error(fallbackMessage)
+  }
+
+  if (error instanceof Error) {
+    return error
+  }
+
+  const parts = [error.message, error.details, error.hint].filter(Boolean)
+  return new Error(parts[0] || fallbackMessage)
+}
+
 export interface CreateExpenseInput {
   dog_id?: string | null
   area_id?: string | null
@@ -164,7 +177,7 @@ export async function createExpense(input: CreateExpenseInput) {
       .single()
 
     if (error) {
-      throw error
+      throw toExpenseError(error, 'Unable to create the expense.')
     }
 
     return data as Expense
@@ -180,7 +193,7 @@ export async function createExpense(input: CreateExpenseInput) {
     .single()
 
   if (error) {
-    throw error
+    throw toExpenseError(error, 'Unable to create the expense.')
   }
 
   return data as Expense

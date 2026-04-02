@@ -43,7 +43,15 @@ function buildDogDisplayLocation(dog) {
 }
 
 function resolveSubmissionAreaId({ matchedAreaId, currentAreaId, areas, fallbackAreaId }) {
-  return matchedAreaId || currentAreaId || fallbackAreaId || areas[0]?.id || ''
+  const validAreaIds = new Set(areas.map((area) => area.id))
+
+  for (const candidate of [matchedAreaId, currentAreaId, fallbackAreaId]) {
+    if (candidate && validAreaIds.has(candidate)) {
+      return candidate
+    }
+  }
+
+  return ''
 }
 
 export function RaiseExpensePage({ dogId, user }) {
@@ -319,7 +327,10 @@ export function RaiseExpensePage({ dogId, user }) {
         navigateTo(mode === 'dog' ? `/dogs/${selectedDog.id}` : '/dashboard')
       }, 1200)
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to raise the expense.'
+      const message =
+        error instanceof Error
+          ? error.message
+          : error?.message || error?.details || error?.hint || 'Unable to raise the expense.'
       setErrorMessage(message)
     } finally {
       setIsSaving(false)
