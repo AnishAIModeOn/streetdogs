@@ -254,7 +254,25 @@ export function AdminUsersPage({ profile }) {
       return localityOptions
     }
 
-    const effectiveLocality = getUserEffectiveLocality(editingUser, localitiesById)
+    const effectiveLocalityId = getUserEffectiveLocalityId(editingUser)
+    const effectiveLocality =
+      getUserEffectiveLocality(editingUser, localitiesById) ||
+      (effectiveLocalityId
+        ? {
+            id: effectiveLocalityId,
+            name:
+              editingUser.society?.neighbourhood ||
+              editingUser.home_locality?.neighbourhood ||
+              editingUser.home_locality?.name ||
+              'Assigned locality',
+            city:
+              editingUser.home_locality?.city ||
+              editingUser.home_locality?.district ||
+              editingUser.home_locality?.region ||
+              '',
+          }
+        : null)
+
     if (!effectiveLocality?.id || localityOptions.some((locality) => locality.id === effectiveLocality.id)) {
       return localityOptions
     }
@@ -263,6 +281,19 @@ export function AdminUsersPage({ profile }) {
       formatLocalityOption(left).localeCompare(formatLocalityOption(right)),
     )
   }, [editingUser, localitiesById, localityOptions])
+
+  useEffect(() => {
+    if (!editingUser) {
+      return
+    }
+
+    const effectiveLocalityId = getUserEffectiveLocalityId(editingUser)
+    setEditForm({
+      role: editingUser.role || 'end_user',
+      home_locality_id: effectiveLocalityId,
+      society_id: editingUser.society_id || '',
+    })
+  }, [editingUser])
 
   const filteredUsers = useMemo(
     () =>
@@ -616,7 +647,7 @@ export function AdminUsersPage({ profile }) {
       )}
 
       <Dialog open={Boolean(editingUser)} onOpenChange={(open) => !open && closeEditModal()}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent key={editingUser?.id || 'no-user'} className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Edit user access</DialogTitle>
             <DialogDescription>
