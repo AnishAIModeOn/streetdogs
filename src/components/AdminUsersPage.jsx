@@ -130,6 +130,29 @@ function buildUserLocationLabel(user, localitiesById) {
   return 'Locality not set'
 }
 
+function buildCurrentLocalityOption(user, localitiesById) {
+  const effectiveLocalityId = getUserEffectiveLocalityId(user)
+  if (!effectiveLocalityId) {
+    return null
+  }
+
+  return (
+    getUserEffectiveLocality(user, localitiesById) || {
+      id: effectiveLocalityId,
+      name:
+        user.society?.neighbourhood ||
+        user.home_locality?.neighbourhood ||
+        user.home_locality?.name ||
+        'Assigned locality',
+      city:
+        user.home_locality?.city ||
+        user.home_locality?.district ||
+        user.home_locality?.region ||
+        '',
+    }
+  )
+}
+
 export function AdminUsersPage({ profile }) {
   const [isSavingUserId, setIsSavingUserId] = useState(null)
   const [errorMessage, setErrorMessage] = useState('')
@@ -254,25 +277,7 @@ export function AdminUsersPage({ profile }) {
       return localityOptions
     }
 
-    const effectiveLocalityId = getUserEffectiveLocalityId(editingUser)
-    const effectiveLocality =
-      getUserEffectiveLocality(editingUser, localitiesById) ||
-      (effectiveLocalityId
-        ? {
-            id: effectiveLocalityId,
-            name:
-              editingUser.society?.neighbourhood ||
-              editingUser.home_locality?.neighbourhood ||
-              editingUser.home_locality?.name ||
-              'Assigned locality',
-            city:
-              editingUser.home_locality?.city ||
-              editingUser.home_locality?.district ||
-              editingUser.home_locality?.region ||
-              '',
-          }
-        : null)
-
+    const effectiveLocality = buildCurrentLocalityOption(editingUser, localitiesById)
     if (!effectiveLocality?.id || localityOptions.some((locality) => locality.id === effectiveLocality.id)) {
       return localityOptions
     }
@@ -281,6 +286,39 @@ export function AdminUsersPage({ profile }) {
       formatLocalityOption(left).localeCompare(formatLocalityOption(right)),
     )
   }, [editingUser, localitiesById, localityOptions])
+
+  const editSocietyOptions = useMemo(() => {
+    const localityId = editForm.home_locality_id
+    const currentSocieties = localityId ? societiesByLocality[localityId] ?? [] : []
+
+    if (!editingUser?.society?.id || !localityId) {
+      return currentSocieties
+    }
+
+    if (currentSocieties.some((society) => society.id === editingUser.society.id)) {
+      return currentSocieties
+    }
+
+    return [
+      ...currentSocieties,
+      {
+        id: editingUser.society.id,
+        name: editingUser.society.name,
+        locality_id: localityId,
+        neighbourhood: editingUser.society.neighbourhood ?? null,
+        pincode: editingUser.society.pincode ?? null,
+      },
+    ].sort((left, right) => left.name.localeCompare(right.name))
+  }, [editForm.home_locality_id, editingUser, societiesByLocality])
+
+  const currentLocalityLabel = useMemo(() => {
+    if (!editingUser) {
+      return 'No locality'
+    }
+
+    const currentLocality = buildCurrentLocalityOption(editingUser, localitiesById)
+    return currentLocality ? formatLocalityOption(currentLocality) : 'No locality'
+  }, [editingUser, localitiesById])
 
   useEffect(() => {
     if (!editingUser) {
@@ -658,7 +696,7 @@ export function AdminUsersPage({ profile }) {
           <div className="grid gap-4 md:grid-cols-2">
             <FormField>
               <FormLabel>Role</FormLabel>
-              <NativeSelect value={editForm.role} onChange={handleEditRoleChange}>
+              <NativeSelect key={`role-${editingUser?.id || 'new'}-${editForm.role}`} value={editForm.role} onChange={handleEditRoleChange}>
                 {roleOptions.map((role) => (
                   <option key={role} value={role}>
                     {formatRole(role)}
@@ -670,6 +708,7 @@ export function AdminUsersPage({ profile }) {
             <FormField>
               <FormLabel>Area</FormLabel>
               <NativeSelect
+                key={`locality-${editingUser?.id || 'new'}-${editForm.home_locality_id || NO_LOCALITY_VALUE}`}
                 value={editForm.home_locality_id || NO_LOCALITY_VALUE}
                 onChange={handleEditLocalityChange}
                 disabled={editForm.role === 'superadmin'}
@@ -686,6 +725,7 @@ export function AdminUsersPage({ profile }) {
             <FormField className="md:col-span-2">
               <FormLabel>Society</FormLabel>
               <NativeSelect
+                key={`society-${editingUser?.id || 'new'}-${editForm.society_id || NO_SOCIETY_VALUE}`}
                 value={editForm.society_id || NO_SOCIETY_VALUE}
                 onChange={(value) =>
                   setEditForm((current) => ({
@@ -696,13 +736,18 @@ export function AdminUsersPage({ profile }) {
                 disabled={editForm.role === 'superadmin' || !editForm.home_locality_id}
               >
                 <option value={NO_SOCIETY_VALUE}>No society</option>
-                {(societiesByLocality[editForm.home_locality_id] ?? []).map((society) => (
+                {editSocietyOptions.map((society) => (
                   <option key={society.id} value={society.id}>
                     {society.name}
                   </option>
                 ))}
               </NativeSelect>
             </FormField>
+          </div>
+
+          <div className="rounded-[1.1rem] border border-border/60 bg-white/70 p-3 text-sm text-muted-foreground">
+            <p>Current area: <span className="font-medium text-foreground">{currentLocalityLabel}</span></p>
+            <p>Current society: <span className="font-medium text-foreground">{editingUser?.society?.name || 'No society'}</span></p>
           </div>
 
           <div className="rounded-[1.35rem] bg-secondary/18 p-4 text-sm leading-6 text-muted-foreground">
