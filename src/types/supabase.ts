@@ -88,10 +88,13 @@ export interface Dog {
 
 export interface Expense {
   id: string
-  dog_id: string
+  dog_id: string | null
   created_by?: string | null
   raised_by_user_id?: string | null
   area_id?: string | null
+  target_scope?: 'dog' | 'area' | 'society' | null
+  target_society_id?: string | null
+  target_society_name?: string | null
   title?: string | null
   expense_type?: string | null
   description: string | null

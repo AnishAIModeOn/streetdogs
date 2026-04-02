@@ -243,6 +243,13 @@ export function DashboardPage({ profile }) {
   const filteredExpenses = useMemo(
     () =>
       expenses.filter((expense) => {
+        if (
+          selection.selectedSocietyName &&
+          normalizeComparable(expense.target_society_name).includes(selection.selectedSocietyName)
+        ) {
+          return true
+        }
+
         if (selection.matchedAreaId && expense.area_id === selection.matchedAreaId) {
           return true
         }

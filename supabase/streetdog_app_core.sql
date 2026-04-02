@@ -48,7 +48,10 @@ create table if not exists public.dogs (
 
 create table if not exists public.expenses (
   id uuid primary key default gen_random_uuid(),
-  dog_id uuid not null references public.dogs(id) on delete cascade,
+  dog_id uuid references public.dogs(id) on delete cascade,
+  target_scope text not null default 'dog' check (target_scope in ('dog', 'area', 'society')),
+  target_society_id uuid,
+  target_society_name text,
   created_by uuid not null references public.profiles(id) on delete restrict,
   title text not null,
   description text,

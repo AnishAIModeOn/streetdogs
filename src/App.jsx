@@ -210,7 +210,9 @@ function App() {
             profile={profile}
           />
         ) : null}
-        {raiseExpenseDogId ? <RaiseExpensePage dogId={raiseExpenseDogId} user={user} /> : null}
+        {currentPath === '/expenses/new' || raiseExpenseDogId ? (
+          <RaiseExpensePage dogId={raiseExpenseDogId} user={user} />
+        ) : null}
         {currentPath === '/dashboard' ? <DashboardPage profile={profile} /> : null}
         {currentPath !== '/dashboard' &&
         currentPath !== '/admin/users' &&
@@ -218,6 +220,7 @@ function App() {
         currentPath !== '/inventory' &&
         currentPath !== '/inventory/admin' &&
         currentPath !== '/inventory/new' &&
+        currentPath !== '/expenses/new' &&
         currentPath !== '/dogs' &&
         currentPath !== '/dogs/new' &&
         currentPath !== '/report-dog' &&

@@ -503,9 +503,12 @@ export async function listExpensesForDog(dogId) {
 export async function createExpense(payload) {
   const client = ensureSupabase()
   const safePayload = {
-    dog_id: payload.dog_id,
+    dog_id: payload.dog_id ?? null,
     raised_by_user_id: payload.raised_by_user_id,
     area_id: payload.area_id,
+    target_scope: payload.target_scope ?? (payload.dog_id ? 'dog' : 'area'),
+    target_society_id: payload.target_society_id ?? null,
+    target_society_name: payload.target_society_name ?? null,
     expense_type: payload.expense_type,
     description: payload.description ?? null,
     total_amount: payload.total_amount,

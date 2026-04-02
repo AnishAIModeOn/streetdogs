@@ -13,7 +13,7 @@ export function isDogDetailPath(path) {
 }
 
 export function isRaiseExpensePath(path) {
-  return /^\/dogs\/[^/]+\/raise-expense$/.test(path)
+  return path === '/expenses/new' || /^\/dogs\/[^/]+\/raise-expense$/.test(path)
 }
 
 export function getDogIdFromPath(path) {

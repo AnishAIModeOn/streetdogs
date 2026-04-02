@@ -2,8 +2,12 @@ import { requireSupabase } from '../integrations/supabase/client'
 import type { Contribution, Expense, ExpenseWithContributions } from '../types/supabase'
 
 export interface CreateExpenseInput {
-  dog_id: string
-  title: string
+  dog_id?: string | null
+  area_id?: string | null
+  target_scope?: 'dog' | 'area' | 'society'
+  target_society_id?: string | null
+  target_society_name?: string | null
+  title?: string | null
   description?: string | null
   amount: number
   incurred_at?: string
@@ -142,9 +146,12 @@ export async function createExpense(input: CreateExpenseInput) {
     const { data, error } = await supabase
       .from('expenses')
       .insert({
-        dog_id: legacyInput.dog_id,
+        dog_id: legacyInput.dog_id ?? null,
         raised_by_user_id: legacyInput.raised_by_user_id ?? user.id,
         area_id: legacyInput.area_id ?? null,
+        target_scope: legacyInput.target_scope ?? (legacyInput.dog_id ? 'dog' : 'area'),
+        target_society_id: legacyInput.target_society_id ?? null,
+        target_society_name: legacyInput.target_society_name ?? null,
         expense_type: legacyInput.expense_type ?? 'other',
         description: legacyInput.description ?? null,
         total_amount: legacyInput.total_amount ?? legacyInput.amount ?? 0,

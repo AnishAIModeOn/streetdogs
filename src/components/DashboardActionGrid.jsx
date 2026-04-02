@@ -14,7 +14,7 @@ const actions = [
   {
     label: 'Raise Expense',
     icon: Wallet,
-    path: '/dogs',
+    path: '/expenses/new',
     className:
       'border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(249,244,236,0.96))] text-foreground',
     iconClassName: 'bg-secondary/70 text-primary',
