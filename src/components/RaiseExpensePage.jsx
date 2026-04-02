@@ -1,10 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Building2, Check, Dog, Loader2, MapPin } from 'lucide-react'
+import { Check, Dog, Loader2, UploadCloud } from 'lucide-react'
 import { emptyExpenseForm } from '../data/seedData'
+import { findMatchingAreaId, normalizeAreaLabel, useAreaSocietyFlow } from '../hooks/use-area-society-flow'
 import { useDogs } from '../hooks/use-dogs'
 import { getDog, getProfile, listAreas } from '../lib/communityData'
 import { navigateTo } from '../lib/navigation'
-import { useCreateExpense } from '../hooks/use-expenses'
+import {
+  useCreateExpense,
+  useCreateExpenseReceipt,
+  useUploadExpenseReceipt,
+} from '../hooks/use-expenses'
+import { AreaSocietyFields } from './AreaSocietyFields'
 import { StatusBanner } from './StatusBanner'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
@@ -20,6 +26,10 @@ function formatLabel(value) {
   return value.replaceAll('_', ' ')
 }
 
+function normalizeText(value) {
+  return (value || '').trim().toLowerCase()
+}
+
 function buildDogDisplayLocation(dog) {
   return (
     dog?.locality_name ||
@@ -31,19 +41,40 @@ function buildDogDisplayLocation(dog) {
   )
 }
 
-function toSocietyState(profile) {
-  if (!profile?.society_id && !profile?.societies?.name) {
-    return null
+function matchesArea(dog, areaId, areaLabel) {
+  if (areaId && dog.area_id === areaId) {
+    return true
   }
 
-  return {
-    id: profile?.society_id || profile?.societies?.id || null,
-    name: profile?.societies?.name || '',
+  const comparableAreaLabel = normalizeText(areaLabel)
+  if (!comparableAreaLabel) {
+    return false
   }
+
+  return [
+    dog.area_name,
+    dog.locality_name,
+    dog.tagged_area_neighbourhood,
+  ].some((value) => normalizeText(value) === comparableAreaLabel)
 }
 
-function normalizeText(value) {
-  return (value || '').trim().toLowerCase()
+function matchesSociety(dog, society) {
+  if (!society) {
+    return true
+  }
+
+  if (society.id && dog.tagged_society_id === society.id) {
+    return true
+  }
+
+  const comparableSocietyName = normalizeText(society.name)
+  if (!comparableSocietyName) {
+    return false
+  }
+
+  return [dog.tagged_society_name, dog.society_name].some(
+    (value) => normalizeText(value) === comparableSocietyName,
+  )
 }
 
 export function RaiseExpensePage({ dogId, user }) {
@@ -52,14 +83,18 @@ export function RaiseExpensePage({ dogId, user }) {
   const [areas, setAreas] = useState([])
   const [form, setForm] = useState(emptyExpenseForm)
   const [selectedDogIds, setSelectedDogIds] = useState(dogId ? [dogId] : [])
-  const [selectedSociety, setSelectedSociety] = useState(null)
-  const [societyName, setSocietyName] = useState('')
+  const [selectedReceiptFile, setSelectedReceiptFile] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const { data: dogs = [] } = useDogs()
   const createExpenseMutation = useCreateExpense()
+  const createExpenseReceiptMutation = useCreateExpenseReceipt()
+  const uploadExpenseReceiptMutation = useUploadExpenseReceipt()
+  const areaSocietyFlow = useAreaSocietyFlow({
+    autoDetect: false,
+  })
 
   useEffect(() => {
     let isMounted = true
@@ -81,9 +116,40 @@ export function RaiseExpensePage({ dogId, user }) {
         setAreas(nextAreas)
         setLinkedDog(nextDog)
 
-        const nextSociety = toSocietyState(nextProfile)
-        setSelectedSociety(nextSociety)
-        setSocietyName(nextSociety?.name || '')
+        const initialAreaId = nextProfile?.home_locality_id || nextProfile?.primary_area_id || nextDog?.area_id || ''
+        const initialArea = initialAreaId ? nextAreas.find((area) => area.id === initialAreaId) : null
+        const initialSociety =
+          nextProfile?.societies?.name || nextProfile?.society_id
+            ? {
+                id: nextProfile?.society_id || nextProfile?.societies?.id || null,
+                name: nextProfile?.societies?.name || '',
+                pincode: nextProfile?.societies?.pincode || nextProfile?.pincode || '',
+                neighbourhood:
+                  nextProfile?.societies?.neighbourhood ||
+                  nextProfile?.neighbourhood ||
+                  initialArea?.name ||
+                  '',
+              }
+            : null
+
+        areaSocietyFlow.applySnapshot({
+          areaInput:
+            nextProfile?.societies?.neighbourhood ||
+            nextProfile?.neighbourhood ||
+            initialArea?.name ||
+            '',
+          pincode: nextProfile?.societies?.pincode || nextProfile?.pincode || '',
+          selectedSociety: initialSociety,
+          manual: true,
+          detectedLabel: '',
+          detectedNeighbourhood:
+            nextProfile?.societies?.neighbourhood ||
+            nextProfile?.neighbourhood ||
+            initialArea?.name ||
+            '',
+          societyDraftName: '',
+        })
+
         setSelectedDogIds(nextDog?.id ? [nextDog.id] : dogId ? [dogId] : [])
       } catch (error) {
         if (isMounted) {
@@ -101,31 +167,40 @@ export function RaiseExpensePage({ dogId, user }) {
     return () => {
       isMounted = false
     }
-  }, [dogId, user.id])
+  }, [areaSocietyFlow, dogId, user.id])
 
-  const areasById = useMemo(() => Object.fromEntries(areas.map((area) => [area.id, area])), [areas])
+  const matchedAreaId = useMemo(
+    () =>
+      findMatchingAreaId(
+        areas,
+        areaSocietyFlow.areaContext.neighbourhood || areaSocietyFlow.areaLabel,
+      ),
+    [areaSocietyFlow.areaContext.neighbourhood, areaSocietyFlow.areaLabel, areas],
+  )
 
-  const profileAreaId = profile?.home_locality_id || profile?.primary_area_id || linkedDog?.area_id || ''
-  const currentArea = profileAreaId ? areasById[profileAreaId] : null
-  const normalizedSocietyName = normalizeText(societyName)
+  const currentArea = useMemo(() => {
+    if (matchedAreaId) {
+      return areas.find((area) => area.id === matchedAreaId) || null
+    }
 
-  const filteredDogs = useMemo(() => {
-    return dogs.filter((dog) => {
-      if (!profileAreaId || dog.area_id !== profileAreaId) {
-        return false
-      }
+    const profileAreaId = profile?.home_locality_id || profile?.primary_area_id || linkedDog?.area_id || ''
+    return profileAreaId ? areas.find((area) => area.id === profileAreaId) || null : null
+  }, [areas, linkedDog?.area_id, matchedAreaId, profile?.home_locality_id, profile?.primary_area_id])
 
-      if (!normalizedSocietyName) {
-        return true
-      }
+  const selectedSociety = areaSocietyFlow.selectedSociety
+  const areaLabel = normalizeAreaLabel(
+    areaSocietyFlow.areaContext.neighbourhood || areaSocietyFlow.areaLabel || currentArea?.name || '',
+  )
 
-      if (selectedSociety?.id) {
-        return dog.tagged_society_id === selectedSociety.id
-      }
-
-      return normalizeText(dog.tagged_society_name) === normalizedSocietyName
-    })
-  }, [dogs, normalizedSocietyName, profileAreaId, selectedSociety?.id])
+  const filteredDogs = useMemo(
+    () =>
+      dogs.filter(
+        (dog) =>
+          matchesArea(dog, matchedAreaId, areaLabel) &&
+          matchesSociety(dog, selectedSociety),
+      ),
+    [areaLabel, dogs, matchedAreaId, selectedSociety],
+  )
 
   useEffect(() => {
     const allowedDogIds = new Set(filteredDogs.map((dog) => dog.id))
@@ -137,7 +212,14 @@ export function RaiseExpensePage({ dogId, user }) {
     [filteredDogs, selectedDogIds],
   )
 
-  const expenseScope = selectedDogs.length === 0 ? (normalizedSocietyName ? 'society' : 'area') : selectedDogs.length === 1 ? 'dog' : 'group'
+  const expenseScope =
+    selectedDogs.length === 0
+      ? selectedSociety?.name
+        ? 'society'
+        : 'area'
+      : selectedDogs.length === 1
+        ? 'dog'
+        : 'group'
 
   const dogSummary =
     expenseScope === 'area'
@@ -156,25 +238,16 @@ export function RaiseExpensePage({ dogId, user }) {
     )
   }
 
-  const handleSocietyNameChange = (event) => {
-    const nextValue = event.target.value
-    setSocietyName(nextValue)
-
-    if (!nextValue.trim()) {
-      setSelectedSociety(null)
-      return
-    }
-
-    if (normalizeText(selectedSociety?.name) !== normalizeText(nextValue)) {
-      setSelectedSociety((current) => (current ? { ...current, id: null, name: nextValue } : { id: null, name: nextValue }))
-    }
-  }
-
   const handleSubmit = async (event) => {
     event.preventDefault()
 
-    if (!profileAreaId || !currentArea) {
-      setErrorMessage('Your profile must have a home area before you can raise an expense.')
+    if (!matchedAreaId && !currentArea?.id) {
+      setErrorMessage('Please choose your area using the same area picker as profile and sign-up.')
+      return
+    }
+
+    if (!selectedReceiptFile) {
+      setErrorMessage('Please upload a receipt before raising this expense.')
       return
     }
 
@@ -207,14 +280,14 @@ export function RaiseExpensePage({ dogId, user }) {
         descriptionParts.push(`Group expense for: ${selectedDogNames}`)
       }
 
-      const targetScope = selectedDogs.length === 1 ? 'dog' : normalizedSocietyName ? 'society' : 'area'
-      const payload = {
+      const targetScope = selectedDogs.length === 1 ? 'dog' : selectedSociety?.name ? 'society' : 'area'
+      const createdExpense = await createExpenseMutation.mutateAsync({
         dog_id: selectedDogs.length === 1 ? selectedDogs[0].id : null,
         raised_by_user_id: user.id,
-        area_id: profileAreaId,
+        area_id: matchedAreaId || currentArea?.id || null,
         target_scope: targetScope,
-        target_society_id: targetScope !== 'dog' ? selectedSociety?.id ?? null : null,
-        target_society_name: targetScope !== 'dog' && normalizedSocietyName ? societyName.trim() : null,
+        target_society_id: targetScope !== 'dog' ? selectedSociety?._pending ? null : selectedSociety?.id ?? null : null,
+        target_society_name: targetScope !== 'dog' ? selectedSociety?.name ?? null : null,
         expense_type: form.expense_type,
         description: descriptionParts.filter(Boolean).join('\n\n') || null,
         total_amount: totalAmount,
@@ -222,9 +295,18 @@ export function RaiseExpensePage({ dogId, user }) {
         amount_pending: totalAmount,
         disclaimer_accepted: false,
         status: 'open',
-      }
+      })
 
-      await createExpenseMutation.mutateAsync(payload)
+      const uploadedReceipt = await uploadExpenseReceiptMutation.mutateAsync({
+        file: selectedReceiptFile,
+        userId: user.id,
+      })
+
+      await createExpenseReceiptMutation.mutateAsync({
+        expense_id: createdExpense.id,
+        uploaded_by_user_id: user.id,
+        file_url: uploadedReceipt.receipt_url,
+      })
 
       setSuccessMessage(
         targetScope === 'dog'
@@ -291,7 +373,7 @@ export function RaiseExpensePage({ dogId, user }) {
               Raise an expense
             </h1>
             <p className="text-sm leading-6 text-muted-foreground">
-              Area comes from your profile. Add a society if needed and optionally link one or more dogs.
+              Area and society now use the same picker flow as sign-up and profile. Upload a receipt and optionally link one or more dogs.
             </p>
           </div>
           <div className="rounded-[1.4rem] border border-white/70 bg-white/85 px-4 py-3 text-sm text-foreground shadow-soft">
@@ -325,35 +407,12 @@ export function RaiseExpensePage({ dogId, user }) {
               <CardDescription>Compact form for area, society, single-dog, or group expenses.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <FormField>
-                <FormLabel>Area</FormLabel>
-                <div className="flex items-start gap-3 rounded-[1.35rem] border border-white/75 bg-secondary/15 px-4 py-3">
-                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary/75" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-foreground">
-                      {currentArea?.name || profile?.neighbourhood || 'Area unavailable'}
-                    </p>
-                    <p className="text-xs leading-5 text-muted-foreground">
-                      {currentArea?.city || profile?.city || 'From your profile'}
-                    </p>
-                  </div>
-                </div>
-                <FormDescription>This is locked to your profile home area.</FormDescription>
-              </FormField>
-
-              <FormField>
-                <FormLabel>Society</FormLabel>
-                <div className="relative">
-                  <Building2 className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-primary/70" />
-                  <Input
-                    value={societyName}
-                    placeholder="Optional society"
-                    onChange={handleSocietyNameChange}
-                    className="pl-11"
-                  />
-                </div>
-                <FormDescription>Optional. Clear it for an area expense, or keep/edit it for society filtering.</FormDescription>
-              </FormField>
+              <AreaSocietyFields
+                flow={areaSocietyFlow}
+                deferSocietyCreate
+                cardTitle="Area and society"
+                compact
+              />
 
               <FormField>
                 <FormLabel>Select dogs</FormLabel>
@@ -362,14 +421,12 @@ export function RaiseExpensePage({ dogId, user }) {
                     <p className="text-sm font-medium text-foreground">
                       {filteredDogs.length} dog{filteredDogs.length === 1 ? '' : 's'} available
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      {selectedDogIds.length} selected
-                    </p>
+                    <p className="text-xs text-muted-foreground">{selectedDogIds.length} selected</p>
                   </div>
 
                   {filteredDogs.length === 0 ? (
                     <div className="rounded-[1.2rem] bg-white/80 px-4 py-3 text-sm text-muted-foreground">
-                      No dogs match this area{normalizedSocietyName ? ' and society' : ''}. Leave this empty to raise an area or society expense.
+                      No dogs match this area{selectedSociety?.name ? ' and society' : ''}. Leave this empty to raise an area or society expense.
                     </div>
                   ) : (
                     <div className="grid gap-2">
@@ -413,7 +470,7 @@ export function RaiseExpensePage({ dogId, user }) {
                   )}
                 </div>
                 <FormDescription>
-                  No dogs selected means {normalizedSocietyName ? 'a society expense' : 'an area expense'}.
+                  No dogs selected means {selectedSociety?.name ? 'a society expense' : 'an area expense'}.
                 </FormDescription>
               </FormField>
 
@@ -460,6 +517,30 @@ export function RaiseExpensePage({ dogId, user }) {
                     setForm((current) => ({ ...current, description: event.target.value }))
                   }
                 />
+              </FormField>
+
+              <FormField>
+                <FormLabel>Receipt upload</FormLabel>
+                <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-[1.5rem] border border-dashed border-border bg-secondary/15 px-5 py-8 text-center transition hover:bg-secondary/25">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <UploadCloud className="h-5 w-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">
+                      {selectedReceiptFile ? selectedReceiptFile.name : 'Choose a receipt file'}
+                    </p>
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      Upload a bill or proof file. This is required.
+                    </p>
+                  </div>
+                  <input
+                    className="sr-only"
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={(event) => setSelectedReceiptFile(event.target.files?.[0] ?? null)}
+                  />
+                </label>
+                <FormDescription>Mandatory for every expense request.</FormDescription>
               </FormField>
 
               <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
