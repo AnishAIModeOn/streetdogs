@@ -92,6 +92,45 @@ function formatLocalityOption(locality) {
   return localityCity ? `${localityCity} · ${localityName}` : localityName
 }
 
+function normalizeText(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function resolveUserLocalityId(user, localities) {
+  if (user.home_locality_id || user.home_locality?.id || user.society?.locality_id) {
+    return user.home_locality_id || user.home_locality?.id || user.society?.locality_id || ''
+  }
+
+  const localityHints = [
+    user.home_locality?.name,
+    user.home_locality?.locality_name,
+    user.home_locality?.neighbourhood,
+    user.home_locality?.label,
+    user.society?.neighbourhood,
+  ]
+    .map(normalizeText)
+    .filter(Boolean)
+
+  if (!localityHints.length) {
+    return ''
+  }
+
+  const matchingLocality = localities.find((locality) => {
+    const localityValues = [
+      locality?.name,
+      locality?.locality_name,
+      locality?.neighbourhood,
+      locality?.label,
+    ]
+      .map(normalizeText)
+      .filter(Boolean)
+
+    return localityValues.some((value) => localityHints.includes(value))
+  })
+
+  return matchingLocality?.id || ''
+}
+
 function getUserEffectiveLocalityId(user) {
   return user.home_locality_id || user.home_locality?.id || user.society?.locality_id || ''
 }
@@ -130,14 +169,21 @@ function buildUserLocationLabel(user, localitiesById) {
   return 'Locality not set'
 }
 
-function buildCurrentLocalityOption(user, localitiesById) {
-  const effectiveLocalityId = getUserEffectiveLocalityId(user)
+function buildCurrentLocalityOption(user, localities, localitiesById) {
+  const effectiveLocalityId = resolveUserLocalityId(user, localities)
   if (!effectiveLocalityId) {
     return null
   }
 
   return (
-    getUserEffectiveLocality(user, localitiesById) || {
+    getUserEffectiveLocality(
+      {
+        ...user,
+        home_locality_id: effectiveLocalityId,
+        home_locality: user.home_locality || localitiesById.get(effectiveLocalityId) || null,
+      },
+      localitiesById,
+    ) || {
       id: effectiveLocalityId,
       name:
         user.society?.neighbourhood ||
@@ -246,7 +292,7 @@ export function AdminUsersPage({ profile }) {
   }, [filterLocalityId, filterSocietyId])
 
   useEffect(() => {
-    const effectiveLocalityId = editingUser ? getUserEffectiveLocalityId(editingUser) : ''
+    const effectiveLocalityId = editingUser ? resolveUserLocalityId(editingUser, localities) : ''
     if (!effectiveLocalityId) {
       return
     }
@@ -277,7 +323,7 @@ export function AdminUsersPage({ profile }) {
       return localityOptions
     }
 
-    const effectiveLocality = buildCurrentLocalityOption(editingUser, localitiesById)
+    const effectiveLocality = buildCurrentLocalityOption(editingUser, localities, localitiesById)
     if (!effectiveLocality?.id || localityOptions.some((locality) => locality.id === effectiveLocality.id)) {
       return localityOptions
     }
@@ -316,27 +362,27 @@ export function AdminUsersPage({ profile }) {
       return 'No locality'
     }
 
-    const currentLocality = buildCurrentLocalityOption(editingUser, localitiesById)
+    const currentLocality = buildCurrentLocalityOption(editingUser, localities, localitiesById)
     return currentLocality ? formatLocalityOption(currentLocality) : 'No locality'
-  }, [editingUser, localitiesById])
+  }, [editingUser, localities, localitiesById])
 
   useEffect(() => {
     if (!editingUser) {
       return
     }
 
-    const effectiveLocalityId = getUserEffectiveLocalityId(editingUser)
+    const effectiveLocalityId = resolveUserLocalityId(editingUser, localities)
     setEditForm({
       role: editingUser.role || 'end_user',
       home_locality_id: effectiveLocalityId,
       society_id: editingUser.society_id || '',
     })
-  }, [editingUser])
+  }, [editingUser, localities])
 
   const filteredUsers = useMemo(
     () =>
       users.filter((user) => {
-        const effectiveLocalityId = getUserEffectiveLocalityId(user)
+        const effectiveLocalityId = resolveUserLocalityId(user, localities)
 
         if (filterRole !== ALL_FILTER_VALUE && user.role !== filterRole) {
           return false
@@ -360,7 +406,7 @@ export function AdminUsersPage({ profile }) {
       total: users.length,
       admins: users.filter((user) => ['inventory_admin', 'superadmin'].includes(user.role)).length,
       missingLocality: users.filter(
-        (user) => user.role === 'inventory_admin' && !getUserEffectiveLocalityId(user),
+        (user) => user.role === 'inventory_admin' && !resolveUserLocalityId(user, localities),
       ).length,
       inactiveProfiles: users.filter((user) => user.status === 'inactive').length,
     }),
@@ -377,7 +423,7 @@ export function AdminUsersPage({ profile }) {
     setErrorMessage('')
     setSuccessMessage('')
 
-    const effectiveLocalityId = getUserEffectiveLocalityId(user)
+    const effectiveLocalityId = resolveUserLocalityId(user, localities)
     setEditForm({
       role: user.role || 'end_user',
       home_locality_id: effectiveLocalityId,
@@ -410,7 +456,7 @@ export function AdminUsersPage({ profile }) {
         }
       }
 
-      const fallbackLocalityId = current.home_locality_id || getUserEffectiveLocalityId(editingUser || {})
+      const fallbackLocalityId = current.home_locality_id || resolveUserLocalityId(editingUser || {}, localities)
       return {
         ...current,
         role,
