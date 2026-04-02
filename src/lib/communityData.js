@@ -221,11 +221,7 @@ export async function listProfilesForAdmin() {
           home_locality_id,
           society_id,
           created_at,
-          home_locality:localities!profiles_home_locality_id_fkey (
-            id,
-            name,
-            city
-          ),
+          home_locality:localities!profiles_home_locality_id_fkey (*),
           society:societies!profiles_society_id_fkey (
             id,
             name,
@@ -278,11 +274,7 @@ export async function updateUserAdminSettings(userId, payload) {
           home_locality_id,
           society_id,
           created_at,
-          home_locality:localities!profiles_home_locality_id_fkey (
-            id,
-            name,
-            city
-          ),
+          home_locality:localities!profiles_home_locality_id_fkey (*),
           society:societies!profiles_society_id_fkey (
             id,
             name,

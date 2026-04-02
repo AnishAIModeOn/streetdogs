@@ -52,13 +52,37 @@ function UserAvatar({ name }) {
   )
 }
 
+function getLocalityName(locality) {
+  return (
+    locality?.name ||
+    locality?.locality_name ||
+    locality?.neighbourhood ||
+    locality?.label ||
+    'Locality'
+  )
+}
+
+function getLocalityCity(locality) {
+  return locality?.city || locality?.district || locality?.region || ''
+}
+
+function formatLocalityOption(locality) {
+  const localityName = getLocalityName(locality)
+  const localityCity = getLocalityCity(locality)
+  return localityCity ? `${localityCity} · ${localityName}` : localityName
+}
+
 function buildUserLocationLabel(user) {
-  if (user.society?.name && user.home_locality?.name) {
-    return `${user.home_locality.city} · ${user.home_locality.name} · ${user.society.name}`
+  const localityName = getLocalityName(user.home_locality)
+  const localityCity = getLocalityCity(user.home_locality)
+  const localityLabel = user.home_locality ? (localityCity ? `${localityCity} · ${localityName}` : localityName) : ''
+
+  if (user.society?.name && localityLabel) {
+    return `${localityLabel} · ${user.society.name}`
   }
 
-  if (user.home_locality?.name) {
-    return `${user.home_locality.city} · ${user.home_locality.name}`
+  if (localityLabel) {
+    return localityLabel
   }
 
   return 'Locality not set'
@@ -390,7 +414,7 @@ export function AdminUsersPage({ profile }) {
                 <SelectItem value={ALL_FILTER_VALUE}>All localities</SelectItem>
                 {localityOptions.map((locality) => (
                   <SelectItem key={locality.id} value={locality.id}>
-                    {locality.city} · {locality.name}
+                    {formatLocalityOption(locality)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -535,7 +559,7 @@ export function AdminUsersPage({ profile }) {
                   <SelectItem value={NO_SOCIETY_VALUE}>No locality</SelectItem>
                   {localityOptions.map((locality) => (
                     <SelectItem key={locality.id} value={locality.id}>
-                      {locality.city} · {locality.name}
+                      {formatLocalityOption(locality)}
                     </SelectItem>
                   ))}
                 </SelectContent>
