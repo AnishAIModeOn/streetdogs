@@ -51,7 +51,7 @@ function resolveSubmissionAreaId({ matchedAreaId, currentAreaId, areas, fallback
     }
   }
 
-  return ''
+  return areas[0]?.id || ''
 }
 
 export function RaiseExpensePage({ dogId, user }) {
