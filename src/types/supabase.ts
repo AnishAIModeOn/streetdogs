@@ -31,7 +31,6 @@ export interface Profile {
   phone: string | null
   role: ProfileRole
   city: string | null
-  area_name: string | null
   neighbourhood?: string | null
   neighbourhood_id?: string | null
   pincode?: string | null

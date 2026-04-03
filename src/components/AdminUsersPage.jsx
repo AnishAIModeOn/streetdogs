@@ -96,7 +96,7 @@ function getUserEffectiveLocality(user, localitiesById) {
 }
 
 function buildUserLocationLabel(user, localitiesById) {
-  const profileAreaLabel = normalizeAreaLabel(user?.neighbourhood || user?.area_name || '')
+  const profileAreaLabel = normalizeAreaLabel(user?.neighbourhood || '')
   if (user?.society?.name && profileAreaLabel) {
     return `${profileAreaLabel} · ${user.society.name}`
   }
@@ -132,7 +132,7 @@ function buildStoredLocalityOption(user, localitiesById) {
   return (
     localitiesById.get(localityId) || {
       id: localityId,
-      name: user?.neighbourhood || user?.area_name || 'Assigned locality',
+      name: user?.neighbourhood || 'Assigned locality',
       city: '',
     }
   )
@@ -221,7 +221,6 @@ function buildInitialEditAreaLabel(user, localitiesById) {
     user?.neighbourhood ||
       user?.society?.neighbourhood ||
       getLocalityName(storedLocality) ||
-      user?.area_name ||
       '',
   )
 }
@@ -241,7 +240,7 @@ function EditUserAccessDialog({
   })
 
   const currentLocalityLabel = useMemo(() => {
-    const profileAreaLabel = normalizeAreaLabel(user?.neighbourhood || user?.area_name || '')
+    const profileAreaLabel = normalizeAreaLabel(user?.neighbourhood || '')
     if (profileAreaLabel) {
       return profileAreaLabel
     }

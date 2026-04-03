@@ -18,7 +18,6 @@ type ProfileShape = {
   full_name?: string | null
   upi_id?: string | null
   role?: string | null
-  area_name?: string | null
   neighbourhood?: string | null
   neighbourhood_id?: string | null
   pincode?: string | null
@@ -28,7 +27,7 @@ type ProfileShape = {
 
 function getInitialAreaLabel(profile: ProfileShape | null) {
   return normalizeAreaLabel(
-    profile?.societies?.neighbourhood || profile?.neighbourhood || profile?.area_name || '',
+    profile?.societies?.neighbourhood || profile?.neighbourhood || '',
   )
 }
 
@@ -43,7 +42,7 @@ function getInitialSociety(profile: ProfileShape | null) {
     locality_id: profile?.societies?.locality_id || profile?.neighbourhood_id || null,
     pincode: profile?.societies?.pincode || profile?.pincode || null,
     neighbourhood:
-      profile?.societies?.neighbourhood || profile?.neighbourhood || profile?.area_name || null,
+      profile?.societies?.neighbourhood || profile?.neighbourhood || null,
   }
 }
 
