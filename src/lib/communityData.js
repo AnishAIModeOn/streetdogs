@@ -38,6 +38,30 @@ function unwrap(result) {
   return data
 }
 
+function normalizeProfile(profile) {
+  if (!profile) {
+    return profile
+  }
+
+  return {
+    ...profile,
+    neighbourhood_id: profile.neighbourhood_id ?? profile.societies?.locality_id ?? null,
+  }
+}
+
+function normalizeProfiles(profiles) {
+  return Array.isArray(profiles) ? profiles.map(normalizeProfile) : []
+}
+
+function sanitizeProfileUpdate(payload) {
+  if (!payload) {
+    return payload
+  }
+
+  const { neighbourhood_id: _ignoredNeighbourhoodId, ...safePayload } = payload
+  return safePayload
+}
+
 // ── Societies ────────────────────────────────────────────────
 
 /**
@@ -199,23 +223,35 @@ export async function listSocietiesByLocality(localityId) {
 
 export async function getProfile(userId) {
   const client = ensureSupabase()
-  return unwrap(
+  return normalizeProfile(
+    unwrap(
     await client
       .from('profiles')
       .select('*, societies(id, name, locality_id, pincode, neighbourhood)')
       .eq('id', userId)
       .maybeSingle(),
+    ),
   )
 }
 
 export async function updateProfile(userId, payload) {
   const client = ensureSupabase()
-  return unwrap(await client.from('profiles').update(payload).eq('id', userId).select().single())
+  return normalizeProfile(
+    unwrap(
+      await client
+        .from('profiles')
+        .update(sanitizeProfileUpdate(payload))
+        .eq('id', userId)
+        .select('*, societies(id, name, locality_id, pincode, neighbourhood)')
+        .single(),
+    ),
+  )
 }
 
 export async function listProfilesForAdmin() {
   const client = ensureSupabase()
-  return unwrap(
+  return normalizeProfiles(
+    unwrap(
     await client
       .from('profiles')
       .select(
@@ -225,7 +261,6 @@ export async function listProfilesForAdmin() {
           role,
           status,
           neighbourhood,
-          neighbourhood_id,
           pincode,
           society_id,
           created_at,
@@ -239,6 +274,7 @@ export async function listProfilesForAdmin() {
         `,
       )
       .order('created_at', { ascending: false }),
+    ),
   )
 }
 
@@ -263,13 +299,13 @@ export async function updateUserRole(userId, role) {
 
 export async function updateUserAdminSettings(userId, payload) {
   const client = ensureSupabase()
-  return unwrap(
+  return normalizeProfile(
+    unwrap(
     await client
       .from('profiles')
       .update({
         role: payload.role,
         neighbourhood: payload.neighbourhood ?? null,
-        neighbourhood_id: payload.neighbourhood_id ?? null,
         pincode: payload.pincode ?? null,
         society_id: payload.society_id ?? null,
       })
@@ -281,7 +317,6 @@ export async function updateUserAdminSettings(userId, payload) {
           role,
           status,
           neighbourhood,
-          neighbourhood_id,
           pincode,
           society_id,
           created_at,
@@ -295,6 +330,7 @@ export async function updateUserAdminSettings(userId, payload) {
         `,
       )
       .single(),
+    ),
   )
 }
 

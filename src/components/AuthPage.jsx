@@ -82,10 +82,6 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
           profileUpdate.neighbourhood = areaSocietyFlow.areaLabel
         }
 
-        if (areaSocietyFlow.selectedSociety?.locality_id) {
-          profileUpdate.neighbourhood_id = areaSocietyFlow.selectedSociety.locality_id
-        }
-
         if (areaSocietyFlow.areaContext.pincode) {
           profileUpdate.pincode = areaSocietyFlow.areaContext.pincode
         }

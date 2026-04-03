@@ -388,7 +388,6 @@ function EditUserAccessDialog({
       await updateUserAdminSettings(user.id, {
         role,
         neighbourhood: isSuperadminRole ? null : resolvedAreaLabel || null,
-        neighbourhood_id: isSuperadminRole ? null : resolvedLocalityId,
         pincode: isSuperadminRole ? null : resolvedPincode || null,
         society_id: resolvedSocietyId,
       })

@@ -2,6 +2,22 @@ import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
 import { requireSupabase } from '../integrations/supabase/client'
 import type { AuthSessionState, Profile } from '../types/supabase'
 
+function normalizeProfile(profile: Profile | null) {
+  if (!profile) {
+    return profile
+  }
+
+  return {
+    ...profile,
+    neighbourhood_id: profile.neighbourhood_id ?? profile.societies?.locality_id ?? null,
+  } as Profile
+}
+
+function sanitizeProfileUpdate(payload: Partial<Profile>) {
+  const { neighbourhood_id: _ignoredNeighbourhoodId, ...safePayload } = payload
+  return safePayload
+}
+
 async function getProfile(userId: string) {
   const supabase = requireSupabase()
   const { data, error } = await supabase
@@ -14,7 +30,7 @@ async function getProfile(userId: string) {
     throw error
   }
 
-  return data as Profile
+  return normalizeProfile(data as Profile)
 }
 
 export async function signInWithPassword(email: string, password: string) {
@@ -98,16 +114,16 @@ export async function updateMyProfile(payload: Partial<Profile>) {
   const supabase = requireSupabase()
   const { data, error } = await supabase
     .from('profiles')
-    .update(payload)
+    .update(sanitizeProfileUpdate(payload))
     .eq('id', authState.user.id)
-    .select('*')
+    .select('*, societies(id, name, locality_id, pincode, neighbourhood)')
     .single()
 
   if (error) {
     throw error
   }
 
-  return data as Profile
+  return normalizeProfile(data as Profile)
 }
 
 export function subscribeToAuthChanges(

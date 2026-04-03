@@ -149,7 +149,6 @@ export function useProfile(userId: string, initialProfile: ProfileShape | null) 
         full_name: trimmedFullName,
         upi_id: form.upi_id.trim() || null,
         neighbourhood: selectedAreaLabel || null,
-        neighbourhood_id: neighbourhoodId,
         pincode: areaSocietyFlow.areaContext.pincode || null,
         society_id: societyId,
       }
