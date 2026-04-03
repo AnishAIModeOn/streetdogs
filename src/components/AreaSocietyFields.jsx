@@ -17,7 +17,7 @@ import { normalizeAreaLabel, useAreaSocietyFlow } from '../hooks/use-area-societ
 export function AreaSocietyFields({
   flow,
   deferSocietyCreate = false,
-  cardTitle = 'Area and society',
+  cardTitle = 'Neighbourhood and society',
   cardCopy = 'Use your location or type your neighbourhood so StreetDog App can route this dog to the right community.',
   compact = false,
 }) {
@@ -29,7 +29,7 @@ export function AreaSocietyFields({
     autoDetect: false,
   })
   const areaLabel = useMemo(
-    () => normalizeAreaLabel(flow.areaContext.neighbourhood || flow.areaLabel) || 'Select area',
+    () => normalizeAreaLabel(flow.areaContext.neighbourhood || flow.areaLabel) || 'Select neighbourhood',
     [flow.areaContext.neighbourhood, flow.areaLabel],
   )
   const societyLabel = flow.selectedSociety?.name || 'No society'
@@ -87,7 +87,7 @@ export function AreaSocietyFields({
             <div className="flex h-full flex-col bg-[linear-gradient(180deg,rgba(251,247,238,0.98),rgba(255,255,255,0.98))] sm:max-h-[90vh] sm:rounded-[2rem]">
               <DialogHeader className="border-b border-white/70 px-4 pb-4 pt-6 pr-14 sm:px-6">
                 <DialogTitle>{cardTitle}</DialogTitle>
-                <DialogDescription>Choose the area and optional society for this report.</DialogDescription>
+                <DialogDescription>Choose the neighbourhood and optional society for this report.</DialogDescription>
               </DialogHeader>
 
               <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] sm:px-6 sm:pb-24">
@@ -95,7 +95,7 @@ export function AreaSocietyFields({
                   <FormField>
                     <FormLabel className="flex items-center gap-1.5">
                       <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                      Area
+                      Neighbourhood
                     </FormLabel>
 
                     {draftFlow.detecting ? (
@@ -118,7 +118,7 @@ export function AreaSocietyFields({
                             className="underline underline-offset-2 transition-colors hover:text-foreground"
                             onClick={() => draftFlow.setManual()}
                           >
-                            not your area?
+                            not your neighbourhood?
                           </button>
                         </FormDescription>
                       </>
@@ -222,7 +222,7 @@ export function AreaSocietyFields({
         <FormField>
           <FormLabel className="flex items-center gap-1.5">
             <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-            Area
+            Neighbourhood
           </FormLabel>
 
           {flow.detecting ? (
@@ -245,7 +245,7 @@ export function AreaSocietyFields({
                   className="underline underline-offset-2 transition-colors hover:text-foreground"
                   onClick={() => flow.setManual()}
                 >
-                  not your area?
+                  not your neighbourhood?
                 </button>
               </FormDescription>
             </>

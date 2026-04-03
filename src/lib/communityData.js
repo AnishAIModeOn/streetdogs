@@ -202,7 +202,7 @@ export async function getProfile(userId) {
   return unwrap(
     await client
       .from('profiles')
-      .select('*, societies(id, name, pincode, neighbourhood)')
+      .select('*, societies(id, name, locality_id, pincode, neighbourhood)')
       .eq('id', userId)
       .maybeSingle(),
   )
@@ -226,12 +226,11 @@ export async function listProfilesForAdmin() {
           status,
           area_name,
           neighbourhood,
+          neighbourhood_id,
           pincode,
-          primary_area_id,
-          home_locality_id,
           society_id,
           created_at,
-          home_locality:localities!profiles_home_locality_id_fkey (*),
+          neighbourhood_ref:localities!profiles_neighbourhood_id_fkey (*),
           society:societies!profiles_society_id_fkey (
             id,
             name,
@@ -272,9 +271,8 @@ export async function updateUserAdminSettings(userId, payload) {
       .update({
         role: payload.role,
         neighbourhood: payload.neighbourhood ?? null,
+        neighbourhood_id: payload.neighbourhood_id ?? null,
         pincode: payload.pincode ?? null,
-        primary_area_id: payload.primary_area_id ?? null,
-        home_locality_id: payload.home_locality_id ?? null,
         society_id: payload.society_id ?? null,
       })
       .eq('id', userId)
@@ -286,12 +284,11 @@ export async function updateUserAdminSettings(userId, payload) {
           status,
           area_name,
           neighbourhood,
+          neighbourhood_id,
           pincode,
-          primary_area_id,
-          home_locality_id,
           society_id,
           created_at,
-          home_locality:localities!profiles_home_locality_id_fkey (*),
+          neighbourhood_ref:localities!profiles_neighbourhood_id_fkey (*),
           society:societies!profiles_society_id_fkey (
             id,
             name,

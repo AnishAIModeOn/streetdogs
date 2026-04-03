@@ -73,10 +73,8 @@ export function InventoryPage({ user, profile }) {
         setSuccessMessage('')
         const currentProfile = await getProfile(user.id)
         const filterAreaId =
-          currentProfile?.primary_area_id ||
-          currentProfile?.home_locality_id ||
-          profile?.primary_area_id ||
-          profile?.home_locality_id ||
+          currentProfile?.neighbourhood_id ||
+          profile?.neighbourhood_id ||
           null
 
         if (!filterAreaId) {
@@ -100,10 +98,10 @@ export function InventoryPage({ user, profile }) {
 
     loadRequests()
     return () => { isMounted = false }
-  }, [profile?.home_locality_id, profile?.primary_area_id, user?.id])
+  }, [profile?.neighbourhood_id, user?.id])
 
   const reloadRequests = async () => {
-    const filterAreaId = profile?.primary_area_id || profile?.home_locality_id || null
+    const filterAreaId = profile?.neighbourhood_id || null
     if (!filterAreaId) {
       setRequests([])
       return

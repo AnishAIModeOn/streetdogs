@@ -82,7 +82,7 @@ export function ProfilePage({ user, profile, onComplete, onSignOut }) {
           <AreaSocietyFields
             flow={areaSocietyFlow}
             deferSocietyCreate
-            cardTitle="Area and society"
+            cardTitle="Neighbourhood and society"
             compact
           />
 

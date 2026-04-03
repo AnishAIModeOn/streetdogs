@@ -4,14 +4,13 @@ import { Filter, MapPin, ShieldCheck, Users } from 'lucide-react'
 import {
   countPendingContributions,
   createSociety,
-  listAreas,
   listLocalities,
   listProfilesForAdmin,
   listSocietiesByLocality,
   searchSocieties,
   updateUserAdminSettings,
 } from '../lib/communityData'
-import { findMatchingAreaId, normalizeAreaLabel, useAreaSocietyFlow } from '../hooks/use-area-society-flow'
+import { normalizeAreaLabel, useAreaSocietyFlow } from '../hooks/use-area-society-flow'
 import { AreaSocietyFields } from './AreaSocietyFields'
 import { StatusBanner } from './StatusBanner'
 import { Badge } from './ui/badge'
@@ -88,12 +87,12 @@ function formatLocalityOption(locality) {
 }
 
 function resolveUserLocalityId(user) {
-  return user?.home_locality_id || user?.home_locality?.id || user?.society?.locality_id || ''
+  return user?.neighbourhood_id || user?.neighbourhood_ref?.id || user?.society?.locality_id || ''
 }
 
 function getUserEffectiveLocality(user, localitiesById) {
-  if (user?.home_locality) {
-    return user.home_locality
+  if (user?.neighbourhood_ref) {
+    return user.neighbourhood_ref
   }
 
   const fallbackLocalityId = user?.society?.locality_id
@@ -135,11 +134,11 @@ function buildStoredLocalityOption(user, localitiesById) {
   }
 
   return (
-    user?.home_locality ||
+    user?.neighbourhood_ref ||
     localitiesById.get(localityId) || {
       id: localityId,
-      name: user?.home_locality?.name || user?.home_locality?.neighbourhood || 'Assigned locality',
-      city: user?.home_locality?.city || user?.home_locality?.district || user?.home_locality?.region || '',
+      name: user?.neighbourhood_ref?.name || user?.neighbourhood_ref?.neighbourhood || 'Assigned locality',
+      city: user?.neighbourhood_ref?.city || user?.neighbourhood_ref?.district || user?.neighbourhood_ref?.region || '',
     }
   )
 }
@@ -234,7 +233,6 @@ function buildInitialEditAreaLabel(user, localitiesById) {
 
 function EditUserAccessDialog({
   user,
-  areas,
   localities,
   localitiesById,
   onClose,
@@ -306,7 +304,6 @@ function EditUserAccessDialog({
       user?.society?.pincode ||
       user?.pincode ||
       ''
-    let resolvedAreaId = isSuperadminRole ? null : findMatchingAreaId(areas, resolvedAreaLabel) || null
 
     let resolvedLocalityId = isSuperadminRole
       ? null
@@ -336,12 +333,12 @@ function EditUserAccessDialog({
     }
 
     if (!isSuperadminRole && areaSocietyFlow.selectedSociety?._pending && !resolvedLocalityId) {
-      setErrorMessage('Choose an existing area before adding a new society for this user.')
+      setErrorMessage('Choose an existing neighbourhood before adding a new society for this user.')
       return
     }
 
-    if (isInventoryAdmin && !resolvedAreaLabel) {
-      setErrorMessage('Inventory admins must have an area assigned.')
+    if (isInventoryAdmin && (!resolvedLocalityId || !areaSocietyFlow.selectedSociety)) {
+      setErrorMessage('Inventory admins must have neighbourhood and society assigned')
       return
     }
 
@@ -351,7 +348,7 @@ function EditUserAccessDialog({
         areaSocietyFlow.selectedSociety ||
         normalizeAreaLabel(areaSocietyFlow.areaContext.neighbourhood || areaSocietyFlow.areaLabel))
     ) {
-      setErrorMessage('Superadmins must not have an area or society assigned.')
+      setErrorMessage('Superadmins must not have a neighbourhood or society assigned.')
       return
     }
 
@@ -362,7 +359,7 @@ function EditUserAccessDialog({
       if (!isSuperadminRole && areaSocietyFlow.selectedSociety) {
         if (areaSocietyFlow.selectedSociety._pending) {
           if (!areaSocietyFlow.selectedSociety.name || !areaSocietyFlow.selectedSociety.pincode) {
-            throw new Error('Please choose an area with a pincode before adding a new society.')
+            throw new Error('Please choose a neighbourhood with a pincode before adding a new society.')
           }
 
           const createdSociety = await createSociety({
@@ -386,7 +383,7 @@ function EditUserAccessDialog({
             resolvedLocalityId &&
             areaSocietyFlow.selectedSociety.locality_id !== resolvedLocalityId
           ) {
-            setErrorMessage('Selected society must belong to the selected area.')
+            setErrorMessage('Selected society must belong to the selected neighbourhood.')
             return
           }
 
@@ -394,16 +391,11 @@ function EditUserAccessDialog({
         }
       }
 
-      if (!resolvedAreaId && resolvedAreaLabel) {
-        resolvedAreaId = findMatchingAreaId(areas, resolvedAreaLabel) || null
-      }
-
       await updateUserAdminSettings(user.id, {
         role,
         neighbourhood: isSuperadminRole ? null : resolvedAreaLabel || null,
+        neighbourhood_id: isSuperadminRole ? null : resolvedLocalityId,
         pincode: isSuperadminRole ? null : resolvedPincode || null,
-        primary_area_id: resolvedAreaId,
-        home_locality_id: resolvedLocalityId,
         society_id: resolvedSocietyId,
       })
 
@@ -422,7 +414,7 @@ function EditUserAccessDialog({
         <DialogHeader>
           <DialogTitle>Edit user access</DialogTitle>
           <DialogDescription>
-            Update role, area, and society using the same picker flow as create account and profile.
+            Update role, neighbourhood, and society using the same picker flow as create account and profile.
           </DialogDescription>
         </DialogHeader>
 
@@ -449,7 +441,7 @@ function EditUserAccessDialog({
             <AreaSocietyFields
               flow={areaSocietyFlow}
               deferSocietyCreate
-              cardTitle="Area and society"
+              cardTitle="Neighbourhood and society"
               compact
             />
           </div>
@@ -457,7 +449,7 @@ function EditUserAccessDialog({
 
         <div className="rounded-[1.1rem] border border-border/60 bg-white/70 p-3 text-sm text-muted-foreground">
           <p>
-            Current area: <span className="font-medium text-foreground">{currentLocalityLabel}</span>
+            Current neighbourhood: <span className="font-medium text-foreground">{currentLocalityLabel}</span>
           </p>
           <p>
             Current society: <span className="font-medium text-foreground">{user?.society?.name || 'No society'}</span>
@@ -465,7 +457,7 @@ function EditUserAccessDialog({
         </div>
 
         <div className="rounded-[1.35rem] bg-secondary/18 p-4 text-sm leading-6 text-muted-foreground">
-          Inventory admins must have an area and may optionally have a society. Superadmins must not have an area or society assigned. Any selected society must belong to the selected area.
+          Inventory admins must have both neighbourhood and society assigned. Superadmins must not have a neighbourhood or society assigned. Any selected society must belong to the selected neighbourhood.
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
@@ -509,15 +501,6 @@ export function AdminUsersPage({ profile }) {
   } = useQuery({
     queryKey: ['admin', 'localities'],
     queryFn: listLocalities,
-    enabled: isSuperadmin,
-  })
-
-  const {
-    data: areas = [],
-    error: areasError,
-  } = useQuery({
-    queryKey: ['admin', 'areas'],
-    queryFn: listAreas,
     enabled: isSuperadmin,
   })
 
@@ -592,7 +575,7 @@ export function AdminUsersPage({ profile }) {
       total: users.length,
       admins: users.filter((user) => ['inventory_admin', 'superadmin'].includes(user.role)).length,
       missingLocality: users.filter(
-        (user) => user.role === 'inventory_admin' && !resolveUserLocalityId(user),
+        (user) => user.role === 'inventory_admin' && (!resolveUserLocalityId(user) || !user.society_id),
       ).length,
       inactiveProfiles: users.filter((user) => user.status === 'inactive').length,
     }),
@@ -603,8 +586,7 @@ export function AdminUsersPage({ profile }) {
     errorMessage ||
     (usersError instanceof Error ? usersError.message : '') ||
     (pendingError instanceof Error ? pendingError.message : '') ||
-    (localitiesError instanceof Error ? localitiesError.message : '') ||
-    (areasError instanceof Error ? areasError.message : '')
+    (localitiesError instanceof Error ? localitiesError.message : '')
 
   const handleFilterLocalityChange = async (localityId) => {
     setFilterLocalityId(localityId)
@@ -645,7 +627,7 @@ export function AdminUsersPage({ profile }) {
               Manage community roles
             </h1>
             <p className="max-w-lg text-sm leading-7 text-muted-foreground sm:text-[0.95rem]">
-              Review locality and society assignments, then update who can manage care and community workflows.
+              Review neighbourhood and society assignments, then update who can manage care and community workflows.
             </p>
           </div>
         </div>
@@ -658,7 +640,7 @@ export function AdminUsersPage({ profile }) {
           <CardContent className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-1">
             <StatTile label="Total members" value={stats.total} icon={Users} color="bg-primary/10 text-primary" />
             <StatTile label="Admin roles" value={stats.admins} icon={ShieldCheck} color="bg-amber-50 text-amber-600" />
-            <StatTile label="Inventory admins missing locality" value={stats.missingLocality} icon={MapPin} color="bg-rose-50 text-rose-500" />
+            <StatTile label="Inventory admins missing assignment" value={stats.missingLocality} icon={MapPin} color="bg-rose-50 text-rose-500" />
             <StatTile label="Pending approvals" value={pendingContributions} icon={ShieldCheck} color="bg-emerald-50 text-emerald-600" />
           </CardContent>
         </Card>
@@ -673,7 +655,7 @@ export function AdminUsersPage({ profile }) {
             <Filter className="h-5 w-5" />
             Filters
           </CardTitle>
-          <CardDescription>Filter members by locality, society, or role.</CardDescription>
+          <CardDescription>Filter members by neighbourhood, society, or role.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3">
           <FormField>
@@ -694,13 +676,13 @@ export function AdminUsersPage({ profile }) {
           </FormField>
 
           <FormField>
-            <FormLabel>Filter by Area</FormLabel>
+            <FormLabel>Filter by Neighbourhood</FormLabel>
             <Select value={filterLocalityId} onValueChange={handleFilterLocalityChange}>
               <SelectTrigger>
-                <SelectValue placeholder="All localities" />
+                <SelectValue placeholder="All neighbourhoods" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL_FILTER_VALUE}>All localities</SelectItem>
+                <SelectItem value={ALL_FILTER_VALUE}>All neighbourhoods</SelectItem>
                 {localityOptions.map((locality) => (
                   <SelectItem key={locality.id} value={locality.id}>
                     {formatLocalityOption(locality)}
@@ -818,7 +800,6 @@ export function AdminUsersPage({ profile }) {
       {editingUser ? (
         <EditUserAccessDialog
           user={editingUser}
-          areas={areas}
           localities={localities}
           localitiesById={localitiesById}
           onClose={() => setEditingUser(null)}

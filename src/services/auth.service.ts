@@ -6,7 +6,7 @@ async function getProfile(userId: string) {
   const supabase = requireSupabase()
   const { data, error } = await supabase
     .from('profiles')
-    .select('*, societies(id, name, pincode, neighbourhood)')
+    .select('*, societies(id, name, locality_id, pincode, neighbourhood)')
     .eq('id', userId)
     .single()
 

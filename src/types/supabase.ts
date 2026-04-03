@@ -33,15 +33,15 @@ export interface Profile {
   city: string | null
   area_name: string | null
   neighbourhood?: string | null
+  neighbourhood_id?: string | null
   pincode?: string | null
-  home_locality_id?: string | null
-  primary_area_id?: string | null
   society_id?: string | null
   upi_id?: string | null
   status?: 'active' | 'inactive' | null
   societies?: {
     id?: string | null
     name?: string | null
+    locality_id?: string | null
     pincode?: string | null
     neighbourhood?: string | null
   } | null

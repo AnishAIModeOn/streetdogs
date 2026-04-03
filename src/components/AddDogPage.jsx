@@ -69,7 +69,7 @@ export function AddDogPage({ user, profile }) {
   const [areas, setAreas] = useState([])
   const [form, setForm] = useState({
     ...emptyDogForm,
-    area_id: profile?.primary_area_id || '',
+    area_id: profile?.neighbourhood_id || '',
     guest_name: profile?.full_name || '',
   })
   const [fieldErrors, setFieldErrors] = useState({})
@@ -206,7 +206,7 @@ export function AddDogPage({ user, profile }) {
     const nextErrors = {}
 
     if (!areaSocietyFlow.areaContext.neighbourhood && !areaSocietyFlow.areaLabel) {
-      nextErrors.area = 'Please choose or type an area in the Area field.'
+      nextErrors.area = 'Please choose or type a neighbourhood in the Neighbourhood field.'
     }
 
     if (!form.ai_condition.trim()) {
@@ -240,7 +240,7 @@ export function AddDogPage({ user, profile }) {
         matchedAreaId,
         currentAreaId: form.area_id,
         areas,
-        fallbackAreaId: profile?.primary_area_id || '',
+        fallbackAreaId: profile?.neighbourhood_id || '',
       })
 
       if (!submissionAreaId) {
@@ -318,7 +318,7 @@ export function AddDogPage({ user, profile }) {
             {[
               'Upload a photo first and make sure the preview looks right.',
               'If you want help, analyze the photo and review the suggestions in the same form.',
-              'Choose the StreetDog App area so the record reaches the right volunteer group.',
+              'Choose the StreetDog App neighbourhood so the record reaches the right volunteer group.',
             ].map((tip, index) => (
               <div key={index} className="flex items-start gap-3 rounded-xl bg-secondary/35 px-4 py-3">
                 <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[0.65rem] font-bold text-primary">
@@ -518,8 +518,8 @@ export function AddDogPage({ user, profile }) {
                 {fieldErrors.area ? <FormMessage>{fieldErrors.area}</FormMessage> : null}
                 <FormDescription>
                   {matchedAreaName
-                    ? `Matched StreetDog App area: ${matchedAreaName.name}`
-                    : 'Your Area and Society will still be saved even if there is no exact StreetDog App area match.'}
+                    ? `Matched StreetDog App neighbourhood: ${matchedAreaName.name}`
+                    : 'Your neighbourhood and society will still be saved even if there is no exact StreetDog App neighbourhood match.'}
                 </FormDescription>
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">

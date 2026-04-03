@@ -36,7 +36,7 @@ export function NewInventoryRequestPage({ user, profile }) {
 
   const canManageInventory =
     profile?.role === 'inventory_admin' || profile?.role === 'superadmin'
-  const scopedAreaId = profile?.primary_area_id || profile?.home_locality_id || null
+  const scopedAreaId = profile?.neighbourhood_id || null
 
   const validateForm = () => {
     if (!form.title.trim()) {

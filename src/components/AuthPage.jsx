@@ -82,6 +82,10 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
           profileUpdate.neighbourhood = areaSocietyFlow.areaLabel
         }
 
+        if (areaSocietyFlow.selectedSociety?.locality_id) {
+          profileUpdate.neighbourhood_id = areaSocietyFlow.selectedSociety.locality_id
+        }
+
         if (areaSocietyFlow.areaContext.pincode) {
           profileUpdate.pincode = areaSocietyFlow.areaContext.pincode
         }
@@ -129,13 +133,13 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
       title={isSignUp ? 'Create your account' : 'Sign in to your area dashboard'}
       description={
         isSignUp
-          ? 'Start with your name, email, and password. We will ask for your primary area next.'
-          : 'Use your email and password to access area-based dog visibility, community records, and volunteer workflows.'
+          ? 'Start with your name, email, and password. We will ask for your neighbourhood next.'
+          : 'Use your email and password to access neighbourhood-based dog visibility, community records, and volunteer workflows.'
       }
       asideTitle={isSignUp ? 'Join the community' : 'Welcome back'}
       asideCopy={
         isSignUp
-          ? 'A short setup helps us connect you to the right area and the right dog records.'
+          ? 'A short setup helps us connect you to the right neighbourhood and the right dog records.'
           : 'Sign in to continue supporting dogs in your neighborhood with one shared workspace.'
       }
       footer={
@@ -203,7 +207,7 @@ export function AuthPage({ currentPath, authError, onSignedIn, onNavigate }) {
           <AreaSocietyFields
             flow={areaSocietyFlow}
             deferSocietyCreate
-            cardTitle="Area and society"
+            cardTitle="Neighbourhood and society"
             compact
           />
 

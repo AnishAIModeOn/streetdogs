@@ -66,7 +66,7 @@ export function InventoryAdminPage({ user, profile }) {
   const canManageInventory =
     profile?.role === 'inventory_admin' || profile?.role === 'superadmin'
   const isSuperadmin = profile?.role === 'superadmin'
-  const scopedAreaId = profile?.primary_area_id || profile?.home_locality_id || null
+  const scopedAreaId = profile?.neighbourhood_id || null
 
   useEffect(() => {
     if (!canManageInventory) {

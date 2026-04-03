@@ -11,7 +11,7 @@ export const emptySignInForm = {
 
 export const emptyProfileCompletionForm = {
   full_name: '',
-  home_locality_id: '',
+  neighbourhood_id: '',
   society_id: '',
   upi_id: '',
 }

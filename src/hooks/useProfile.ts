@@ -7,6 +7,7 @@ import { getAuthState, updateMyProfile } from '../services/auth.service'
 type SocietyShape = {
   id?: string | null
   name?: string | null
+  locality_id?: string | null
   pincode?: string | null
   neighbourhood?: string | null
   _pending?: boolean
@@ -16,10 +17,11 @@ type ProfileShape = {
   id: string
   full_name?: string | null
   upi_id?: string | null
+  role?: string | null
   area_name?: string | null
   neighbourhood?: string | null
+  neighbourhood_id?: string | null
   pincode?: string | null
-  primary_area_id?: string | null
   society_id?: string | null
   societies?: SocietyShape | null
 }
@@ -38,6 +40,7 @@ function getInitialSociety(profile: ProfileShape | null) {
   return {
     id: profile?.society_id || profile?.societies?.id || null,
     name: profile?.societies?.name || '',
+    locality_id: profile?.societies?.locality_id || profile?.neighbourhood_id || null,
     pincode: profile?.societies?.pincode || profile?.pincode || null,
     neighbourhood:
       profile?.societies?.neighbourhood || profile?.neighbourhood || profile?.area_name || null,
@@ -54,7 +57,7 @@ async function resolveSocietyId(selectedSociety: SocietyShape | null) {
   }
 
   if (!selectedSociety.name || !selectedSociety.pincode) {
-    throw new Error('Please choose an area with a pincode before adding a new society.')
+    throw new Error('Please choose a neighbourhood with a pincode before adding a new society.')
   }
 
   const created = await createSociety({
@@ -128,7 +131,7 @@ export function useProfile(userId: string, initialProfile: ProfileShape | null) 
     }
 
     if (!selectedAreaLabel) {
-      throw new Error('Area is required.')
+      throw new Error('Neighbourhood is required.')
     }
 
     setIsSaving(true)
@@ -136,10 +139,18 @@ export function useProfile(userId: string, initialProfile: ProfileShape | null) 
 
     try {
       const societyId = await resolveSocietyId(areaSocietyFlow.selectedSociety)
+      const neighbourhoodId =
+        areaSocietyFlow.selectedSociety?.locality_id || initialProfile?.neighbourhood_id || null
+
+      if (initialProfile?.role === 'inventory_admin' && (!neighbourhoodId || !societyId)) {
+        throw new Error('Inventory admins must have neighbourhood and society assigned')
+      }
+
       const profileUpdate: Record<string, string | null> = {
         full_name: trimmedFullName,
         upi_id: form.upi_id.trim() || null,
         neighbourhood: selectedAreaLabel || null,
+        neighbourhood_id: neighbourhoodId,
         pincode: areaSocietyFlow.areaContext.pincode || null,
         society_id: societyId,
       }
