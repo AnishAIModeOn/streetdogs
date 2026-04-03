@@ -200,23 +200,220 @@ function buildInitialEditSociety(user, localitiesById) {
   }
 }
 
+function EditUserAccessDialog({
+  user,
+  localities,
+  localitiesById,
+  onClose,
+  onSaved,
+}) {
+  const [role, setRole] = useState(user?.role || 'end_user')
+  const [isSaving, setIsSaving] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
+  const areaSocietyFlow = useAreaSocietyFlow({
+    autoDetect: false,
+  })
+
+  const currentLocalityLabel = useMemo(() => {
+    const currentLocality = buildStoredLocalityOption(user, localitiesById)
+    return currentLocality ? formatLocalityOption(currentLocality) : 'No locality'
+  }, [user, localitiesById])
+
+  useEffect(() => {
+    const initialSociety = buildInitialEditSociety(user, localitiesById)
+    const storedLocality = buildStoredLocalityOption(user, localitiesById)
+
+    setRole(user?.role || 'end_user')
+    areaSocietyFlow.applySnapshot({
+      areaInput:
+        initialSociety?.neighbourhood || getLocalityName(storedLocality) || '',
+      pincode: initialSociety?.pincode || '',
+      selectedSociety: initialSociety,
+      manual: true,
+      detectedLabel: '',
+      detectedNeighbourhood: '',
+      societyDraftName: '',
+    })
+  }, [user, localitiesById, areaSocietyFlow.applySnapshot])
+
+  const handleRoleChange = (nextRole) => {
+    setRole(nextRole)
+    setErrorMessage('')
+
+    if (nextRole === 'superadmin') {
+      areaSocietyFlow.applySnapshot({
+        areaInput: '',
+        pincode: '',
+        selectedSociety: null,
+        manual: true,
+        detectedLabel: '',
+        detectedNeighbourhood: '',
+        societyDraftName: '',
+      })
+    }
+  }
+
+  const handleSave = async () => {
+    const isInventoryAdmin = role === 'inventory_admin'
+    const isSuperadminRole = role === 'superadmin'
+
+    let resolvedLocalityId = isSuperadminRole
+      ? null
+      : resolveLocalityIdFromFlow({
+          flow: areaSocietyFlow,
+          localities,
+          fallbackLocalityId: resolveUserLocalityId(user),
+        }) || null
+
+    let resolvedSocietyId = null
+
+    if (!isSuperadminRole && areaSocietyFlow.selectedSociety?._pending && !resolvedLocalityId) {
+      setErrorMessage('Choose an existing area before adding a new society for this user.')
+      return
+    }
+
+    if (isInventoryAdmin && !resolvedLocalityId) {
+      setErrorMessage('Inventory admins must have an area assigned.')
+      return
+    }
+
+    if (
+      isSuperadminRole &&
+      (resolvedLocalityId ||
+        areaSocietyFlow.selectedSociety ||
+        normalizeAreaLabel(areaSocietyFlow.areaContext.neighbourhood || areaSocietyFlow.areaLabel))
+    ) {
+      setErrorMessage('Superadmins must not have an area or society assigned.')
+      return
+    }
+
+    try {
+      setIsSaving(true)
+      setErrorMessage('')
+
+      if (!isSuperadminRole && areaSocietyFlow.selectedSociety) {
+        if (areaSocietyFlow.selectedSociety._pending) {
+          if (!areaSocietyFlow.selectedSociety.name || !areaSocietyFlow.selectedSociety.pincode) {
+            throw new Error('Please choose an area with a pincode before adding a new society.')
+          }
+
+          const createdSociety = await createSociety({
+            name: areaSocietyFlow.selectedSociety.name,
+            pincode: areaSocietyFlow.selectedSociety.pincode,
+            neighbourhood:
+              areaSocietyFlow.selectedSociety.neighbourhood ||
+              areaSocietyFlow.areaContext.neighbourhood ||
+              null,
+            locality_id: resolvedLocalityId,
+            coordinates: null,
+          })
+
+          resolvedSocietyId = createdSociety?.id ?? null
+          resolvedLocalityId = createdSociety?.locality_id || resolvedLocalityId
+        } else {
+          resolvedSocietyId = areaSocietyFlow.selectedSociety.id || null
+
+          if (
+            areaSocietyFlow.selectedSociety.locality_id &&
+            resolvedLocalityId &&
+            areaSocietyFlow.selectedSociety.locality_id !== resolvedLocalityId
+          ) {
+            setErrorMessage('Selected society must belong to the selected area.')
+            return
+          }
+
+          resolvedLocalityId = areaSocietyFlow.selectedSociety.locality_id || resolvedLocalityId
+        }
+      }
+
+      await updateUserAdminSettings(user.id, {
+        role,
+        home_locality_id: resolvedLocalityId,
+        society_id: resolvedSocietyId,
+      })
+
+      await onSaved()
+      onClose()
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to update that user.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={Boolean(user)} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Edit user access</DialogTitle>
+          <DialogDescription>
+            Update role, area, and society using the same picker flow as create account and profile.
+          </DialogDescription>
+        </DialogHeader>
+
+        {errorMessage ? <StatusBanner variant="error">{errorMessage}</StatusBanner> : null}
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <FormField>
+            <FormLabel>Role</FormLabel>
+            <Select value={role} onValueChange={handleRoleChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select role" />
+              </SelectTrigger>
+              <SelectContent>
+                {roleOptions.map((roleOption) => (
+                  <SelectItem key={roleOption} value={roleOption}>
+                    {formatRole(roleOption)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FormField>
+
+          <div className={role === 'superadmin' ? 'pointer-events-none opacity-60 md:col-span-2' : 'md:col-span-2'}>
+            <AreaSocietyFields
+              flow={areaSocietyFlow}
+              deferSocietyCreate
+              cardTitle="Area and society"
+              compact
+            />
+          </div>
+        </div>
+
+        <div className="rounded-[1.1rem] border border-border/60 bg-white/70 p-3 text-sm text-muted-foreground">
+          <p>
+            Current area: <span className="font-medium text-foreground">{currentLocalityLabel}</span>
+          </p>
+          <p>
+            Current society: <span className="font-medium text-foreground">{user?.society?.name || 'No society'}</span>
+          </p>
+        </div>
+
+        <div className="rounded-[1.35rem] bg-secondary/18 p-4 text-sm leading-6 text-muted-foreground">
+          Inventory admins must have an area and may optionally have a society. Superadmins must not have an area or society assigned. Any selected society must belong to the selected area.
+        </div>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="button" disabled={isSaving} onClick={handleSave}>
+            {isSaving ? 'Saving...' : 'Save changes'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export function AdminUsersPage({ profile }) {
-  const [isSavingUserId, setIsSavingUserId] = useState(null)
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [editingUser, setEditingUser] = useState(null)
-  const [editForm, setEditForm] = useState({
-    role: 'end_user',
-    home_locality_id: '',
-    society_id: '',
-  })
   const [societiesByLocality, setSocietiesByLocality] = useState({})
   const [filterRole, setFilterRole] = useState(ALL_FILTER_VALUE)
   const [filterLocalityId, setFilterLocalityId] = useState(ALL_FILTER_VALUE)
   const [filterSocietyId, setFilterSocietyId] = useState(ALL_FILTER_VALUE)
-  const editAreaSocietyFlow = useAreaSocietyFlow({
-    autoDetect: false,
-  })
 
   const isSuperadmin = profile?.role === 'superadmin'
 
@@ -276,14 +473,6 @@ export function AdminUsersPage({ profile }) {
     return nextSocieties
   }
 
-  useEffect(() => {
-    if (filterLocalityId === ALL_FILTER_VALUE || filterSocietyId !== ALL_FILTER_VALUE) {
-      return
-    }
-
-    fetchSocietiesForLocality(filterLocalityId).catch(() => {})
-  }, [filterLocalityId, filterSocietyId])
-
   const filterSocietyOptions = useMemo(
     () =>
       filterLocalityId && filterLocalityId !== ALL_FILTER_VALUE
@@ -291,62 +480,6 @@ export function AdminUsersPage({ profile }) {
         : [],
     [filterLocalityId, societiesByLocality],
   )
-
-  const currentLocalityLabel = useMemo(() => {
-    if (!editingUser) {
-      return 'No locality'
-    }
-
-    const currentLocality = buildStoredLocalityOption(editingUser, localitiesById)
-    return currentLocality ? formatLocalityOption(currentLocality) : 'No locality'
-  }, [editingUser, localitiesById])
-
-  useEffect(() => {
-    if (!editingUser) {
-      setEditForm({
-        role: 'end_user',
-        home_locality_id: '',
-        society_id: '',
-      })
-
-      editAreaSocietyFlow.applySnapshot({
-        areaInput: '',
-        pincode: '',
-        selectedSociety: null,
-        manual: true,
-        detectedLabel: '',
-        detectedNeighbourhood: '',
-        societyDraftName: '',
-      })
-      return
-    }
-
-    const resolvedLocalityId = resolveUserLocalityId(editingUser)
-    const initialSociety = buildInitialEditSociety(editingUser, localitiesById)
-
-    setEditForm({
-      role: editingUser.role || 'end_user',
-      home_locality_id: resolvedLocalityId,
-      society_id: editingUser.society_id || '',
-    })
-
-    editAreaSocietyFlow.applySnapshot({
-      areaInput:
-        initialSociety?.neighbourhood ||
-        getLocalityName(buildStoredLocalityOption(editingUser, localitiesById)) ||
-        '',
-      pincode: initialSociety?.pincode || '',
-      selectedSociety: initialSociety,
-      manual: true,
-      detectedLabel: '',
-      detectedNeighbourhood: '',
-      societyDraftName: '',
-    })
-
-    if (resolvedLocalityId) {
-      fetchSocietiesForLocality(resolvedLocalityId).catch(() => {})
-    }
-  }, [editingUser, localitiesById, editAreaSocietyFlow.applySnapshot])
 
   const filteredUsers = useMemo(
     () =>
@@ -388,137 +521,12 @@ export function AdminUsersPage({ profile }) {
     (pendingError instanceof Error ? pendingError.message : '') ||
     (localitiesError instanceof Error ? localitiesError.message : '')
 
-  const openEditModal = (user) => {
-    setErrorMessage('')
-    setSuccessMessage('')
-    setEditingUser(user)
-  }
-
-  const closeEditModal = () => {
-    setEditingUser(null)
-  }
-
-  const handleEditRoleChange = (role) => {
-    setEditForm((current) => ({
-      ...current,
-      role,
-      home_locality_id: role === 'superadmin' ? '' : current.home_locality_id,
-      society_id: role === 'superadmin' ? '' : current.society_id,
-    }))
-
-    if (role === 'superadmin') {
-      editAreaSocietyFlow.applySnapshot({
-        areaInput: '',
-        pincode: '',
-        selectedSociety: null,
-        manual: true,
-        detectedLabel: '',
-        detectedNeighbourhood: '',
-        societyDraftName: '',
-      })
-    }
-  }
-
   const handleFilterLocalityChange = async (localityId) => {
     setFilterLocalityId(localityId)
     setFilterSocietyId(ALL_FILTER_VALUE)
 
     if (localityId !== ALL_FILTER_VALUE) {
       await fetchSocietiesForLocality(localityId)
-    }
-  }
-
-  const handleSaveUser = async () => {
-    if (!editingUser) {
-      return
-    }
-
-    const isInventoryAdmin = editForm.role === 'inventory_admin'
-    const isSuperadminRole = editForm.role === 'superadmin'
-
-    let resolvedLocalityId = isSuperadminRole
-      ? null
-      : resolveLocalityIdFromFlow({
-          flow: editAreaSocietyFlow,
-          localities,
-          fallbackLocalityId: resolveUserLocalityId(editingUser),
-        }) || null
-
-    let resolvedSocietyId = null
-
-    if (!isSuperadminRole && editAreaSocietyFlow.selectedSociety?._pending && !resolvedLocalityId) {
-      setErrorMessage('Choose an existing area before adding a new society for this user.')
-      return
-    }
-
-    if (isInventoryAdmin && !resolvedLocalityId) {
-      setErrorMessage('Inventory admins must have an area assigned.')
-      return
-    }
-
-    if (
-      isSuperadminRole &&
-      (resolvedLocalityId ||
-        editAreaSocietyFlow.selectedSociety ||
-        normalizeAreaLabel(editAreaSocietyFlow.areaContext.neighbourhood || editAreaSocietyFlow.areaLabel))
-    ) {
-      setErrorMessage('Superadmins must not have an area or society assigned.')
-      return
-    }
-
-    try {
-      setIsSavingUserId(editingUser.id)
-      setErrorMessage('')
-      setSuccessMessage('')
-
-      if (!isSuperadminRole && editAreaSocietyFlow.selectedSociety) {
-        if (editAreaSocietyFlow.selectedSociety._pending) {
-          if (!editAreaSocietyFlow.selectedSociety.name || !editAreaSocietyFlow.selectedSociety.pincode) {
-            throw new Error('Please choose an area with a pincode before adding a new society.')
-          }
-
-          const createdSociety = await createSociety({
-            name: editAreaSocietyFlow.selectedSociety.name,
-            pincode: editAreaSocietyFlow.selectedSociety.pincode,
-            neighbourhood:
-              editAreaSocietyFlow.selectedSociety.neighbourhood ||
-              editAreaSocietyFlow.areaContext.neighbourhood ||
-              null,
-            locality_id: resolvedLocalityId,
-            coordinates: null,
-          })
-
-          resolvedSocietyId = createdSociety?.id ?? null
-          resolvedLocalityId = createdSociety?.locality_id || resolvedLocalityId
-        } else {
-          resolvedSocietyId = editAreaSocietyFlow.selectedSociety.id || null
-
-          if (
-            editAreaSocietyFlow.selectedSociety.locality_id &&
-            resolvedLocalityId &&
-            editAreaSocietyFlow.selectedSociety.locality_id !== resolvedLocalityId
-          ) {
-            setErrorMessage('Selected society must belong to the selected area.')
-            return
-          }
-
-          resolvedLocalityId = editAreaSocietyFlow.selectedSociety.locality_id || resolvedLocalityId
-        }
-      }
-
-      await updateUserAdminSettings(editingUser.id, {
-        role: editForm.role,
-        home_locality_id: resolvedLocalityId,
-        society_id: resolvedSocietyId,
-      })
-
-      await refetchUsers()
-      closeEditModal()
-      setSuccessMessage('User access updated successfully.')
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to update that user.')
-    } finally {
-      setIsSavingUserId(null)
     }
   }
 
@@ -694,7 +702,14 @@ export function AdminUsersPage({ profile }) {
                       Status <span className="font-medium capitalize text-foreground">{user.status || 'active'}</span>
                     </span>
                   </div>
-                  <Button type="button" onClick={() => openEditModal(user)}>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setErrorMessage('')
+                      setSuccessMessage('')
+                      setEditingUser(user)
+                    }}
+                  >
                     Edit user
                   </Button>
                 </div>
@@ -715,69 +730,18 @@ export function AdminUsersPage({ profile }) {
         </div>
       )}
 
-      <Dialog open={Boolean(editingUser)} onOpenChange={(open) => !open && closeEditModal()}>
-        <DialogContent key={editingUser?.id || 'no-user'} className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Edit user access</DialogTitle>
-            <DialogDescription>
-              Update role, area, and society using the same picker flow as create account and profile.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <FormField>
-              <FormLabel>Role</FormLabel>
-              <Select value={editForm.role} onValueChange={handleEditRoleChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {roleOptions.map((role) => (
-                    <SelectItem key={role} value={role}>
-                      {formatRole(role)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FormField>
-
-            <div className={editForm.role === 'superadmin' ? 'pointer-events-none opacity-60 md:col-span-2' : 'md:col-span-2'}>
-              <AreaSocietyFields
-                flow={editAreaSocietyFlow}
-                deferSocietyCreate
-                cardTitle="Area and society"
-                compact
-              />
-            </div>
-          </div>
-
-          <div className="rounded-[1.1rem] border border-border/60 bg-white/70 p-3 text-sm text-muted-foreground">
-            <p>
-              Current area: <span className="font-medium text-foreground">{currentLocalityLabel}</span>
-            </p>
-            <p>
-              Current society: <span className="font-medium text-foreground">{editingUser?.society?.name || 'No society'}</span>
-            </p>
-          </div>
-
-          <div className="rounded-[1.35rem] bg-secondary/18 p-4 text-sm leading-6 text-muted-foreground">
-            Inventory admins must have an area and may optionally have a society. Superadmins must not have an area or society assigned. Any selected society must belong to the selected area.
-          </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" onClick={closeEditModal}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              disabled={!editingUser || isSavingUserId === editingUser?.id}
-              onClick={handleSaveUser}
-            >
-              {isSavingUserId === editingUser?.id ? 'Saving...' : 'Save changes'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {editingUser ? (
+        <EditUserAccessDialog
+          user={editingUser}
+          localities={localities}
+          localitiesById={localitiesById}
+          onClose={() => setEditingUser(null)}
+          onSaved={async () => {
+            await refetchUsers()
+            setSuccessMessage('User access updated successfully.')
+          }}
+        />
+      ) : null}
     </section>
   )
 }
