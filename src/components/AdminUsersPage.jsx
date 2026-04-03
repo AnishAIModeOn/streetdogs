@@ -158,30 +158,40 @@ function resolveLocalityIdFromFlow({ flow, localities, fallbackLocalityId = '' }
     return selectedSocietyLocalityId
   }
 
-  const selectedAreaLabel = normalizeAreaLabel(flow.areaContext.neighbourhood || flow.areaLabel || '')
-  if (!selectedAreaLabel) {
-    return fallbackLocalityId || ''
+  const candidateLabels = [
+    flow.areaInput,
+    flow.areaContext.neighbourhood,
+    flow.areaContext.areaLabel,
+    flow.areaLabel,
+    flow.selectedSociety?.neighbourhood,
+  ]
+    .map((value) => normalizeAreaLabel(value || ''))
+    .filter(Boolean)
+
+  for (const candidateLabel of candidateLabels) {
+    const comparableAreaLabel = normalizeComparable(candidateLabel)
+    if (!comparableAreaLabel) {
+      continue
+    }
+
+    const exactMatch = localities.find((locality) =>
+      buildLocalityComparableLabels(locality).includes(comparableAreaLabel),
+    )
+    if (exactMatch?.id) {
+      return exactMatch.id
+    }
+
+    const partialMatch = localities.find((locality) =>
+      buildLocalityComparableLabels(locality).some(
+        (label) => label.includes(comparableAreaLabel) || comparableAreaLabel.includes(label),
+      ),
+    )
+    if (partialMatch?.id) {
+      return partialMatch.id
+    }
   }
 
-  const comparableAreaLabel = normalizeComparable(selectedAreaLabel)
-  if (!comparableAreaLabel) {
-    return fallbackLocalityId || ''
-  }
-
-  const exactMatch = localities.find((locality) =>
-    buildLocalityComparableLabels(locality).includes(comparableAreaLabel),
-  )
-  if (exactMatch?.id) {
-    return exactMatch.id
-  }
-
-  const partialMatch = localities.find((locality) =>
-    buildLocalityComparableLabels(locality).some(
-      (label) => label.includes(comparableAreaLabel) || comparableAreaLabel.includes(label),
-    ),
-  )
-
-  return partialMatch?.id || ''
+  return fallbackLocalityId || ''
 }
 
 function buildInitialEditSociety(user, localitiesById) {
@@ -198,6 +208,13 @@ function buildInitialEditSociety(user, localitiesById) {
     neighbourhood: user.society.neighbourhood ?? getLocalityName(storedLocality) ?? null,
     pincode: user.society.pincode ?? null,
   }
+}
+
+function buildInitialEditAreaLabel(user, localitiesById) {
+  const storedLocality = buildStoredLocalityOption(user, localitiesById)
+  return normalizeAreaLabel(
+    getLocalityName(storedLocality) || user?.society?.neighbourhood || '',
+  )
 }
 
 function EditUserAccessDialog({
@@ -221,12 +238,11 @@ function EditUserAccessDialog({
 
   useEffect(() => {
     const initialSociety = buildInitialEditSociety(user, localitiesById)
-    const storedLocality = buildStoredLocalityOption(user, localitiesById)
+    const initialAreaLabel = buildInitialEditAreaLabel(user, localitiesById)
 
     setRole(user?.role || 'end_user')
     areaSocietyFlow.applySnapshot({
-      areaInput:
-        initialSociety?.neighbourhood || getLocalityName(storedLocality) || '',
+      areaInput: initialAreaLabel,
       pincode: initialSociety?.pincode || '',
       selectedSociety: initialSociety,
       manual: true,
