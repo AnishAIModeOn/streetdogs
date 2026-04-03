@@ -36,6 +36,7 @@ export function NewInventoryRequestPage({ user, profile }) {
 
   const canManageInventory =
     profile?.role === 'inventory_admin' || profile?.role === 'superadmin'
+  const scopedAreaId = profile?.primary_area_id || profile?.home_locality_id || null
 
   const validateForm = () => {
     if (!form.title.trim()) {
@@ -104,8 +105,12 @@ export function NewInventoryRequestPage({ user, profile }) {
       setErrorMessage('')
       setSuccessMessage('')
 
+      if (!scopedAreaId) {
+        throw new Error('Please assign an area before creating an inventory request.')
+      }
+
       const createdRequest = await createInventoryRequest({
-        area_id: profile.primary_area_id,
+        area_id: scopedAreaId,
         created_by_user_id: user.id,
         title: form.title.trim(),
         description: form.description.trim() || null,

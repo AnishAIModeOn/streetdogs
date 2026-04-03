@@ -66,6 +66,7 @@ export function InventoryAdminPage({ user, profile }) {
   const canManageInventory =
     profile?.role === 'inventory_admin' || profile?.role === 'superadmin'
   const isSuperadmin = profile?.role === 'superadmin'
+  const scopedAreaId = profile?.primary_area_id || profile?.home_locality_id || null
 
   useEffect(() => {
     if (!canManageInventory) {
@@ -80,15 +81,15 @@ export function InventoryAdminPage({ user, profile }) {
         setErrorMessage('')
         const [nextRequests, nextPendingSocietyDogs, nextPendingExpenses] = await Promise.all([
           listInventoryRequestsForReporting({
-            areaId: profile?.primary_area_id,
+            areaId: scopedAreaId,
             includeAllAreas: isSuperadmin,
           }),
           listPendingSocietyDogsForReview({
-            areaId: profile?.primary_area_id,
+            areaId: scopedAreaId,
             includeAllAreas: isSuperadmin,
           }),
           listPendingExpenseApprovals({
-            areaId: profile?.primary_area_id,
+            areaId: scopedAreaId,
             includeAllAreas: isSuperadmin,
           }),
         ])
@@ -113,20 +114,20 @@ export function InventoryAdminPage({ user, profile }) {
 
     loadRequests()
     return () => { isMounted = false }
-  }, [canManageInventory, isSuperadmin, profile?.primary_area_id])
+  }, [canManageInventory, isSuperadmin, scopedAreaId])
 
   const reloadRequests = async () => {
     const [nextRequests, nextPendingSocietyDogs, nextPendingExpenses] = await Promise.all([
       listInventoryRequestsForReporting({
-        areaId: profile?.primary_area_id,
+        areaId: scopedAreaId,
         includeAllAreas: isSuperadmin,
       }),
       listPendingSocietyDogsForReview({
-        areaId: profile?.primary_area_id,
+        areaId: scopedAreaId,
         includeAllAreas: isSuperadmin,
       }),
       listPendingExpenseApprovals({
-        areaId: profile?.primary_area_id,
+        areaId: scopedAreaId,
         includeAllAreas: isSuperadmin,
       }),
     ])

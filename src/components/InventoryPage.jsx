@@ -72,10 +72,15 @@ export function InventoryPage({ user, profile }) {
         setErrorMessage('')
         setSuccessMessage('')
         const currentProfile = await getProfile(user.id)
-        const filterAreaId = currentProfile?.primary_area_id || profile?.primary_area_id || null
+        const filterAreaId =
+          currentProfile?.primary_area_id ||
+          currentProfile?.home_locality_id ||
+          profile?.primary_area_id ||
+          profile?.home_locality_id ||
+          null
 
         if (!filterAreaId) {
-          throw new Error('Your profile does not have a primary area yet.')
+          throw new Error('Your profile does not have an assigned area yet.')
         }
 
         const nextRequests = await listInventoryRequestsForArea(filterAreaId)
@@ -95,10 +100,15 @@ export function InventoryPage({ user, profile }) {
 
     loadRequests()
     return () => { isMounted = false }
-  }, [profile?.primary_area_id, user?.id])
+  }, [profile?.home_locality_id, profile?.primary_area_id, user?.id])
 
   const reloadRequests = async () => {
-    const nextRequests = await listInventoryRequestsForArea(profile.primary_area_id)
+    const filterAreaId = profile?.primary_area_id || profile?.home_locality_id || null
+    if (!filterAreaId) {
+      setRequests([])
+      return
+    }
+    const nextRequests = await listInventoryRequestsForArea(filterAreaId)
     setRequests(nextRequests)
   }
 

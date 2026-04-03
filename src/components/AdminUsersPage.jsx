@@ -8,6 +8,7 @@ import {
   listLocalities,
   listProfilesForAdmin,
   listSocietiesByLocality,
+  searchSocieties,
   updateUserAdminSettings,
 } from '../lib/communityData'
 import { findMatchingAreaId, normalizeAreaLabel, useAreaSocietyFlow } from '../hooks/use-area-society-flow'
@@ -293,12 +294,25 @@ function EditUserAccessDialog({
 
     let resolvedSocietyId = null
 
+    if (!isSuperadminRole && !resolvedLocalityId && resolvedAreaLabel) {
+      const matchingSocieties = await searchSocieties('', '', resolvedAreaLabel).catch(() => [])
+      const candidateLocalityIds = [...new Set(
+        matchingSocieties
+          .map((society) => society?.locality_id || '')
+          .filter(Boolean),
+      )]
+
+      if (candidateLocalityIds.length > 0) {
+        resolvedLocalityId = candidateLocalityIds[0]
+      }
+    }
+
     if (!isSuperadminRole && areaSocietyFlow.selectedSociety?._pending && !resolvedLocalityId) {
       setErrorMessage('Choose an existing area before adding a new society for this user.')
       return
     }
 
-    if (isInventoryAdmin && !resolvedAreaId) {
+    if (isInventoryAdmin && !resolvedAreaId && !resolvedLocalityId) {
       setErrorMessage('Inventory admins must have an area assigned.')
       return
     }
