@@ -87,16 +87,12 @@ function formatLocalityOption(locality) {
 }
 
 function resolveUserLocalityId(user) {
-  return user?.neighbourhood_id || user?.neighbourhood_ref?.id || user?.society?.locality_id || ''
+  return user?.neighbourhood_id || user?.society?.locality_id || ''
 }
 
 function getUserEffectiveLocality(user, localitiesById) {
-  if (user?.neighbourhood_ref) {
-    return user.neighbourhood_ref
-  }
-
-  const fallbackLocalityId = user?.society?.locality_id
-  return fallbackLocalityId ? localitiesById.get(fallbackLocalityId) ?? null : null
+  const localityId = resolveUserLocalityId(user)
+  return localityId ? localitiesById.get(localityId) ?? null : null
 }
 
 function buildUserLocationLabel(user, localitiesById) {
@@ -134,11 +130,10 @@ function buildStoredLocalityOption(user, localitiesById) {
   }
 
   return (
-    user?.neighbourhood_ref ||
     localitiesById.get(localityId) || {
       id: localityId,
-      name: user?.neighbourhood_ref?.name || user?.neighbourhood_ref?.neighbourhood || 'Assigned locality',
-      city: user?.neighbourhood_ref?.city || user?.neighbourhood_ref?.district || user?.neighbourhood_ref?.region || '',
+      name: user?.neighbourhood || user?.area_name || 'Assigned locality',
+      city: '',
     }
   )
 }

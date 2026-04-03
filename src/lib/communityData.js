@@ -230,7 +230,6 @@ export async function listProfilesForAdmin() {
           pincode,
           society_id,
           created_at,
-          neighbourhood_ref:localities!profiles_neighbourhood_id_fkey (*),
           society:societies!profiles_society_id_fkey (
             id,
             name,
@@ -288,7 +287,6 @@ export async function updateUserAdminSettings(userId, payload) {
           pincode,
           society_id,
           created_at,
-          neighbourhood_ref:localities!profiles_neighbourhood_id_fkey (*),
           society:societies!profiles_society_id_fkey (
             id,
             name,
