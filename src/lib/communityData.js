@@ -224,6 +224,9 @@ export async function listProfilesForAdmin() {
           full_name,
           role,
           status,
+          area_name,
+          neighbourhood,
+          pincode,
           primary_area_id,
           home_locality_id,
           society_id,
@@ -268,6 +271,8 @@ export async function updateUserAdminSettings(userId, payload) {
       .from('profiles')
       .update({
         role: payload.role,
+        neighbourhood: payload.neighbourhood ?? null,
+        pincode: payload.pincode ?? null,
         primary_area_id: payload.primary_area_id ?? null,
         home_locality_id: payload.home_locality_id ?? null,
         society_id: payload.society_id ?? null,
@@ -279,6 +284,9 @@ export async function updateUserAdminSettings(userId, payload) {
           full_name,
           role,
           status,
+          area_name,
+          neighbourhood,
+          pincode,
           primary_area_id,
           home_locality_id,
           society_id,

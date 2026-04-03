@@ -101,6 +101,15 @@ function getUserEffectiveLocality(user, localitiesById) {
 }
 
 function buildUserLocationLabel(user, localitiesById) {
+  const profileAreaLabel = normalizeAreaLabel(user?.neighbourhood || user?.area_name || '')
+  if (user?.society?.name && profileAreaLabel) {
+    return `${profileAreaLabel} · ${user.society.name}`
+  }
+
+  if (profileAreaLabel) {
+    return profileAreaLabel
+  }
+
   const effectiveLocality = getUserEffectiveLocality(user, localitiesById)
   const localityLabel = effectiveLocality ? formatLocalityOption(effectiveLocality) : ''
 
@@ -215,7 +224,11 @@ function buildInitialEditSociety(user, localitiesById) {
 function buildInitialEditAreaLabel(user, localitiesById) {
   const storedLocality = buildStoredLocalityOption(user, localitiesById)
   return normalizeAreaLabel(
-    getLocalityName(storedLocality) || user?.society?.neighbourhood || user?.area_name || '',
+    user?.neighbourhood ||
+      user?.society?.neighbourhood ||
+      getLocalityName(storedLocality) ||
+      user?.area_name ||
+      '',
   )
 }
 
@@ -235,6 +248,11 @@ function EditUserAccessDialog({
   })
 
   const currentLocalityLabel = useMemo(() => {
+    const profileAreaLabel = normalizeAreaLabel(user?.neighbourhood || user?.area_name || '')
+    if (profileAreaLabel) {
+      return profileAreaLabel
+    }
+
     const currentLocality = buildStoredLocalityOption(user, localitiesById)
     return currentLocality ? formatLocalityOption(currentLocality) : 'No locality'
   }, [user, localitiesById])
@@ -275,13 +293,19 @@ function EditUserAccessDialog({
   const handleSave = async () => {
     const isInventoryAdmin = role === 'inventory_admin'
     const isSuperadminRole = role === 'superadmin'
-    const resolvedAreaLabel = normalizeAreaLabel(
+    let resolvedAreaLabel = normalizeAreaLabel(
       areaSocietyFlow.areaInput ||
         areaSocietyFlow.areaContext.neighbourhood ||
         areaSocietyFlow.areaLabel ||
         areaSocietyFlow.selectedSociety?.neighbourhood ||
         '',
     )
+    let resolvedPincode =
+      areaSocietyFlow.selectedSociety?.pincode ||
+      areaSocietyFlow.areaContext.pincode ||
+      user?.society?.pincode ||
+      user?.pincode ||
+      ''
     let resolvedAreaId = isSuperadminRole ? null : findMatchingAreaId(areas, resolvedAreaLabel) || null
 
     let resolvedLocalityId = isSuperadminRole
@@ -307,12 +331,16 @@ function EditUserAccessDialog({
       }
     }
 
+    if (!resolvedAreaLabel && areaSocietyFlow.selectedSociety?.neighbourhood) {
+      resolvedAreaLabel = normalizeAreaLabel(areaSocietyFlow.selectedSociety.neighbourhood)
+    }
+
     if (!isSuperadminRole && areaSocietyFlow.selectedSociety?._pending && !resolvedLocalityId) {
       setErrorMessage('Choose an existing area before adding a new society for this user.')
       return
     }
 
-    if (isInventoryAdmin && !resolvedAreaId && !resolvedLocalityId) {
+    if (isInventoryAdmin && !resolvedAreaLabel) {
       setErrorMessage('Inventory admins must have an area assigned.')
       return
     }
@@ -372,6 +400,8 @@ function EditUserAccessDialog({
 
       await updateUserAdminSettings(user.id, {
         role,
+        neighbourhood: isSuperadminRole ? null : resolvedAreaLabel || null,
+        pincode: isSuperadminRole ? null : resolvedPincode || null,
         primary_area_id: resolvedAreaId,
         home_locality_id: resolvedLocalityId,
         society_id: resolvedSocietyId,
