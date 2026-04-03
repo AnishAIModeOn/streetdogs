@@ -4,12 +4,13 @@ import { Filter, MapPin, ShieldCheck, Users } from 'lucide-react'
 import {
   countPendingContributions,
   createSociety,
+  listAreas,
   listLocalities,
   listProfilesForAdmin,
   listSocietiesByLocality,
   updateUserAdminSettings,
 } from '../lib/communityData'
-import { normalizeAreaLabel, useAreaSocietyFlow } from '../hooks/use-area-society-flow'
+import { findMatchingAreaId, normalizeAreaLabel, useAreaSocietyFlow } from '../hooks/use-area-society-flow'
 import { AreaSocietyFields } from './AreaSocietyFields'
 import { StatusBanner } from './StatusBanner'
 import { Badge } from './ui/badge'
@@ -213,12 +214,13 @@ function buildInitialEditSociety(user, localitiesById) {
 function buildInitialEditAreaLabel(user, localitiesById) {
   const storedLocality = buildStoredLocalityOption(user, localitiesById)
   return normalizeAreaLabel(
-    getLocalityName(storedLocality) || user?.society?.neighbourhood || '',
+    getLocalityName(storedLocality) || user?.society?.neighbourhood || user?.area_name || '',
   )
 }
 
 function EditUserAccessDialog({
   user,
+  areas,
   localities,
   localitiesById,
   onClose,
@@ -272,6 +274,14 @@ function EditUserAccessDialog({
   const handleSave = async () => {
     const isInventoryAdmin = role === 'inventory_admin'
     const isSuperadminRole = role === 'superadmin'
+    const resolvedAreaLabel = normalizeAreaLabel(
+      areaSocietyFlow.areaInput ||
+        areaSocietyFlow.areaContext.neighbourhood ||
+        areaSocietyFlow.areaLabel ||
+        areaSocietyFlow.selectedSociety?.neighbourhood ||
+        '',
+    )
+    let resolvedAreaId = isSuperadminRole ? null : findMatchingAreaId(areas, resolvedAreaLabel) || null
 
     let resolvedLocalityId = isSuperadminRole
       ? null
@@ -288,7 +298,7 @@ function EditUserAccessDialog({
       return
     }
 
-    if (isInventoryAdmin && !resolvedLocalityId) {
+    if (isInventoryAdmin && !resolvedAreaId) {
       setErrorMessage('Inventory admins must have an area assigned.')
       return
     }
@@ -342,8 +352,13 @@ function EditUserAccessDialog({
         }
       }
 
+      if (!resolvedAreaId && resolvedAreaLabel) {
+        resolvedAreaId = findMatchingAreaId(areas, resolvedAreaLabel) || null
+      }
+
       await updateUserAdminSettings(user.id, {
         role,
+        primary_area_id: resolvedAreaId,
         home_locality_id: resolvedLocalityId,
         society_id: resolvedSocietyId,
       })
@@ -454,6 +469,15 @@ export function AdminUsersPage({ profile }) {
   })
 
   const {
+    data: areas = [],
+    error: areasError,
+  } = useQuery({
+    queryKey: ['admin', 'areas'],
+    queryFn: listAreas,
+    enabled: isSuperadmin,
+  })
+
+  const {
     data: pendingContributions = 0,
     error: pendingError,
   } = useQuery({
@@ -535,7 +559,8 @@ export function AdminUsersPage({ profile }) {
     errorMessage ||
     (usersError instanceof Error ? usersError.message : '') ||
     (pendingError instanceof Error ? pendingError.message : '') ||
-    (localitiesError instanceof Error ? localitiesError.message : '')
+    (localitiesError instanceof Error ? localitiesError.message : '') ||
+    (areasError instanceof Error ? areasError.message : '')
 
   const handleFilterLocalityChange = async (localityId) => {
     setFilterLocalityId(localityId)
@@ -749,6 +774,7 @@ export function AdminUsersPage({ profile }) {
       {editingUser ? (
         <EditUserAccessDialog
           user={editingUser}
+          areas={areas}
           localities={localities}
           localitiesById={localitiesById}
           onClose={() => setEditingUser(null)}
