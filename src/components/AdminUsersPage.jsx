@@ -326,12 +326,19 @@ function EditUserAccessDialog({
       resolvedAreaLabel = normalizeAreaLabel(areaSocietyFlow.selectedSociety.neighbourhood)
     }
 
-    if (!isSuperadminRole && areaSocietyFlow.selectedSociety?._pending && !resolvedLocalityId) {
-      setErrorMessage('Choose an existing neighbourhood before adding a new society for this user.')
+    if (
+      !isSuperadminRole &&
+      areaSocietyFlow.selectedSociety?._pending &&
+      !resolvedAreaLabel
+    ) {
+      setErrorMessage('Choose a neighbourhood before adding a new society for this user.')
       return
     }
 
-    if (isInventoryAdmin && (!resolvedLocalityId || !areaSocietyFlow.selectedSociety)) {
+    if (
+      isInventoryAdmin &&
+      (!resolvedAreaLabel || !areaSocietyFlow.selectedSociety)
+    ) {
       setErrorMessage('Inventory admins must have neighbourhood and society assigned')
       return
     }
