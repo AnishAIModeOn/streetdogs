@@ -86,7 +86,7 @@ function formatLocalityOption(locality) {
   return localityCity ? `${localityCity} · ${localityName}` : localityName
 }
 
-function resolveUserLocalityId(user, localities) {
+function resolveUserLocalityId(user) {
   return (
     user?.home_locality_id ||
     user?.home_locality?.id ||
@@ -797,7 +797,7 @@ export function AdminUsersPage({ profile }) {
                 compact
               />
             </div>
-{false && (
+{/*
   <FormField className="md:col-span-2 gap-3">
               <FormLabel>Location</FormLabel>
               <div className="flex min-h-11 w-full items-center justify-between gap-3 rounded-2xl border border-white/75 bg-white/92 px-3 py-2 text-left shadow-soft">
@@ -853,7 +853,7 @@ export function AdminUsersPage({ profile }) {
                 </FormField>
               </div>
             </FormField>
-)}
+*/}
           </div>
 
           <div className="rounded-[1.1rem] border border-border/60 bg-white/70 p-3 text-sm text-muted-foreground">
