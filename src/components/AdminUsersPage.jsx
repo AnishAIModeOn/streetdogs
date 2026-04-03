@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronDown, Filter, MapPin, ShieldCheck, Users } from 'lucide-react'
+import { Filter, MapPin, ShieldCheck, Users } from 'lucide-react'
 import {
   countPendingContributions,
+  createSociety,
   listLocalities,
   listProfilesForAdmin,
   listSocietiesByLocality,
   updateUserAdminSettings,
 } from '../lib/communityData'
+import { normalizeAreaLabel, useAreaSocietyFlow } from '../hooks/use-area-society-flow'
+import { AreaSocietyFields } from './AreaSocietyFields'
 import { StatusBanner } from './StatusBanner'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
@@ -21,19 +24,6 @@ import {
 } from './ui/dialog'
 import { FormField, FormLabel } from './ui/form'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
-
-function NativeSelect({ value, onChange, disabled = false, children }) {
-  return (
-    <select
-      className="flex h-11 w-full rounded-2xl border border-input bg-white/90 px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      disabled={disabled}
-    >
-      {children}
-    </select>
-  )
-}
 
 const roleOptions = ['end_user', 'inventory_admin', 'superadmin']
 const ALL_FILTER_VALUE = '__all__'
@@ -84,6 +74,10 @@ function getLocalityName(locality) {
 
 function getLocalityCity(locality) {
   return locality?.city || locality?.district || locality?.region || ''
+}
+
+function normalizeComparable(value) {
+  return normalizeAreaLabel(value).trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
 function formatLocalityOption(locality) {
@@ -151,6 +145,57 @@ function buildStoredLocalityOption(user, localitiesById) {
   )
 }
 
+function buildLocalityComparableLabels(locality) {
+  const localityName = getLocalityName(locality)
+  const localityCity = getLocalityCity(locality)
+
+  return [
+    locality?.name,
+    locality?.locality_name,
+    locality?.neighbourhood,
+    locality?.label,
+    localityName,
+    localityCity ? `${localityCity} ${localityName}` : '',
+    localityCity ? `${localityName} ${localityCity}` : '',
+    localityCity ? `${localityName}, ${localityCity}` : '',
+    formatLocalityOption(locality),
+  ]
+    .map((value) => normalizeComparable(value || ''))
+    .filter(Boolean)
+}
+
+function resolveLocalityIdFromFlow({ flow, localities, fallbackLocalityId = '' }) {
+  const selectedSocietyLocalityId = flow.selectedSociety?.locality_id || ''
+  if (selectedSocietyLocalityId) {
+    return selectedSocietyLocalityId
+  }
+
+  const selectedAreaLabel = normalizeAreaLabel(flow.areaContext.neighbourhood || flow.areaLabel || '')
+  if (!selectedAreaLabel) {
+    return fallbackLocalityId || ''
+  }
+
+  const comparableAreaLabel = normalizeComparable(selectedAreaLabel)
+  if (!comparableAreaLabel) {
+    return fallbackLocalityId || ''
+  }
+
+  const exactMatch = localities.find((locality) =>
+    buildLocalityComparableLabels(locality).includes(comparableAreaLabel),
+  )
+  if (exactMatch?.id) {
+    return exactMatch.id
+  }
+
+  const partialMatch = localities.find((locality) =>
+    buildLocalityComparableLabels(locality).some(
+      (label) => label.includes(comparableAreaLabel) || comparableAreaLabel.includes(label),
+    ),
+  )
+
+  return partialMatch?.id || ''
+}
+
 export function AdminUsersPage({ profile }) {
   const [isSavingUserId, setIsSavingUserId] = useState(null)
   const [errorMessage, setErrorMessage] = useState('')
@@ -165,6 +210,9 @@ export function AdminUsersPage({ profile }) {
   const [filterRole, setFilterRole] = useState(ALL_FILTER_VALUE)
   const [filterLocalityId, setFilterLocalityId] = useState(ALL_FILTER_VALUE)
   const [filterSocietyId, setFilterSocietyId] = useState(ALL_FILTER_VALUE)
+  const editAreaSocietyFlow = useAreaSocietyFlow({
+    autoDetect: false,
+  })
 
   const isSuperadmin = profile?.role === 'superadmin'
   const {
@@ -270,45 +318,6 @@ export function AdminUsersPage({ profile }) {
     [filterLocalityId, societiesByLocality],
   )
 
-  const editLocalityOptions = useMemo(() => {
-    if (!editingUser) {
-      return localityOptions
-    }
-
-    const storedLocality = buildStoredLocalityOption(editingUser, localitiesById)
-    if (!storedLocality?.id || localityOptions.some((locality) => locality.id === storedLocality.id)) {
-      return localityOptions
-    }
-
-    return [...localityOptions, storedLocality].sort((left, right) =>
-      formatLocalityOption(left).localeCompare(formatLocalityOption(right)),
-    )
-  }, [editingUser, localitiesById, localityOptions])
-
-  const editSocietyOptions = useMemo(() => {
-    const localityId = editForm.home_locality_id
-    const currentSocieties = localityId ? societiesByLocality[localityId] ?? [] : []
-
-    if (!editingUser?.society?.id || !localityId) {
-      return currentSocieties
-    }
-
-    if (currentSocieties.some((society) => society.id === editingUser.society.id)) {
-      return currentSocieties
-    }
-
-    return [
-      ...currentSocieties,
-      {
-        id: editingUser.society.id,
-        name: editingUser.society.name,
-        locality_id: localityId,
-        neighbourhood: editingUser.society.neighbourhood ?? null,
-        pincode: editingUser.society.pincode ?? null,
-      },
-    ].sort((left, right) => left.name.localeCompare(right.name))
-  }, [editForm.home_locality_id, editingUser, societiesByLocality])
-
   const currentLocalityLabel = useMemo(() => {
     if (!editingUser) {
       return 'No locality'
@@ -317,24 +326,6 @@ export function AdminUsersPage({ profile }) {
     const currentLocality = buildStoredLocalityOption(editingUser, localitiesById)
     return currentLocality ? formatLocalityOption(currentLocality) : 'No locality'
   }, [editingUser, localitiesById])
-
-  const selectedLocalityLabel = useMemo(() => {
-    if (!editForm.home_locality_id) {
-      return 'Select area'
-    }
-
-    const selectedLocality = editLocalityOptions.find((locality) => locality.id === editForm.home_locality_id)
-    return selectedLocality ? formatLocalityOption(selectedLocality) : 'Select area'
-  }, [editForm.home_locality_id, editLocalityOptions])
-
-  const selectedSocietyLabel = useMemo(() => {
-    if (!editForm.society_id) {
-      return 'No society'
-    }
-
-    const selectedSociety = editSocietyOptions.find((society) => society.id === editForm.society_id)
-    return selectedSociety?.name || 'No society'
-  }, [editForm.society_id, editSocietyOptions])
 
   useEffect(() => {
     if (!editingUser) {
@@ -347,6 +338,40 @@ export function AdminUsersPage({ profile }) {
       society_id: editingUser.society_id || '',
     })
   }, [editingUser, localities])
+
+  useEffect(() => {
+    if (!editingUser) {
+      editAreaSocietyFlow.applySnapshot({
+        areaInput: '',
+        pincode: '',
+        selectedSociety: null,
+        manual: true,
+        detectedLabel: '',
+        detectedNeighbourhood: '',
+        societyDraftName: '',
+      })
+      return
+    }
+
+    const storedLocality = buildStoredLocalityOption(editingUser, localitiesById)
+    editAreaSocietyFlow.applySnapshot({
+      areaInput: editingUser?.society?.neighbourhood || getLocalityName(storedLocality) || '',
+      pincode: editingUser?.society?.pincode || '',
+      selectedSociety: editingUser?.society
+        ? {
+            id: editingUser.society.id,
+            name: editingUser.society.name,
+            locality_id: editingUser.society.locality_id ?? editingUser.home_locality_id ?? null,
+            neighbourhood: editingUser.society.neighbourhood ?? getLocalityName(storedLocality) ?? null,
+            pincode: editingUser.society.pincode ?? null,
+          }
+        : null,
+      manual: true,
+      detectedLabel: '',
+      detectedNeighbourhood: '',
+      societyDraftName: '',
+    })
+  }, [editAreaSocietyFlow.applySnapshot, editingUser, localitiesById])
 
   const filteredUsers = useMemo(
     () =>
@@ -418,6 +443,15 @@ export function AdminUsersPage({ profile }) {
   const handleEditRoleChange = (role) => {
     setEditForm((current) => {
       if (role === 'superadmin') {
+        editAreaSocietyFlow.applySnapshot({
+          areaInput: '',
+          pincode: '',
+          selectedSociety: null,
+          manual: true,
+          detectedLabel: '',
+          detectedNeighbourhood: '',
+          societyDraftName: '',
+        })
         return {
           role,
           home_locality_id: '',
@@ -433,19 +467,6 @@ export function AdminUsersPage({ profile }) {
         society_id: fallbackLocalityId ? current.society_id : '',
       }
     })
-  }
-
-  const handleEditLocalityChange = async (localityId) => {
-    const nextLocalityId = localityId === NO_LOCALITY_VALUE ? '' : localityId
-    setEditForm((current) => ({
-      ...current,
-      home_locality_id: nextLocalityId,
-      society_id: '',
-    }))
-
-    if (nextLocalityId) {
-      await fetchSocietiesForLocality(nextLocalityId)
-    }
   }
 
   const handleFilterLocalityChange = async (localityId) => {
@@ -464,34 +485,76 @@ export function AdminUsersPage({ profile }) {
 
     const isInventoryAdmin = editForm.role === 'inventory_admin'
     const isSuperadminRole = editForm.role === 'superadmin'
-    let resolvedLocalityId = isSuperadminRole ? null : editForm.home_locality_id || null
-    const resolvedSocietyId = isSuperadminRole ? null : editForm.society_id || null
+    let resolvedLocalityId = isSuperadminRole
+      ? null
+      : resolveLocalityIdFromFlow({
+          flow: editAreaSocietyFlow,
+          localities,
+          fallbackLocalityId: resolveUserLocalityId(editingUser, localities),
+        }) || null
+    let resolvedSocietyId = null
+
+    if (!isSuperadminRole && editAreaSocietyFlow.selectedSociety?._pending && !resolvedLocalityId) {
+      setErrorMessage('Choose an existing area before adding a new society for this user.')
+      return
+    }
 
     if (isInventoryAdmin && !resolvedLocalityId) {
-      setErrorMessage('Inventory admins must have a locality assigned.')
+      setErrorMessage('Inventory admins must have an area assigned.')
       return
     }
 
-    if (isSuperadminRole && (resolvedLocalityId || resolvedSocietyId)) {
-      setErrorMessage('Superadmins must not have a locality or society assigned.')
+    if (
+      isSuperadminRole &&
+      (resolvedLocalityId ||
+        editAreaSocietyFlow.selectedSociety ||
+        normalizeAreaLabel(editAreaSocietyFlow.areaContext.neighbourhood || editAreaSocietyFlow.areaLabel))
+    ) {
+      setErrorMessage('Superadmins must not have an area or society assigned.')
       return
-    }
-
-    if (resolvedSocietyId) {
-      const matchingSociety = (societiesByLocality[resolvedLocalityId] ?? []).find(
-        (society) => society.id === resolvedSocietyId,
-      )
-      if (!matchingSociety || matchingSociety.locality_id !== resolvedLocalityId) {
-        setErrorMessage('Selected society must belong to the selected locality.')
-        return
-      }
-      resolvedLocalityId = matchingSociety.locality_id || resolvedLocalityId
     }
 
     try {
       setIsSavingUserId(editingUser.id)
       setErrorMessage('')
       setSuccessMessage('')
+
+      if (!isSuperadminRole && editAreaSocietyFlow.selectedSociety) {
+        if (editAreaSocietyFlow.selectedSociety._pending) {
+          if (!editAreaSocietyFlow.selectedSociety.name || !editAreaSocietyFlow.selectedSociety.pincode) {
+            throw new Error('Please choose an area with a pincode before adding a new society.')
+          }
+
+          const createdSociety = await createSociety({
+            name: editAreaSocietyFlow.selectedSociety.name,
+            pincode: editAreaSocietyFlow.selectedSociety.pincode,
+            neighbourhood:
+              editAreaSocietyFlow.selectedSociety.neighbourhood ||
+              editAreaSocietyFlow.areaContext.neighbourhood ||
+              null,
+            locality_id: resolvedLocalityId,
+            coordinates: null,
+          })
+
+          resolvedSocietyId = createdSociety?.id ?? null
+          resolvedLocalityId = createdSociety?.locality_id || resolvedLocalityId
+        } else {
+          resolvedSocietyId = editAreaSocietyFlow.selectedSociety.id || null
+
+          if (
+            editAreaSocietyFlow.selectedSociety.locality_id &&
+            resolvedLocalityId &&
+            editAreaSocietyFlow.selectedSociety.locality_id !== resolvedLocalityId
+          ) {
+            setErrorMessage('Selected society must belong to the selected area.')
+            return
+          }
+
+          resolvedLocalityId =
+            editAreaSocietyFlow.selectedSociety.locality_id || resolvedLocalityId
+        }
+      }
+
       await updateUserAdminSettings(editingUser.id, {
         role: editForm.role,
         home_locality_id: resolvedLocalityId,
@@ -712,16 +775,30 @@ export function AdminUsersPage({ profile }) {
           <div className="grid gap-4 md:grid-cols-2">
             <FormField>
               <FormLabel>Role</FormLabel>
-              <NativeSelect key={`role-${editingUser?.id || 'new'}-${editForm.role}`} value={editForm.role} onChange={handleEditRoleChange}>
-                {roleOptions.map((role) => (
-                  <option key={role} value={role}>
-                    {formatRole(role)}
-                  </option>
-                ))}
-              </NativeSelect>
+              <Select value={editForm.role} onValueChange={handleEditRoleChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roleOptions.map((role) => (
+                    <SelectItem key={role} value={role}>
+                      {formatRole(role)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </FormField>
 
-            <FormField className="md:col-span-2 gap-3">
+            <div className={`md:col-span-2 ${editForm.role === 'superadmin' ? 'pointer-events-none opacity-60' : ''}`}>
+              <AreaSocietyFields
+                flow={editAreaSocietyFlow}
+                deferSocietyCreate
+                cardTitle="Area and society"
+                compact
+              />
+            </div>
+{false && (
+  <FormField className="md:col-span-2 gap-3">
               <FormLabel>Location</FormLabel>
               <div className="flex min-h-11 w-full items-center justify-between gap-3 rounded-2xl border border-white/75 bg-white/92 px-3 py-2 text-left shadow-soft">
                 <span className="min-w-0 flex items-center gap-2 text-sm">
@@ -776,6 +853,7 @@ export function AdminUsersPage({ profile }) {
                 </FormField>
               </div>
             </FormField>
+)}
           </div>
 
           <div className="rounded-[1.1rem] border border-border/60 bg-white/70 p-3 text-sm text-muted-foreground">

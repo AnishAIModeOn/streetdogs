@@ -110,7 +110,13 @@ export async function searchNeighbourhoods(term) {
  * Create a new society row, but first check for an exact case-insensitive
  * name+pincode match to avoid duplicates.  Returns the existing row if found.
  */
-export async function createSociety({ name, pincode, neighbourhood = null, coordinates = null }) {
+export async function createSociety({
+  name,
+  pincode,
+  neighbourhood = null,
+  coordinates = null,
+  locality_id = null,
+}) {
   const client = ensureSupabase()
   const trimmedName = name.trim()
 
@@ -129,7 +135,7 @@ export async function createSociety({ name, pincode, neighbourhood = null, coord
   return unwrap(
     await client
       .from('societies')
-      .insert({ name: trimmedName, pincode, neighbourhood, coordinates })
+      .insert({ name: trimmedName, pincode, neighbourhood, coordinates, locality_id })
       .select()
       .single(),
   )
