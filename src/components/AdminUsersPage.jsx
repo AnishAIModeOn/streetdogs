@@ -92,43 +92,13 @@ function formatLocalityOption(locality) {
   return localityCity ? `${localityCity} · ${localityName}` : localityName
 }
 
-function normalizeText(value) {
-  return String(value || '').trim().toLowerCase()
-}
-
 function resolveUserLocalityId(user, localities) {
-  if (user.home_locality_id || user.home_locality?.id || user.society?.locality_id) {
-    return user.home_locality_id || user.home_locality?.id || user.society?.locality_id || ''
-  }
-
-  const localityHints = [
-    user.home_locality?.name,
-    user.home_locality?.locality_name,
-    user.home_locality?.neighbourhood,
-    user.home_locality?.label,
-    user.society?.neighbourhood,
-  ]
-    .map(normalizeText)
-    .filter(Boolean)
-
-  if (!localityHints.length) {
-    return ''
-  }
-
-  const matchingLocality = localities.find((locality) => {
-    const localityValues = [
-      locality?.name,
-      locality?.locality_name,
-      locality?.neighbourhood,
-      locality?.label,
-    ]
-      .map(normalizeText)
-      .filter(Boolean)
-
-    return localityValues.some((value) => localityHints.includes(value))
-  })
-
-  return matchingLocality?.id || ''
+  return (
+    user?.home_locality_id ||
+    user?.home_locality?.id ||
+    user?.society?.locality_id ||
+    ''
+  )
 }
 
 function getUserEffectiveLocality(user, localitiesById) {
@@ -166,7 +136,7 @@ function buildUserLocationLabel(user, localitiesById) {
 }
 
 function buildStoredLocalityOption(user, localitiesById) {
-  const localityId = user?.home_locality_id || user?.home_locality?.id || ''
+  const localityId = user?.home_locality_id || user?.home_locality?.id || user?.society?.locality_id || ''
   if (!localityId) {
     return null
   }
@@ -280,7 +250,7 @@ export function AdminUsersPage({ profile }) {
     }
 
     fetchSocietiesForLocality(localityId).catch(() => {})
-  }, [editingUser?.home_locality_id])
+  }, [editingUser?.home_locality_id, editingUser?.society?.locality_id])
 
   const localityOptions = useMemo(
     () => [...localities].sort((left, right) => formatLocalityOption(left).localeCompare(formatLocalityOption(right))),
@@ -373,10 +343,10 @@ export function AdminUsersPage({ profile }) {
 
     setEditForm({
       role: editingUser.role || 'end_user',
-      home_locality_id: editingUser.home_locality_id || '',
+      home_locality_id: resolveUserLocalityId(editingUser, localities),
       society_id: editingUser.society_id || '',
     })
-  }, [editingUser])
+  }, [editingUser, localities])
 
   const filteredUsers = useMemo(
     () =>
@@ -424,14 +394,15 @@ export function AdminUsersPage({ profile }) {
 
     setEditForm({
       role: user.role || 'end_user',
-      home_locality_id: user.home_locality_id || '',
+      home_locality_id: resolveUserLocalityId(user, localities),
       society_id: user.society_id || '',
     })
     setEditingUser(user)
 
-    if (user.home_locality_id) {
-      seedSocietyOptionForUser(user, user.home_locality_id)
-      fetchSocietiesForLocality(user.home_locality_id).catch(() => {})
+    const effectiveLocalityId = resolveUserLocalityId(user, localities)
+    if (effectiveLocalityId) {
+      seedSocietyOptionForUser(user, effectiveLocalityId)
+      fetchSocietiesForLocality(effectiveLocalityId).catch(() => {})
     }
   }
 
@@ -493,7 +464,7 @@ export function AdminUsersPage({ profile }) {
 
     const isInventoryAdmin = editForm.role === 'inventory_admin'
     const isSuperadminRole = editForm.role === 'superadmin'
-    const resolvedLocalityId = isSuperadminRole ? null : editForm.home_locality_id || null
+    let resolvedLocalityId = isSuperadminRole ? null : editForm.home_locality_id || null
     const resolvedSocietyId = isSuperadminRole ? null : editForm.society_id || null
 
     if (isInventoryAdmin && !resolvedLocalityId) {
@@ -514,6 +485,7 @@ export function AdminUsersPage({ profile }) {
         setErrorMessage('Selected society must belong to the selected locality.')
         return
       }
+      resolvedLocalityId = matchingSociety.locality_id || resolvedLocalityId
     }
 
     try {
